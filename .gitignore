@@ -1,0 +1,33 @@
+# dependencies
+/node_modules
+
+# next.js build output
+/.next
+/out
+/build
+*.tsbuildinfo
+next-env.d.ts
+
+# environment — never commit real secrets
+.env
+.env.local
+.env*.local
+
+# vercel
+.vercel
+
+# local dev / debug artifacts
+devlog.txt
+prodlog.txt
+*.log
+
+# os
+.DS_Store
+Thumbs.db
+
+# internal HR reference — kept local, not tracked
+Priya_HR_AI_Employee.txt
+
+# temporary QA seed scripts + manifest (see scripts/_seed_cleanup.tmp.ts)
+scripts/_seed*.tmp.ts
+scripts/_seed_manifest.json
