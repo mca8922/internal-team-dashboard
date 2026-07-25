@@ -4,6 +4,7 @@
 // Board Members create accounts (from the Team page).
 import * as React from 'react';
 import { Button, Field } from '@/components/ui';
+import { Icon } from '@/components/Icon';
 import { signIn } from '@/lib/auth-actions';
 import { BrandPanel } from './BrandPanel';
 
@@ -28,6 +29,7 @@ function ArrowGlyph({ className }: { className?: string }) {
 export function LoginForm() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [pwVisible, setPwVisible] = React.useState(false);
   const [err, setErr] = React.useState<{ email?: string; password?: string }>({});
   const [pending, setPending] = React.useState(false);
 
@@ -68,18 +70,31 @@ export function LoginForm() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@maheshchandra.com"
+                placeholder="youremail@example.com"
+                autoComplete="username"
                 autoFocus
               />
             </Field>
             <Field label="Password" error={err.password}>
-              <input
-                className="input"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-              />
+              <div className="pw-field">
+                <input
+                  className="input pw-input"
+                  type={pwVisible ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className="pw-toggle"
+                  onClick={() => setPwVisible((v) => !v)}
+                  aria-label={pwVisible ? 'Hide password' : 'Show password'}
+                  aria-pressed={pwVisible}
+                >
+                  <Icon name={pwVisible ? 'eye-off' : 'eye'} size={17} />
+                </button>
+              </div>
             </Field>
             <Button type="submit" size="lg" loading={pending} className="signin-submit">
               {pending ? (

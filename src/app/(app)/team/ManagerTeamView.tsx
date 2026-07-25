@@ -14,6 +14,7 @@ import { ResponsibilitiesCard } from './ResponsibilitiesCard';
 import { roleLabel, weeklyTargetFromDaily } from '@/lib/roles';
 import { durationMs } from '@/lib/dates';
 import { submitChangeRequest } from '@/lib/actions';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import type { ChangeRequestField, UserRole } from '@/lib/types';
 
 export interface ManagerTeamMember {
@@ -128,17 +129,19 @@ function TeamCard({
           </div>
         </div>
       </button>
-      <div className="mt-3">
-        <Button
-          size="sm"
-          variant="secondary"
-          icon="edit"
-          onClick={() => onRequest(u)}
-          className="w-full"
-        >
-          Request change
-        </Button>
-      </div>
+      {FEATURE_FLAGS.teamRequests ? (
+        <div className="mt-3">
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="edit"
+            onClick={() => onRequest(u)}
+            className="w-full"
+          >
+            Request change
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

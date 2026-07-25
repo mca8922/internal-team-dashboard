@@ -12,6 +12,7 @@ import { Icon, type IconName } from './Icon';
 import { Button } from './ui';
 import { useToast } from './Toast';
 import { markTourSeen } from '@/lib/actions';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
 // Breathing room between the highlighted element and the spotlight ring.
 const SPOT_PAD = 6;
@@ -27,6 +28,10 @@ interface TourStep {
   // CSS selector of the element to spotlight. Omit for a centered card.
   selector?: string;
   boardOnly?: boolean;
+  // Only shown while this feature flag is on — see PHASE.md / featureFlags.ts.
+  // The step's route (e.g. `/log`) redirects away entirely while its flag is
+  // off, so skipping the step is required, not just tidy.
+  flag?: keyof typeof FEATURE_FLAGS;
 }
 
 const STEPS: TourStep[] = [
@@ -64,6 +69,7 @@ const STEPS: TourStep[] = [
   {
     icon: 'edit',
     title: 'Set the tone of your day',
+    flag: 'dailyLog',
     intro:
       'Every Daily Log starts here. Pick a mood, rate your energy, and add tags to label what the day was about, such as a client or a project.',
     route: '/log',
@@ -72,6 +78,7 @@ const STEPS: TourStep[] = [
   {
     icon: 'edit',
     title: 'Write your log in blocks',
+    flag: 'dailyLog',
     intro: 'This is your writing space. A few things make it easy to use:',
     points: [
       'Every log opens with two questions for you to answer in your own words.',
@@ -207,7 +214,8 @@ export function OnboardingTour({ isBoard, tourSeen }: { isBoard: boolean; tourSe
   const pathname = usePathname();
   const toast = useToast();
   const steps = React.useMemo(
-    () => STEPS.filter((s) => !s.boardOnly || isBoard),
+    () =>
+      STEPS.filter((s) => (!s.boardOnly || isBoard) && (!s.flag || FEATURE_FLAGS[s.flag])),
     [isBoard],
   );
 

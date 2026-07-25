@@ -603,6 +603,41 @@ p { margin: 0; }
 }
 .field-error { font-size: 11.5px; color: var(--color-red); }
 
+/* Password field with a show/hide toggle overlaid on the input's right edge.
+   The toggle is a real button (not a decorative span) so it stays reachable
+   by keyboard/tab order and screen readers, but sized/positioned to read as
+   part of the input rather than a separate control. */
+.pw-field { position: relative; display: flex; }
+.pw-input { padding-right: 42px; }
+.pw-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--color-grey-text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 120ms, background 120ms;
+}
+.pw-toggle:hover { color: var(--color-black); background: color-mix(in srgb, var(--color-black) 6%, transparent); }
+.pw-toggle:focus-visible {
+  outline: none;
+  color: var(--color-green-primary);
+  box-shadow: 0 0 0 2px var(--color-green-primary);
+}
+.pw-toggle:active { transform: translateY(-50%) scale(0.92); }
+@media (max-width: 480px) {
+  /* Slightly larger tap target on touch screens without crowding the field. */
+  .pw-toggle { width: 36px; height: 36px; right: 2px; }
+  .pw-input { padding-right: 44px; }
+}
+
 /* ===== DatePicker (modern replacement for <input type="date">) ===== */
 .datepicker { position: relative; width: 100%; }
 /* Trigger reuses .input; lay out the calendar icon, value and caret in a row. */

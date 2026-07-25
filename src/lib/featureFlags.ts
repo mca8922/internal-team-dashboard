@@ -14,5 +14,5 @@ export const FEATURE_FLAGS = {
   // Internship progress, flagged members, milestone replay.
   // Team pulse, department check-in, and the streak card are always on —
   // see dashboard/page.tsx.
-  dashboardExtras: false,
+  dashboardExtras: true,
 } as const;

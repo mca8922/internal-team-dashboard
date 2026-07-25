@@ -41,7 +41,7 @@ Everything else stays in the codebase, gated off via `FEATURE_FLAGS`
 | `analyticsFilters` | Month/Week stepper + CSV export on Personal Analytics; range control (7/14/30/all/month/custom) on Team Analytics | `analytics/page.tsx`, `analytics/team/page.tsx`, `analytics/team/TeamAnalyticsShell.tsx` |
 | `goalsCleanup` | "Clean up" button + archive/export/restore modal on Goals | `goals/GoalsView.tsx` |
 | `settingsNotifications` | "Notifications" card (push/sound toggles) + per-event notification prefs card on Settings | `settings/SettingsView.tsx` |
-| `dashboardExtras` | Internship progress card, flagged members card, milestone replay button | `dashboard/page.tsx` |
+| ~~`dashboardExtras`~~ | ~~Internship progress card, flagged members card, milestone replay button~~ — re-enabled, see below | `dashboard/page.tsx` |
 
 ## Removed (not gated, deleted entirely)
 
@@ -84,8 +84,10 @@ come back:
 - Goals cleanup/export (`goalsCleanup`)
 - Settings → Notifications section (`settingsNotifications`) — explicitly
   deferred by the user to Phase 2
-- Remaining dashboard extras: internship progress, flagged members,
-  milestone replay (`dashboardExtras`)
+
+`dashboardExtras` (internship progress, flagged members, milestone replay)
+was flipped back to `true` ahead of the rest of this list, after a report
+that the internship progress bar was missing for interns.
 
 Priya and Tips are NOT on this list — see "Removed" above. They were cut
 from the codebase, not flag-gated, so bringing either back is new work.

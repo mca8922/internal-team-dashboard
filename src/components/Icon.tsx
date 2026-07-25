@@ -5,7 +5,7 @@ export type IconName =
   | 'home' | 'clock' | 'edit' | 'target' | 'users' | 'chart' | 'plane' | 'settings'
   | 'logout' | 'play' | 'pause' | 'plus' | 'minus' | 'check' | 'x' | 'chevron-down'
   | 'chevron-right' | 'chevron-left' | 'menu' | 'sidebar' | 'sun' | 'moon' | 'bell'
-  | 'calendar' | 'flag' | 'trash' | 'eye' | 'search' | 'fire' | 'sparkles' | 'lock'
+  | 'calendar' | 'flag' | 'trash' | 'eye' | 'eye-off' | 'search' | 'fire' | 'sparkles' | 'lock'
   | 'mail' | 'user' | 'grip' | 'building' | 'bolt' | 'arrow-right' | 'arrow-left' | 'archive'
   | 'monitor' | 'help-circle' | 'bot' | 'refresh' | 'copy' | 'more-vertical'
   | 'crown' | 'shield' | 'inbox'
@@ -59,6 +59,7 @@ export function Icon({ name, size = 16, stroke = 1.6, style }: IconProps) {
     case 'flag': return <svg {...props}><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><path d="M4 22V15" /></svg>;
     case 'trash': return <svg {...props}><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /></svg>;
     case 'eye': return <svg {...props}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" /><circle cx="12" cy="12" r="3" /></svg>;
+    case 'eye-off': return <svg {...props}><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a20.42 20.42 0 0 1-2.16 3.19" /><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" /><path d="M1 1l22 22" /></svg>;
     case 'search': return <svg {...props}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>;
     case 'fire': return <svg {...props}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 17c1.5 0 2.5-1.25 2.5-2.5 0-2-2-3-2-5 0-1.5 1-3 3-3 1 2.5 5 4 5 8.5a7.5 7.5 0 0 1-15 0c0-2.5 1.5-4.5 3-5.5C7 11 8.5 12 8.5 14.5z" /></svg>;
     case 'sparkles': return <svg {...props}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></svg>;
