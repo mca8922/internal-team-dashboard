@@ -1,4 +1,4 @@
-# reStrucAI · Internal Team Dashboard
+# MCA · Internal Team Dashboard
 
 A Next.js 15 (App Router) + Supabase port of the reStrucAI team dashboard —
 punch tracking, Notion-style daily logs, goal cascades, team management,
