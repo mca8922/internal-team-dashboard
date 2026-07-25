@@ -21,7 +21,6 @@ import {
   getGoalPins,
   getSavedViews,
   visibleGoals,
-  getMyGoalItemUnlocks,
 } from '@/lib/queries';
 import { GoalsView, type AssigneeChip, type AssignerInfo } from './GoalsView';
 import { goalInDept } from './goal-ui';
@@ -61,7 +60,6 @@ export default async function GoalsPage() {
     onLeaveUserIds,
     pinnedGoalIds,
     savedViews,
-    myUnlocks,
     archivedGoals,
   ] = await Promise.all([
     getGoals(),
@@ -77,12 +75,10 @@ export default async function GoalsPage() {
     getOnLeaveUserIdsToday(),
     getGoalPins(profile.id),
     getSavedViews(profile.id),
-    getMyGoalItemUnlocks(),
     // Archived goals power the Board-only cleanup "Archived" tab (restore /
     // permanent delete). Members never see it, so skip the query for them.
     isBoard ? getArchivedGoals() : Promise.resolve<Goal[]>([]),
   ]);
-  const unlockedItemIds = new Set(myUnlocks.map((u) => u.item_id));
 
   // Board: everything. Manager: every goal in the department they head (so they
   // can manage the whole department). Member: just what's visible to them.
@@ -220,7 +216,6 @@ export default async function GoalsPage() {
       departments={departments}
       pinnedGoalIds={pinnedGoalIds}
       savedViews={savedViews}
-      unlockedItemIds={unlockedItemIds}
     />
     </Suspense>
   );

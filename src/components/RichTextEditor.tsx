@@ -32,11 +32,22 @@ const COMMANDS: Cmd[] = [
   { name: 'underline', title: 'Underline (Ctrl+U)', render: <u>U</u> },
   { name: 'strikeThrough', title: 'Strikethrough', render: <s>S</s> },
   {
+    // A translucent tint rather than a solid fill: it mixes with whatever
+    // surface sits behind it, so the theme's own (already-legible) text
+    // color stays readable in both light and dark mode instead of a fixed
+    // background/foreground pair going invisible when the theme flips.
     name: 'hiliteColor',
-    arg: '#E1ECE6',
+    arg: 'rgba(47, 148, 99, 0.28)',
     title: 'Highlight',
     render: (
-      <span style={{ background: '#E1ECE6', color: '#1F5C3E', padding: '0 4px', borderRadius: 3 }}>
+      <span
+        style={{
+          background: 'rgba(47, 148, 99, 0.28)',
+          color: 'var(--color-green-primary)',
+          padding: '0 4px',
+          borderRadius: 3,
+        }}
+      >
         H
       </span>
     ),

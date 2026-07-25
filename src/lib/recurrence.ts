@@ -146,17 +146,6 @@ export function isCompletionCurrent(
   return new Date(doneAt) >= periodStart(recurrence, now);
 }
 
-// Cadences whose task description is hidden behind a tap-to-unlock lock until
-// the member reveals it. Custom-day items were the original case; daily and
-// weekdays items get the same one-time reveal ritual so the task "unlocks as
-// the day comes". The unlock is persisted per (item, member), so once tapped it
-// stays open across refreshes and days (see goal_item_unlocks).
-export const LOCKABLE_RECURRENCES: ChecklistRecurrence[] = ['custom', 'daily', 'weekdays'];
-
-export function isLockableRecurrence(recurrence: ChecklistRecurrence): boolean {
-  return LOCKABLE_RECURRENCES.includes(recurrence);
-}
-
 // The member's CURRENT work report for a Report Work item — the one that should
 // be shown to the Board/managers (and the member) alongside the item's done
 // state. Report visibility must track the SAME window the tick does, otherwise a

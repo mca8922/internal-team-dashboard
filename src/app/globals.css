@@ -4510,311 +4510,30 @@ body { font-size: 15px; }
   word-break: break-word;
   overflow-wrap: anywhere;
 }
-/* ===== Task Lock Box — live-wallpaper overlay ===== */
-
-.task-lock-wrap { position: relative; display: block; }
-.task-lock-wrap .goal-check-desc { user-select: none; }
-
-/* ── Base ──────────────────────────────────────────────────────────────── */
-.task-lock {
-  position: absolute;
-  inset: 0;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  cursor: default;
-  z-index: 1;
-}
-/* Glow orb layer — fixed px sizes so they stay visible regardless of
-   container aspect ratio (wide/short description boxes). */
-.task-lock::before {
-  content: '';
-  position: absolute;
-  inset: -40px;           /* extend past edges so orbs reach the corners */
-  pointer-events: none;
-  filter: blur(22px);
-  will-change: transform;
-  z-index: 0;
-}
-/* Dot-grid texture */
-.task-lock::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
-  background-size: 18px 18px;
-  pointer-events: none;
-  z-index: 0;
-}
-/* All real children above the two pseudo layers */
-.task-lock > * { position: relative; z-index: 1; }
-
-/* ── Shared icon ring ───────────────────────────────────────────────────── */
-.task-lock-icon-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px; height: 40px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255,255,255,0.15);
-  background: rgba(255,255,255,0.07);
+/* Completed-at pill — sits on the right of the row, clearly set apart from the
+   task text so the timestamp reads at a glance. */
+.goal-check-completed-at {
   flex-shrink: 0;
-}
-.task-lock-icon-wrap svg { display: block; }
-
-/* ── Shared text ────────────────────────────────────────────────────────── */
-.task-lock-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,0.45);
-}
-.task-lock-hint {
-  font-size: 10.5px;
-  color: rgba(255,255,255,0.35);
-  text-align: center;
-  padding: 0 14px;
-}
-
-/* "Available [day]" pill */
-.task-lock-avail {
+  align-self: center;
   display: inline-flex;
   align-items: center;
-  padding: 4px 13px;
-  border-radius: 100px;
-  font-size: 11px;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--color-green-light);
+  border: 1px solid rgba(31, 92, 62, 0.25);
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  color: var(--color-green-primary);
+  white-space: nowrap;
 }
-
-/* ── STATIC — violet / purple live wallpaper ────────────────────────────── */
-/* The animated background-size trick: a large multi-stop gradient that
-   shifts position — this IS the live wallpaper effect, guaranteed visible. */
-.task-lock-static {
-  border: 1px solid rgba(139,92,246,0.28);
-  background:
-    linear-gradient(135deg,
-      #0d0221 0%,  #3b0764 18%, #1e1b4b 36%,
-      #4c0a74 54%, #1d1060 72%, #0d0221 100%);
-  background-size: 400% 400%;
-  animation: wallpaper-violet 9s ease-in-out infinite;
-}
-@keyframes wallpaper-violet {
-  0%   { background-position:   0% 50%; }
-  25%  { background-position:  50%  0%; }
-  50%  { background-position: 100% 50%; }
-  75%  { background-position:  50% 100%; }
-  100% { background-position:   0% 50%; }
-}
-/* Fixed-px glow orbs on top of the gradient */
-.task-lock-static::before {
-  background:
-    radial-gradient(circle 90px  at 20% 50%,  rgba(168,85,247,0.75)  0%, transparent 70%),
-    radial-gradient(circle 70px  at 80% 30%,  rgba(236,72,153,0.60)  0%, transparent 70%),
-    radial-gradient(circle 80px  at 55% 80%,  rgba(99,102,241,0.60)  0%, transparent 70%),
-    radial-gradient(circle 60px  at 70% 70%,  rgba(167,139,250,0.50) 0%, transparent 70%);
-  animation: orbs-violet 12s ease-in-out infinite alternate;
-}
-@keyframes orbs-violet {
-  0%   { transform: translate(0px,  0px)  rotate(0deg);  }
-  33%  { transform: translate(30px,-20px) rotate(40deg); }
-  66%  { transform: translate(-25px,25px) rotate(80deg); }
-  100% { transform: translate(15px, 15px) rotate(120deg);}
-}
-.task-lock-static .task-lock-icon-wrap {
-  background: rgba(139,92,246,0.25);
-  border-color: rgba(196,181,253,0.45);
-}
-.task-lock-static .task-lock-icon-wrap svg { color: #ddd6fe; }
-.task-lock-static .task-lock-avail {
-  background: rgba(139,92,246,0.25);
-  border: 1px solid rgba(196,181,253,0.45);
-  color: #ede9fe;
-}
-
-/* ── CLICKABLE — emerald / teal live wallpaper ──────────────────────────── */
-.task-lock-clickable {
-  cursor: pointer;
-  border: 1px solid rgba(74,222,128,0.28);
-  background:
-    linear-gradient(135deg,
-      #022010 0%,  #064e2a 18%, #0d3b2e 36%,
-      #065535 54%, #0a3320 72%, #022010 100%);
-  background-size: 400% 400%;
-  animation: wallpaper-green 9s ease-in-out infinite;
-  transition: border-color 250ms ease, box-shadow 250ms ease;
-}
-@keyframes wallpaper-green {
-  0%   { background-position:   0% 50%; }
-  25%  { background-position:  50%  0%; }
-  50%  { background-position: 100% 50%; }
-  75%  { background-position:  50% 100%; }
-  100% { background-position:   0% 50%; }
-}
-.task-lock-clickable::before {
-  background:
-    radial-gradient(circle 90px  at 20% 50%,  rgba(34,197,94,0.75)   0%, transparent 70%),
-    radial-gradient(circle 70px  at 80% 30%,  rgba(6,182,212,0.60)   0%, transparent 70%),
-    radial-gradient(circle 80px  at 55% 80%,  rgba(16,185,129,0.60)  0%, transparent 70%),
-    radial-gradient(circle 60px  at 70% 65%,  rgba(52,211,153,0.50)  0%, transparent 70%);
-  animation: orbs-green 12s ease-in-out infinite alternate;
-}
-@keyframes orbs-green {
-  0%   { transform: translate(0px,  0px)  rotate(0deg);  }
-  33%  { transform: translate(30px,-20px) rotate(40deg); }
-  66%  { transform: translate(-25px,25px) rotate(80deg); }
-  100% { transform: translate(15px, 15px) rotate(120deg);}
-}
-.task-lock-clickable:hover {
-  border-color: rgba(74,222,128,0.55);
-  box-shadow: 0 0 0 2px rgba(74,222,128,0.15), 0 8px 28px rgba(0,0,0,0.5);
-}
-.task-lock-clickable .task-lock-icon-wrap {
-  background: rgba(34,197,94,0.22);
-  border-color: rgba(74,222,128,0.5);
-}
-.task-lock-clickable .task-lock-icon-wrap svg { color: #4ade80; }
-.task-lock-clickable .task-lock-label {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  color: #86efac;
-}
-.task-lock-clickable .task-lock-hint { color: rgba(134,239,172,0.5); }
-
-/* Diagonal shimmer over the green box */
-.task-lock-shimmer {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  background: linear-gradient(
-    108deg,
-    transparent 28%,
-    rgba(255,255,255,0.055) 43%,
-    rgba(255,255,255,0.10)  50%,
-    rgba(255,255,255,0.055) 57%,
-    transparent 72%
-  );
-  background-size: 220% 100%;
-  animation: lock-shimmer 2.8s ease-in-out infinite;
-  pointer-events: none;
-}
-@keyframes lock-shimmer {
-  0%   { background-position:  220% 0; }
-  100% { background-position: -220% 0; }
-}
-
-/* ── Security scan line (clickable only) ────────────────────────────────── */
-.task-lock-scan {
-  position: absolute;
-  left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    rgba(74,222,128,0.0) 8%,
-    rgba(74,222,128,0.9) 50%,
-    rgba(74,222,128,0.0) 92%,
-    transparent 100%);
-  box-shadow: 0 0 10px rgba(74,222,128,0.7), 0 0 28px rgba(74,222,128,0.3);
-  animation: scan-sweep 2.8s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 3;
-}
-@keyframes scan-sweep {
-  0%   { top: 8%;  opacity: 0; }
-  8%   { opacity: 1; }
-  92%  { opacity: 1; }
-  100% { top: 92%; opacity: 0; }
-}
-
-/* ── Split-open animation ────────────────────────────────────────────────── */
-/* Halves are pure background panels — no content inside them */
-.task-lock-half {
-  position: absolute;
-  left: 0; right: 0;
-  z-index: 1;
-  pointer-events: none;
-}
-.task-lock-top-half {
-  top: 0; bottom: 50%;
-  transform-origin: center bottom;
-  background: #022010;
-}
-.task-lock-bottom-half {
-  top: 50%; bottom: 0;
-  transform-origin: center top;
-  background: #022010;
-}
-
-/* Content centred over both halves — lives above them */
-.task-lock-content {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
+.board-cl-done-col {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  z-index: 2;
-  pointer-events: none;
-  /* Corner bracket accents */
-  padding: 14px 24px;
+  align-items: flex-end;
+  gap: 5px;
 }
-/* Top-left bracket */
-.task-lock-content::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0;
-  width: 14px; height: 14px;
-  border-top: 1.5px solid rgba(74,222,128,0.5);
-  border-left: 1.5px solid rgba(74,222,128,0.5);
-  border-radius: 2px 0 0 0;
-}
-/* Bottom-right bracket */
-.task-lock-content::after {
-  content: '';
-  position: absolute;
-  bottom: 0; right: 0;
-  width: 14px; height: 14px;
-  border-bottom: 1.5px solid rgba(74,222,128,0.5);
-  border-right: 1.5px solid rgba(74,222,128,0.5);
-  border-radius: 0 0 2px 0;
-}
-
-/* Content fades + shrinks when lock breaks open */
-.task-lock-content-breaking {
-  animation: content-vanish 420ms ease forwards;
-}
-@keyframes content-vanish {
-  0%   { opacity: 1; transform: translate(-50%,-50%) scale(1); }
-  100% { opacity: 0; transform: translate(-50%,-50%) scale(0.75); }
-}
-
-.task-lock-breaking .task-lock-top-half {
-  animation: lock-fly-up 680ms cubic-bezier(0.4,0,0.2,1) forwards;
-}
-.task-lock-breaking .task-lock-bottom-half {
-  animation: lock-fly-down 680ms cubic-bezier(0.4,0,0.2,1) forwards;
-}
-.task-lock-breaking .task-lock-scan,
-.task-lock-breaking .task-lock-shimmer { display: none; }
-
-@keyframes lock-fly-up {
-  0%   { transform: translateY(0);      opacity: 1; }
-  25%  { transform: translateY(-10px);  opacity: 1; }
-  100% { transform: translateY(-115%);  opacity: 0; }
-}
-@keyframes lock-fly-down {
-  0%   { transform: translateY(0);     opacity: 1; }
-  25%  { transform: translateY(10px);  opacity: 1; }
-  100% { transform: translateY(115%);  opacity: 0; }
-}
-
 @keyframes check-pop {
   0% { transform: scale(1); }
   45% { transform: scale(1.28); }
@@ -5100,12 +4819,6 @@ body { font-size: 15px; }
   color: var(--color-green-primary);
 }
 
-/* Preview lock: same visual as clickable but pointer-events off */
-.board-cl-preview-lock {
-  pointer-events: none;
-  cursor: default;
-}
-
 .board-checklist-due-badge {
   margin-left: 6px;
   padding: 2px 8px;
@@ -5280,8 +4993,8 @@ body { font-size: 15px; }
 }
 .rich-text li { margin: 1px 0; }
 .rich-text mark {
-  background: #e5f2eb;
-  color: #288a5d;
+  background: rgba(47, 148, 99, 0.28);
+  color: inherit;
   border-radius: 3px;
   padding: 0 2px;
 }

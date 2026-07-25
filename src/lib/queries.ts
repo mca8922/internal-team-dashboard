@@ -33,7 +33,6 @@ import type {
   TransactionalEmailSettings,
   WorkReport,
   WorkReportReview,
-  GoalItemUnlock,
   ReportTemplate,
   GoalTemplateRow,
   ChangeRequest,
@@ -324,18 +323,6 @@ export const getWorkReportReviews = cache(async (): Promise<WorkReportReview[]> 
     .select('*')
     .order('created_at', { ascending: true });
   return (data ?? []) as WorkReportReview[];
-});
-
-// Which custom-day task descriptions the current member has already tapped
-// open. Fetched once at page load so the lock stays revealed across refreshes.
-// RLS ensures members only see their own rows.
-export const getMyGoalItemUnlocks = cache(async (): Promise<GoalItemUnlock[]> => {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from('goal_item_unlocks')
-    .select('*')
-    .order('unlocked_at', { ascending: true });
-  return (data ?? []) as GoalItemUnlock[];
 });
 
 // Minimal identity (id · name · avatar · role · is_manager) for a set of

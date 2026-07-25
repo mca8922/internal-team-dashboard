@@ -39,11 +39,10 @@ import {
   addGoalPin,
   removeGoalPin,
 } from '@/lib/actions';
-import { isDueToday, isCompletionCurrent, isCarriedOverDone, currentReport, isLockableRecurrence } from '@/lib/recurrence';
-import { StaticLockBox } from '@/components/TaskLockBox';
+import { isDueToday, isCompletionCurrent, isCarriedOverDone, currentReport } from '@/lib/recurrence';
 import { computeGoalProgress } from '@/lib/goal-progress';
 import { type GoalTemplate } from '@/lib/goal-templates';
-import { fmtDate, fmtShort } from '@/lib/dates';
+import { fmtDate, fmtShort, fmtDateDMY, fmtTime } from '@/lib/dates';
 import {
   STATUS,
   LEVEL_META,
@@ -129,8 +128,6 @@ interface CardCtx {
   // Per-user pinned goal ids + a toggle, so a card can show/flip its ★.
   pinnedIds: Set<string>;
   onTogglePin: (g: Goal) => void;
-  // item ids the current member has already tapped open (for the lock boxes).
-  unlockedItemIds: Set<string>;
   // Goal id to briefly highlight after a jump, plus why (drives the pill text).
   flashId: string | null;
   flashReason: 'notif' | 'report';
@@ -701,7 +698,6 @@ function GoalCard({
             reportTemplate={reportTemplate}
             today={todayStr}
             closed={closed}
-            unlockedItemIds={ctx.unlockedItemIds}
             openReportSignal={ctx.reportReq}
           />
           <MemberReportHistory
@@ -878,6 +874,9 @@ function BoardChecklistPanel({
                         null,
                     );
                   const isDone = (done && (it.recurrence === 'once' ? true : due)) || carried;
+                  const doneAt = (completionsByItem[it.id] ?? []).find(
+                    (c) => c.user_id === chip.id,
+                  )?.done_at;
                   const report = it.report_required ? reportFor(it, chip.id) : null;
                   return (
                     <div
@@ -894,31 +893,7 @@ function BoardChecklistPanel({
                         {/* For Report Work items, spine labels in the left gutter
                             separate the GIVEN task from the GOT submission. */}
                         {it.description ? (
-                          previewMode && isLockableRecurrence(it.recurrence) ? (
-                            // Preview mode: show what the member sees — lock overlay
-                            // on top of the description for lockable cadences
-                            // (custom / daily / weekdays).
-                            <span className="task-lock-wrap">
-                              <RichText className="board-cl-desc" value={it.description} />
-                              {due ? (
-                                // Due today: member can tap to unlock — show the
-                                // green clickable style but non-interactive.
-                                <div className="task-lock task-lock-clickable board-cl-preview-lock">
-                                  <div className="task-lock-half task-lock-top-half" aria-hidden />
-                                  <div className="task-lock-half task-lock-bottom-half" aria-hidden />
-                                  <div className="task-lock-content">
-                                    <span className="task-lock-icon-wrap">
-                                      <Icon name="lock" size={20} />
-                                    </span>
-                                    <span className="task-lock-label">Unlockable today</span>
-                                    <span className="task-lock-hint">Member taps to reveal</span>
-                                  </div>
-                                </div>
-                              ) : (
-                                <StaticLockBox item={it} />
-                              )}
-                            </span>
-                          ) : it.report_required ? (
+                          it.report_required ? (
                             <div className="cl-section cl-section-task">
                               <span className="cl-spine cl-spine-task">
                                 <Icon name="list" size={13} />
@@ -970,7 +945,15 @@ function BoardChecklistPanel({
                         ) : null}
                       </span>
                       {isDone ? (
-                        <span className="board-cl-done-tag">Done</span>
+                        <span className="board-cl-done-col">
+                          <span className="board-cl-done-tag">Done</span>
+                          {doneAt ? (
+                            <span className="goal-check-completed-at" title={doneAt}>
+                              <Icon name="check" size={10} />
+                              {fmtDateDMY(doneAt)} · {fmtTime(doneAt)}
+                            </span>
+                          ) : null}
+                        </span>
                       ) : closed ? (
                         <span className="board-cl-notdue-tag">Closed</span>
                       ) : !due ? (
@@ -1393,7 +1376,6 @@ export function GoalsView({
   departments,
   pinnedGoalIds,
   savedViews,
-  unlockedItemIds,
 }: {
   goals: Goal[];
   allGoals: Goal[];
@@ -1421,7 +1403,6 @@ export function GoalsView({
   departments: string[];
   pinnedGoalIds: string[];
   savedViews: SavedView[];
-  unlockedItemIds: Set<string>;
 }) {
   const toast = useToast();
   const confirm = useConfirm();
@@ -1860,7 +1841,6 @@ export function GoalsView({
     highlight: query.trim(),
     pinnedIds: pinned,
     onTogglePin: togglePin,
-    unlockedItemIds,
     flashId,
     flashReason,
     reportReq,

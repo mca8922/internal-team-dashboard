@@ -16,8 +16,8 @@ import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
 import { toggleChecklistItem } from '@/lib/actions';
 import { BottomSparkle, CardConfetti } from './ChecklistCelebration';
-import { isDueToday, isCompletionCurrent, isCarriedOverDone, currentReport, recurrenceLabel, isLockableRecurrence } from '@/lib/recurrence';
-import { ClickableLockBox, StaticLockBox } from './TaskLockBox';
+import { isDueToday, isCompletionCurrent, isCarriedOverDone, currentReport, recurrenceLabel } from '@/lib/recurrence';
+import { fmtDateDMY, fmtTime } from '@/lib/dates';
 import type {
   GoalChecklistItem,
   GoalChecklistCompletion,
@@ -32,7 +32,6 @@ export function GoalChecklist({
   reportTemplate = '',
   today,
   closed = false,
-  unlockedItemIds = new Set<string>(),
   openReportSignal = null,
 }: {
   items: GoalChecklistItem[];
@@ -48,8 +47,6 @@ export function GoalChecklist({
   // Goal is past its due date: the list is frozen — read-only, nothing due,
   // no new period starts. Shows each item's last completion as a record.
   closed?: boolean;
-  // item ids the current member has already tapped open (from DB + optimistic).
-  unlockedItemIds?: Set<string>;
   // External request (e.g. from the "Your day" panel) to open a specific item's
   // report editor. The nonce makes each request re-fire even for the same item.
   openReportSignal?: { itemId: string; n: number } | null;
@@ -61,20 +58,6 @@ export function GoalChecklist({
   // background refresh (realtime fires router.refresh() often, and an older
   // server snapshot would otherwise clobber a tick that hasn't round-tripped).
   const pending = React.useRef<Set<string>>(new Set());
-
-  // Optimistic unlock set: starts from the server-fetched prop and grows as
-  // the member taps lock boxes open (before the server round-trip completes).
-  const [localUnlocked, setLocalUnlocked] = React.useState<Set<string>>(
-    () => new Set(unlockedItemIds),
-  );
-  // Keep in sync when the server prop updates (e.g. realtime refresh).
-  React.useEffect(() => {
-    setLocalUnlocked((cur) => {
-      const next = new Set(unlockedItemIds);
-      for (const id of cur) next.add(id); // keep optimistic additions
-      return next;
-    });
-  }, [unlockedItemIds]);
 
   // Local mirror of MY completion timestamp per item, so a tick feels instant.
   const initial = React.useMemo(() => {
@@ -248,29 +231,15 @@ export function GoalChecklist({
             <span className="goal-check-label">
               <span className="goal-check-title">{it.label}</span>
               {it.description ? (
-                isLockableRecurrence(it.recurrence) && !localUnlocked.has(it.id) ? (
-                  // Description is always rendered underneath; the lock is an
-                  // absolute overlay that flies away when the member taps it.
-                  // Due today → tap to reveal; off day → read-only "available on"
-                  // lock so the description never leaks before its day.
-                  <span className="task-lock-wrap">
-                    <RichText className="goal-check-desc" value={it.description} />
-                    {due ? (
-                      <ClickableLockBox
-                        item={it}
-                        onUnlocked={() =>
-                          setLocalUnlocked((s) => new Set([...s, it.id]))
-                        }
-                      />
-                    ) : (
-                      <StaticLockBox item={it} />
-                    )}
-                  </span>
-                ) : (
-                  <RichText className="goal-check-desc" value={it.description} />
-                )
+                <RichText className="goal-check-desc" value={it.description} />
               ) : null}
             </span>
+            {checked && mine[it.id] ? (
+              <span className="goal-check-completed-at" title={mine[it.id]!}>
+                <Icon name="check" size={10} />
+                {fmtDateDMY(mine[it.id]!)} · {fmtTime(mine[it.id]!)}
+              </span>
+            ) : null}
             {reportLocked ? (
               <span className="goal-check-recur" title="Report your work to unlock">
                 <Icon name="lock" size={11} />

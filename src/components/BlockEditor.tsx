@@ -123,10 +123,23 @@ function SelectionToolbar({ pos }: { pos: { top: number; left: number } | null }
       <button onMouseDown={(e) => { e.preventDefault(); cmd('italic'); }} title="Italic"><i>I</i></button>
       <button onMouseDown={(e) => { e.preventDefault(); cmd('underline'); }} title="Underline"><u>U</u></button>
       <button
-        onMouseDown={(e) => { e.preventDefault(); cmd('hiliteColor', '#E1ECE6'); }}
+        // A translucent tint (not a solid fill) so it mixes with the
+        // surface behind it — the theme's own text color stays legible in
+        // both light and dark mode instead of a fixed color pair going
+        // invisible when the theme flips.
+        onMouseDown={(e) => { e.preventDefault(); cmd('hiliteColor', 'rgba(47, 148, 99, 0.28)'); }}
         title="Highlight"
       >
-        <span style={{ background: '#E1ECE6', color: '#1F5C3E', padding: '0 4px', borderRadius: 3 }}>H</span>
+        <span
+          style={{
+            background: 'rgba(47, 148, 99, 0.28)',
+            color: 'var(--color-green-primary)',
+            padding: '0 4px',
+            borderRadius: 3,
+          }}
+        >
+          H
+        </span>
       </button>
     </div>
   );

@@ -8,7 +8,9 @@
 //
 // One report per member per item per day (keyed on the member's local calendar
 // day, so it lines up with the same "due today" logic the checklist uses).
-// Re-opening the editor on a day already reported lets the member edit it.
+// Collapsed by default — a CTA opens the editor before reporting, "Edit report"
+// re-opens it after. Either way the editor itself has exactly one action:
+// "Submit Report".
 import * as React from 'react';
 import { Button } from './ui';
 import { Icon } from './Icon';
@@ -43,7 +45,16 @@ export function WorkReportPanel({
   const [submitting, setSubmitting] = React.useState(false);
   const [draft, setDraft] = React.useState('');
 
-  const reported = existingBody != null;
+  // Optimistic copy of the just-submitted body — the parent's `existingBody`
+  // prop only reflects the server after its own refresh round-trips, which
+  // otherwise leaves the "Reported today" badge a beat behind a successful
+  // submit. Cleared once the prop itself catches up.
+  const [localBody, setLocalBody] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    setLocalBody(null);
+  }, [existingBody]);
+  const effectiveBody = localBody ?? existingBody;
+  const reported = effectiveBody != null;
 
   // Reviewer feedback (stars + comments) is no longer shown here — it now lives
   // in a goal-level "Feedback on your work" panel (see MemberGoalFeedback in
@@ -51,9 +62,9 @@ export function WorkReportPanel({
 
   // Open (and seed) the editor — from the member's own button or a blocked tick.
   const openEditor = React.useCallback(() => {
-    setDraft(existingBody || templateBody || '');
+    setDraft(effectiveBody || templateBody || '');
     setOpen(true);
-  }, [existingBody, templateBody]);
+  }, [effectiveBody, templateBody]);
 
   // A blocked tick in the checklist bumps openSignal to bring the member here.
   React.useEffect(() => {
@@ -66,6 +77,7 @@ export function WorkReportPanel({
       try {
         const res = await submitWorkReport(itemId, draft, reportDate);
         if (!res.ok) throw new Error(res.error || 'Could not submit your report.');
+        setLocalBody(draft); // show as reported immediately, don't wait on a refresh
         setOpen(false);
         onSubmitted?.(); // parent ticks the item + plays the party popper
       } catch (e) {
@@ -93,8 +105,8 @@ export function WorkReportPanel({
       {/* Already reported (and not editing): show what they wrote + edit. */}
       {reported && !open ? (
         <div className="work-report-card">
-          {existingBody ? (
-            <RichText className="work-report-body" value={existingBody} />
+          {effectiveBody ? (
+            <RichText className="work-report-body" value={effectiveBody} />
           ) : (
             <span className="work-report-empty">Submitted (no details).</span>
           )}
@@ -120,7 +132,7 @@ export function WorkReportPanel({
         </div>
       ) : null}
 
-      {/* Editing. */}
+      {/* Editing: the only action is submitting — no separate cancel step. */}
       {open ? (
         <div className="work-report-editor">
           <RichTextEditor
@@ -131,16 +143,8 @@ export function WorkReportPanel({
             autoFocus
           />
           <div className="work-report-actions">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
             <Button size="sm" icon="check" onClick={submit} loading={submitting}>
-              {reported ? 'Save report' : 'Submit & tick'}
+              Submit Report
             </Button>
           </div>
         </div>
