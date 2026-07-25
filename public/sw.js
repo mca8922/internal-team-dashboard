@@ -1,4 +1,4 @@
-// reStrucAI service worker — handles Web Push events so notifications arrive
+// Mahesh Chandra & Associates service worker — handles Web Push events so notifications arrive
 // even when the dashboard tab is closed.
 
 self.addEventListener('push', (event) => {
@@ -6,10 +6,10 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data?.json() ?? {};
   } catch {
-    data = { title: 'reStrucAI', body: event.data?.text() ?? '' };
+    data = { title: 'Mahesh Chandra & Associates', body: event.data?.text() ?? '' };
   }
 
-  const title = data.title ?? 'reStrucAI';
+  const title = data.title ?? 'Mahesh Chandra & Associates';
   const options = {
     body: data.body ?? '',
     icon: '/favicon.png',

@@ -10,7 +10,7 @@ import { EmailAdmin } from './EmailAdmin';
 import { ManagerEmailView } from './ManagerEmailView';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
-export const metadata = { title: 'Emails · reStrucAI' };
+export const metadata = { title: 'Emails · Mahesh Chandra & Associates' };
 
 export default async function EmailPage() {
   if (!FEATURE_FLAGS.emails) redirect('/dashboard');

@@ -15,7 +15,7 @@ import { getAppAnalytics } from './app-analytics';
 import type { AppAnalyticsResult } from './app-analytics';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
-export const metadata = { title: 'Apps · reStrucAI' };
+export const metadata = { title: 'Apps · Mahesh Chandra & Associates' };
 
 export default async function AppsPage() {
   if (!FEATURE_FLAGS.apps) redirect('/dashboard');

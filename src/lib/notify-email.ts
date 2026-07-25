@@ -12,14 +12,14 @@ import 'server-only';
 //   - per-member opt-out (profiles.transactional_emails_enabled)
 // Every attempt is written to transactional_email_logs for the audit view.
 //
-// Sends under a neutral "reStrucAI Dashboard" identity and with no BCC.
+// Sends under a neutral "Mahesh Chandra & Associates Dashboard" identity and with no BCC.
 import { eventAllowed } from './notif-events';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMail } from '@/lib/mailer';
 import { renderTransactionalEmail, transactionalPlainText } from './email-shell';
 import type { TransactionalEventType } from '@/lib/types';
 
-const FROM = '"reStrucAI Dashboard" <sales@restrucai.com>';
+const FROM = '"Mahesh Chandra & Associates Dashboard" <sales@restrucai.com>';
 const APP_URL = 'https://restrucai-team.vercel.app';
 
 // Keep the email copy em-dash / en-dash / emoji free, no matter what the

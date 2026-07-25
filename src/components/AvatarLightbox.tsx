@@ -77,8 +77,8 @@ export function AvatarLightbox({
             <div className="avatar-lb-watermark" aria-hidden>{initial}</div>
 
             <div className="avatar-lb-corner-brand" aria-hidden>
-              {(['r','e','S','t','r','u','c','A','i'] as const).map((ch, i) => (
-                <span key={i} className={i < 2 || i > 6 ? 'g' : undefined}>{ch}</span>
+              {(['M','C','A'] as const).map((ch, i) => (
+                <span key={i}>{ch}</span>
               ))}
             </div>
 

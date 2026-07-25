@@ -40,7 +40,7 @@ import type { Profile, UserRole } from '@/lib/types';
 import { MilestoneReplayButton } from '@/components/MilestoneReplayButton';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
-export const metadata = { title: 'Dashboard · reStrucAI' };
+export const metadata = { title: 'Dashboard · Mahesh Chandra & Associates' };
 
 function Greeting({
   name,

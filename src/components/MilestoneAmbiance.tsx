@@ -105,7 +105,7 @@ export function MilestoneAmbiance({
       <span className="ms-ambiance-text">
         {"It's your milestone · "}
         <strong>{label}</strong>
-        {' with reStrucAI!'}
+        {' with Mahesh Chandra & Associates!'}
       </span>
       <button type="button" className="ms-ambiance-btn" onClick={replay}>
         Replay 🎉

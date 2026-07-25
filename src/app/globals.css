@@ -1,4 +1,4 @@
-/* reStrucAI — internal team dashboard */
+/* Mahesh Chandra & Associates — internal team dashboard */
 
 :root {
   /* Deep "ledger green" — muted/desaturated vs. the original bright SaaS
@@ -1385,7 +1385,7 @@ p { margin: 0; }
   z-index: 2;
 }
 
-/* reStrucAi brand wordmark in the info panel above the badges */
+/* MCA brand wordmark (Mahesh Chandra & Associates) in the info panel above the badges */
 /* Small brand tag in the top-left corner — mirrors the close × in the top-right */
 .avatar-lb-corner-brand {
   position: absolute;

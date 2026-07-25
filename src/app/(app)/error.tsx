@@ -19,7 +19,7 @@ import { useToast } from '@/components/Toast';
 import { reportError } from '@/lib/actions';
 
 const QUIPS = [
-  "Even reStrucAI's brain needs a reboot sometimes.",
+  "Even our brain needs a reboot sometimes.",
   'Our bot tripped over its own wires.',
   "That wasn't supposed to happen — the bot is as surprised as you.",
   'Somewhere, a semicolon is to blame.',

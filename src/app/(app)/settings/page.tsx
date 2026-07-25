@@ -2,7 +2,7 @@ import { getCurrentProfile, getNotificationPrefs } from '@/lib/queries';
 import { roleLabel, isManager } from '@/lib/roles';
 import { SettingsView } from './SettingsView';
 
-export const metadata = { title: 'Settings · reStrucAI' };
+export const metadata = { title: 'Settings · Mahesh Chandra & Associates' };
 
 export default async function SettingsPage() {
   const profile = (await getCurrentProfile())!;

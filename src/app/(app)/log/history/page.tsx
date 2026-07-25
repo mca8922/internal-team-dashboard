@@ -4,7 +4,7 @@ import { getCurrentProfile, getLogs, getLeaves, getHolidays, logStreak } from '@
 import { LogCalendar } from './LogCalendar';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
-export const metadata = { title: 'Log history · reStrucAI' };
+export const metadata = { title: 'Log history · Mahesh Chandra & Associates' };
 
 export default async function LogHistoryPage() {
   if (!FEATURE_FLAGS.dailyLog) redirect('/dashboard');

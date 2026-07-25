@@ -1,6 +1,6 @@
 // Date / duration helpers — ported from the prototype's lib.js.
 //
-// reStrucAI operates in IST. The app is deployed on Vercel, whose servers
+// Mahesh Chandra & Associates operates in IST. The app is deployed on Vercel, whose servers
 // run in UTC — so "today" MUST be computed in IST, otherwise late-evening
 // IST falls on the previous UTC calendar day and the dashboard, punches,
 // streaks etc. all read stale ("yesterday's") data. Every calendar-day
@@ -82,11 +82,11 @@ export function daysBetween(a: Date | string, b: Date | string): number {
   return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / DAY_MS);
 }
 
-// reStrucAI go-live date — Monday 18 May 2026. Nothing before this counts
+// Mahesh Chandra & Associates go-live date — Monday 18 May 2026. Nothing before this counts
 // as a working day for streaks or the missing-log check.
 export const GO_LIVE_DATE = '2026-05-18';
 
-// reStrucAI official working days are Monday–Friday, 9 AM–6 PM.
+// Mahesh Chandra & Associates official working days are Monday–Friday, 9 AM–6 PM.
 // A "working day" is a weekday (IST) on or after go-live.
 export function isWorkingDay(d: Date | string): boolean {
   const day = istWeekday(d);
@@ -108,7 +108,7 @@ export function fmtDateDMY(d: Date | string): string {
     .replace(/\//g, '-');
 }
 
-// reStrucAI operates in IST — all clock displays are pinned to this zone so
+// Mahesh Chandra & Associates operates in IST — all clock displays are pinned to this zone so
 // they read the same regardless of the viewer's device timezone.
 const IST = 'Asia/Kolkata';
 

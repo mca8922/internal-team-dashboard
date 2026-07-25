@@ -6,7 +6,7 @@ import { fmtDate, isWeekend } from '@/lib/dates';
 import { LogEditor } from './LogEditor';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
-export const metadata = { title: 'Daily Log · reStrucAI' };
+export const metadata = { title: 'Daily Log · Mahesh Chandra & Associates' };
 
 export default async function LogPage({
   searchParams,

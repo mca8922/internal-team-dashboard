@@ -21,7 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'reStrucAI · Internal Team Dashboard',
+  title: 'Mahesh Chandra & Associates · Internal Team Dashboard',
   description: 'Punch in, log work, ship goals. All in one place.',
   // Default favicon — the inline script + FaviconSwitcher then swap it to
   // the light/dark variant that matches the active theme.

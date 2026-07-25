@@ -26,7 +26,7 @@ import { type RangeMode } from './TeamRangeControl';
 import { TeamAnalyticsShell } from './TeamAnalyticsShell';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
-export const metadata = { title: 'Team analytics · reStrucAI' };
+export const metadata = { title: 'Team analytics · Mahesh Chandra & Associates' };
 
 export default async function TeamAnalyticsPage({
   searchParams,

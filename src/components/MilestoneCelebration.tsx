@@ -55,7 +55,7 @@ function copyFor(
         headline: `${m.label}. What a journey!`,
         sub: (
           <>
-            {'Thank you for being part of reStrucAI, '}
+            {'Thank you for being part of Mahesh Chandra & Associates, '}
             {N}
             {'.'}
             <br />
@@ -66,7 +66,7 @@ function copyFor(
       };
     case 'intern':
       return {
-        headline: `${m.label} with reStrucAI!`,
+        headline: `${m.label} with Mahesh Chandra & Associates!`,
         sub: (
           <>
             {'Thank you for everything you bring'}
@@ -80,7 +80,7 @@ function copyFor(
       };
     case 'yearly':
       return {
-        headline: `${m.label} at reStrucAI!`,
+        headline: `${m.label} at Mahesh Chandra & Associates!`,
         sub: (
           <>
             {"Here's to everything you've built with us, "}
@@ -105,7 +105,7 @@ function copyFor(
       };
     default:
       return {
-        headline: `${m.label} with reStrucAI`,
+        headline: `${m.label} with Mahesh Chandra & Associates`,
         sub: (
           <>
             {"Glad you're here, "}

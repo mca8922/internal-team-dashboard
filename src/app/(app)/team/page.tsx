@@ -29,7 +29,7 @@ import { TeamGrid, type TeamMember } from './TeamGrid';
 import { ManagerTeamView, type ManagerTeamMember } from './ManagerTeamView';
 import type { Profile } from '@/lib/types';
 
-export const metadata = { title: 'Team · reStrucAI' };
+export const metadata = { title: 'Team · Mahesh Chandra & Associates' };
 
 export default async function TeamPage() {
   const profile = (await getCurrentProfile())!;

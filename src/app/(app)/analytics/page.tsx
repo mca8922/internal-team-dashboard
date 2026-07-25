@@ -24,7 +24,7 @@ import { MonthStepper } from '@/components/MonthStepper';
 import { WeekStepper } from '@/components/WeekStepper';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
-export const metadata = { title: 'Analytics · reStrucAI' };
+export const metadata = { title: 'Analytics · Mahesh Chandra & Associates' };
 
 export default async function AnalyticsPage({
   searchParams,

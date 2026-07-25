@@ -1,4 +1,4 @@
-// Domain types for the reStrucAI dashboard.
+// Domain types for the Mahesh Chandra & Associates dashboard.
 // These mirror the SQL schema in supabase/migrations.
 
 export type UserRole = 'board' | 'fte' | 'pte' | 'intern';

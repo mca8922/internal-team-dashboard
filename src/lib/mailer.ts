@@ -29,7 +29,7 @@ export interface MailOptions {
 export async function sendMail(opts: MailOptions): Promise<string | null> {
   const transport = createTransport();
   const info = await transport.sendMail({
-    from: opts.from ?? '"reStrucAI Dashboard" <sales@restrucai.com>',
+    from: opts.from ?? '"Mahesh Chandra & Associates Dashboard" <sales@restrucai.com>',
     to: opts.to,
     ...(opts.bcc ? { bcc: opts.bcc } : {}),
     subject: opts.subject,

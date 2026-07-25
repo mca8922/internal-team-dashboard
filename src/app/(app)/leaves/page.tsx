@@ -10,7 +10,7 @@ import {
 import { isFounder } from '@/lib/roles';
 import { LeavesView } from './LeavesView';
 
-export const metadata = { title: 'Leaves · reStrucAI' };
+export const metadata = { title: 'Leaves · Mahesh Chandra & Associates' };
 
 export default async function LeavesPage() {
   const profile = (await getCurrentProfile())!;

@@ -14,7 +14,7 @@ import { isManager, isFounder } from '@/lib/roles';
 import { RequestsView } from './RequestsView';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
-export const metadata = { title: 'Change requests · reStrucAI' };
+export const metadata = { title: 'Change requests · Mahesh Chandra & Associates' };
 
 export default async function RequestsPage() {
   if (!FEATURE_FLAGS.teamRequests) redirect('/dashboard');

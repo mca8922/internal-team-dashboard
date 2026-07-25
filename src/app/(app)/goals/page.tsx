@@ -36,7 +36,7 @@ import type {
   WorkReportReview,
 } from '@/lib/types';
 
-export const metadata = { title: 'Goals · reStrucAI' };
+export const metadata = { title: 'Goals · Mahesh Chandra & Associates' };
 
 export default async function GoalsPage() {
   const profile = (await getCurrentProfile())!;

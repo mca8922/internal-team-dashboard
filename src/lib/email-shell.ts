@@ -1,12 +1,12 @@
-// Brand-styled HTML shell for reStrucAI transactional emails (system notices:
-// goal assigned, leave decided, missed punch-out). Greeting + headline + CTA
-// button + an automated / no-reply footer.
+// Brand-styled HTML shell for Mahesh Chandra & Associates transactional emails
+// (system notices: goal assigned, leave decided, missed punch-out). Greeting +
+// headline + CTA button + an automated / no-reply footer.
 //
 // Light / dark aware via `prefers-color-scheme` so the email matches the theme
 // of the device it is opened on. Every colour is set inline (for clients that
 // ignore <style>) AND given a class, so the dark-mode media query can override
-// it with !important. The "Struc" wordmark glyph flips dark<->light text so it
-// stays legible on either background; the green never changes.
+// it with !important. The wordmark text flips dark<->light so it stays
+// legible on either background.
 //
 // Pure string rendering with no secrets, so it is intentionally NOT
 // `server-only` — the email-preview/test script imports it directly.
@@ -65,32 +65,28 @@ function bodyToHtml(body: string): string {
   return bodyBlocks(body).join('');
 }
 
-// The reStrucAi wordmark as inline-styled spans. `size` drives header (larger)
-// vs footer (smaller).
+// The Mahesh Chandra & Associates wordmark. `size` drives header (larger) vs
+// footer (smaller).
 function wordmark(size: number): string {
   return (
-    `<span style="font-family:${FONT};font-size:${size}px;font-weight:800;letter-spacing:-0.5px">` +
-    `<span class="rt-green" style="color:#16a34a">re</span>` +
-    `<span class="rt-black" style="color:#1a1a1a">Struc</span>` +
-    `<span class="rt-green" style="color:#16a34a">Ai</span>` +
+    `<span class="rt-black" style="font-family:${FONT};font-size:${size}px;font-weight:800;letter-spacing:-0.5px;color:#1a1a1a">` +
+    `Mahesh Chandra &amp; Associates` +
     `</span>`
   );
 }
 
-// Footer wordmark + tagline, with an optional automated / no-reply line. The
-// wordmark is sized large so it spans roughly the same width as the tagline
-// line ("Restructuring Business Processes with AI").
+// Footer wordmark + tagline, with an optional automated / no-reply line.
 function footer(noReply: boolean): string {
   const note = noReply
     ? `<div class="rt-note" style="margin-top:16px;font-family:${FONT};font-size:11px;line-height:1.6;color:#9aa3af">
-                  This is an automated message from the reStrucAi Dashboard.<br>Please do not reply to this email.
+                  This is an automated message from the Mahesh Chandra & Associates Dashboard.<br>Please do not reply to this email.
                 </div>`
     : '';
   return `<tr>
             <td align="center" style="padding:28px 8px 0 8px">
               <div class="rt-divider" style="border-top:1px solid #e9eaee;padding-top:26px">
-                ${wordmark(42)}
-                <div class="rt-tagline" style="margin-top:6px;font-family:${FONT};font-size:12px;letter-spacing:0.2px;color:#8a909a">Restructuring Business Processes with AI</div>
+                ${wordmark(28)}
+                <div class="rt-tagline" style="margin-top:6px;font-family:${FONT};font-size:12px;letter-spacing:0.2px;color:#8a909a">Chartered Accountants</div>
                 ${note}
               </div>
             </td>
@@ -167,7 +163,7 @@ export function transactionalPlainText(parts: TransactionalEmailParts): string {
     `${parts.ctaLabel ?? 'Open the dashboard'}: ${parts.ctaUrl}`,
     '',
     '----',
-    'reStrucAi - Restructuring Business Processes with AI',
+    'Mahesh Chandra & Associates - Chartered Accountants',
     'This is an automated message. Please do not reply to this email.',
   ];
   return lines.join('\n');

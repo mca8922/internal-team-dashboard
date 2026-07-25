@@ -14,7 +14,7 @@ import { PunchConsole } from './PunchConsole';
 import { PunchRequestsCard } from './PunchRequestsCard';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
-export const metadata = { title: 'Punch · reStrucAI' };
+export const metadata = { title: 'Punch · Mahesh Chandra & Associates' };
 
 function firstOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);

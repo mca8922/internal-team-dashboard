@@ -34,7 +34,7 @@ const STEPS: TourStep[] = [
     icon: 'sparkles',
     title: 'Welcome to your Team Dashboard',
     intro:
-      'This is the home base for your work at reStrucAI. In the next minute we will point out each part of the dashboard so you know exactly where everything lives. Use Next to move along, or Skip if you would rather explore on your own.',
+      'This is the home base for your work at Mahesh Chandra & Associates. In the next minute we will point out each part of the dashboard so you know exactly where everything lives. Use Next to move along, or Skip if you would rather explore on your own.',
     route: '/dashboard',
   },
   {

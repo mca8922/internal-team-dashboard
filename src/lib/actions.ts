@@ -390,7 +390,7 @@ export async function sweepWorkAnniversaries(onlyUserId?: string): Promise<void>
       const rows = fresh.map((h) => ({
         user_id: h.id,
         type: 'work_anniversary' as const,
-        title: `${h.ms.label} at reStrucAI 🎉`,
+        title: `${h.ms.label} at Mahesh Chandra & Associates 🎉`,
         body: 'Tap to relive your celebration.',
         href: `/dashboard?celebrate=${h.ms.kind}`,
       }));
@@ -412,7 +412,7 @@ export async function previewMilestonePing(userId: string, kind: MilestoneKind):
   const admin = createAdminClient();
   const label =
     kind === 'yearly' ? '1 year' : kind.startsWith('intern') ? 'Month 2 of 3' : '3 months';
-  const title = `${label} at reStrucAI 🎉`;
+  const title = `${label} at Mahesh Chandra & Associates 🎉`;
   const body = 'Tap to relive your celebration.';
   const href = `/dashboard?celebrate=${kind}`;
   await admin.from('notifications').insert({ user_id: userId, type: 'work_anniversary', title, body, href });
@@ -2821,7 +2821,7 @@ export async function reportError(input: {
 
   const admin = createAdminClient();
   try {
-    await sendMail({ to: BUG_REPORT_TO, from: '"reStrucAI Dashboard" <sales@restrucai.com>', bcc: false, subject, html, text });
+    await sendMail({ to: BUG_REPORT_TO, from: '"Mahesh Chandra & Associates Dashboard" <sales@restrucai.com>', bcc: false, subject, html, text });
     await admin.from('transactional_email_logs').insert({
       recipient_id: null,
       recipient_email: BUG_REPORT_TO,

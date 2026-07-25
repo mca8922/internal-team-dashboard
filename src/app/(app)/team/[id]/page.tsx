@@ -39,7 +39,7 @@ import { MemberLogs } from './MemberLogs';
 import { PresenceLine } from './PresenceLine';
 import { AvatarLightbox } from '@/components/AvatarLightbox';
 
-export const metadata = { title: 'Employee · reStrucAI' };
+export const metadata = { title: 'Employee · Mahesh Chandra & Associates' };
 
 export default async function EmployeePage({
   params,

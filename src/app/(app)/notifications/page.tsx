@@ -5,7 +5,7 @@ import { getCurrentProfile, getNotifications, getDepartmentColors } from '@/lib/
 import { isManager } from '@/lib/roles';
 import { NotificationsHistory } from './NotificationsHistory';
 
-export const metadata = { title: 'Notifications · reStrucAI' };
+export const metadata = { title: 'Notifications · Mahesh Chandra & Associates' };
 
 export default async function NotificationsPage() {
   const profile = (await getCurrentProfile())!;
