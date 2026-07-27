@@ -12,12 +12,14 @@ import {
   reviewLeave,
   deleteLeave,
   createHoliday,
+  updateHoliday,
   deleteHoliday,
   loadMemberGoalsForHandoff,
 } from '@/lib/actions';
 import { MemberGoalsHandoff } from '@/components/MemberGoalsHandoff';
 import { DatePicker } from '@/components/DatePicker';
-import { fmtDate, fmtShort, fmtFriendly, parseDate, daysBetween } from '@/lib/dates';
+import { Icon } from '@/components/Icon';
+import { fmtDate, fmtShort, fmtFriendly, fmtWeekday, parseDate, daysBetween } from '@/lib/dates';
 import { downloadCsv } from '@/lib/csv';
 import type { LeaveUsage } from '@/lib/queries';
 import type { Leave, Holiday, LeaveType } from '@/lib/types';
@@ -157,6 +159,168 @@ function LeaveForm({
         </Button>
         <Button onClick={submit}>Submit</Button>
       </div>
+    </div>
+  );
+}
+
+type HolidayTone = 'today' | 'soon' | 'future' | 'past';
+
+// How urgent/how-far a holiday reads: today gets the gold spotlight, this
+// week reads as "soon" (still green, just the brand's), further out is a
+// quieter tint of the same green, and anything already gone recedes to grey.
+function holidayTone(dateStr: string): { tone: HolidayTone; label: string } {
+  const days = daysBetween(new Date(), parseDate(dateStr));
+  if (days === 0) return { tone: 'today', label: 'Today' };
+  if (days < 0) {
+    const n = Math.abs(days);
+    return { tone: 'past', label: n === 1 ? 'Yesterday' : `${n} days ago` };
+  }
+  if (days === 1) return { tone: 'soon', label: 'Tomorrow' };
+  if (days <= 7) return { tone: 'soon', label: `In ${days} days` };
+  return { tone: 'future', label: `In ${days} days` };
+}
+
+// "Company holidays" showcase — an Upcoming/Past segmented view (holidays are
+// ordered oldest-first from the query; Upcoming keeps that order, Past is
+// reversed so the most recent one leads). Board members get edit/delete right
+// on each card — no need to open the separate "Manage holidays" modal for a
+// quick fix. Everyone else just sees the calendar.
+function HolidaysShowcase({ holidays, isBoard }: { holidays: Holiday[]; isBoard: boolean }) {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [tab, setTab] = React.useState<'upcoming' | 'past'>('upcoming');
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [form, setForm] = React.useState({ date: '', name: '' });
+  const today = fmtDate(new Date());
+
+  const upcoming = holidays.filter((h) => h.holiday_date >= today);
+  const past = [...holidays.filter((h) => h.holiday_date < today)].reverse();
+  const shown = tab === 'upcoming' ? upcoming : past;
+
+  const startEdit = (h: Holiday) => {
+    setEditingId(h.id);
+    setForm({ date: h.holiday_date, name: h.name });
+  };
+  const cancelEdit = () => setEditingId(null);
+  const saveEdit = async () => {
+    if (!editingId || !form.date || !form.name.trim()) return;
+    await updateHoliday(editingId, form.date, form.name.trim());
+    toast('Holiday updated');
+    setEditingId(null);
+  };
+  const remove = async (h: Holiday) => {
+    const ok = await confirm({
+      title: 'Delete holiday?',
+      message: `“${h.name}” (${fmtShort(parseDate(h.holiday_date))}) will be removed from the company calendar.`,
+      confirmLabel: 'Delete',
+      icon: 'trash',
+    });
+    if (!ok) return;
+    await deleteHoliday(h.id);
+    toast('Holiday removed');
+  };
+
+  return (
+    <div className="card mt-6">
+      <div className="holiday-showcase-head">
+        <div className="card-subtitle">Company holidays · {new Date().getFullYear()}</div>
+        <div className="gb-viewswitch">
+          <button
+            type="button"
+            className={`gb-viewswitch-btn${tab === 'upcoming' ? ' active' : ''}`}
+            onClick={() => setTab('upcoming')}
+          >
+            Upcoming{upcoming.length ? ` (${upcoming.length})` : ''}
+          </button>
+          <button
+            type="button"
+            className={`gb-viewswitch-btn${tab === 'past' ? ' active' : ''}`}
+            onClick={() => setTab('past')}
+          >
+            Past{past.length ? ` (${past.length})` : ''}
+          </button>
+        </div>
+      </div>
+
+      {shown.length === 0 ? (
+        <div className="holiday-empty">
+          {tab === 'upcoming' ? 'No upcoming holidays scheduled.' : 'No past holidays yet.'}
+        </div>
+      ) : (
+        <div className="holiday-grid">
+          {shown.map((h) => {
+            if (editingId === h.id) {
+              return (
+                <div key={h.id} className="holiday-chip is-editing">
+                  <div className="holiday-chip-edit-fields">
+                    <DatePicker
+                      value={form.date}
+                      onChange={(v) => setForm((f) => ({ ...f, date: v }))}
+                      ariaLabel="Holiday date"
+                    />
+                    <input
+                      className="input"
+                      value={form.name}
+                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="Holiday name"
+                      aria-label="Holiday name"
+                    />
+                  </div>
+                  <div className="holiday-chip-edit-actions">
+                    <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={saveEdit} disabled={!form.date || !form.name.trim()}>
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              );
+            }
+            const { tone, label } = holidayTone(h.holiday_date);
+            return (
+              <div
+                key={h.id}
+                className={`holiday-chip${tone === 'past' ? ' is-past' : ''}${tone === 'today' ? ' is-today' : ''}`}
+              >
+                <div className="holiday-chip-top">
+                  <span className="holiday-chip-emoji" aria-hidden>
+                    🎉
+                  </span>
+                  <div className="holiday-chip-name">{h.name}</div>
+                </div>
+                <div className="holiday-chip-bottom">
+                  <span className="holiday-chip-date">
+                    {fmtWeekday(parseDate(h.holiday_date))} · {fmtShort(parseDate(h.holiday_date))}
+                  </span>
+                  <span className={`holiday-chip-tag is-${tone}`}>{label}</span>
+                </div>
+                {isBoard ? (
+                  <div className="holiday-chip-manage">
+                    <button
+                      type="button"
+                      className="holiday-pill-btn"
+                      aria-label="Edit holiday"
+                      onClick={() => startEdit(h)}
+                    >
+                      <Icon name="edit" size={12} /> Edit
+                    </button>
+                    <span className="holiday-pill-sep" aria-hidden />
+                    <button
+                      type="button"
+                      className="holiday-pill-btn holiday-pill-btn-danger"
+                      aria-label="Delete holiday"
+                      onClick={() => remove(h)}
+                    >
+                      <Icon name="trash" size={12} /> Delete
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -647,25 +811,7 @@ export function LeavesView({
         )}
       </div>
 
-      <div className="card mt-6">
-        <div className="card-subtitle mb-3">Company holidays · {new Date().getFullYear()}</div>
-        <div className="flex items-center gap-3" style={{ flexWrap: 'wrap' }}>
-          {holidays.map((h) => (
-            <div
-              key={h.id}
-              style={{
-                padding: '8px 12px',
-                background: 'var(--color-bg)',
-                borderRadius: 6,
-                border: '1px solid var(--color-border)',
-              }}
-            >
-              <div className="text-xs text-grey">{fmtShort(parseDate(h.holiday_date))}</div>
-              <div className="text-sm fw-medium">🎉 {h.name}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <HolidaysShowcase holidays={holidays} isBoard={isBoard} />
 
       <Modal
         open={modal}

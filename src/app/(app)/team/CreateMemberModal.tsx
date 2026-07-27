@@ -30,23 +30,31 @@ export function CreateMemberModal({
     name: '',
     email: '',
     password: TEMP_PASSWORD,
-    role: 'fte' as 'board' | 'fte' | 'pte' | 'intern',
     department: '',
   });
+  // Role (permission tier) and Type (employment classification) are separate
+  // fields — see ManageMemberModal for the full Director/Manager/Executive
+  // model. Manager isn't offered here: appointing one needs a department's
+  // existing roster to pick a team from, which only exists once the account
+  // is created, so that still happens afterward in "Manage member".
+  const [uiRole, setUiRole] = React.useState<'director' | 'executive'>('executive');
+  const [type, setType] = React.useState<'fte' | 'pte' | 'intern'>('fte');
   const [internMonths, setInternMonths] = React.useState(3);
   const [err, setErr] = React.useState<Record<string, string>>({});
   const [pending, setPending] = React.useState(false);
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const role: 'board' | 'fte' | 'pte' | 'intern' = uiRole === 'director' ? 'board' : type;
 
   const reset = () => {
     setForm({
       name: '',
       email: '',
       password: TEMP_PASSWORD,
-      role: 'fte',
       department: '',
     });
+    setUiRole('executive');
+    setType('fte');
     setInternMonths(3);
     setErr({});
   };
@@ -71,7 +79,8 @@ export function CreateMemberModal({
     setPending(true);
     const res = await createTeamMember({
       ...form,
-      internshipMonths: form.role === 'intern' ? internMonths : null,
+      role,
+      internshipMonths: role === 'intern' ? internMonths : null,
     });
     setPending(false);
     if (res.error) {
@@ -87,7 +96,7 @@ export function CreateMemberModal({
       open={open}
       onClose={close}
       title="Create account"
-      subtitle="Set up an account for a team member or Board Member. Share the temporary password; they can change it in Settings."
+      subtitle="Set up an account for a team member or Director. Share the temporary password; they can change it in Settings."
     >
       <div className="grid gap-3">
         <Field label="Full name" error={err.name}>
@@ -109,16 +118,14 @@ export function CreateMemberModal({
           />
         </Field>
         <div className="grid grid-2col-even" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Role">
+          <Field label="Role" hint="Manager is appointed later, from Manage member.">
             <select
               className="select"
-              value={form.role}
-              onChange={(e) => set('role', e.target.value)}
+              value={uiRole}
+              onChange={(e) => setUiRole(e.target.value as typeof uiRole)}
             >
-              <option value="board">Board Member</option>
-              <option value="fte">Full-Time</option>
-              <option value="pte">Part-Time</option>
-              <option value="intern">Intern</option>
+              <option value="director">Director</option>
+              <option value="executive">Executive</option>
             </select>
           </Field>
           <Field label="Department" error={err.department}>
@@ -129,7 +136,20 @@ export function CreateMemberModal({
             />
           </Field>
         </div>
-        {form.role === 'intern' && (
+        {uiRole === 'executive' ? (
+          <Field label="Type">
+            <select
+              className="select"
+              value={type}
+              onChange={(e) => setType(e.target.value as typeof type)}
+            >
+              <option value="fte">Full-Time</option>
+              <option value="pte">Part-Time</option>
+              <option value="intern">Intern</option>
+            </select>
+          </Field>
+        ) : null}
+        {role === 'intern' && (
           <Field
             label="Internship tenure"
             hint="Shown as a progress card on the intern's dashboard."

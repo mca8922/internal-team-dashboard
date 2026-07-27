@@ -11,6 +11,11 @@ export const FEATURE_FLAGS = {
   analyticsFilters: false,
   goalsCleanup: false,
   settingsNotifications: false,
+  // Full notification pipeline: goal/leave/punch/work-report bell items +
+  // toasts + the /notifications history list. While off, only the two
+  // undismissable device reminders (upload avatar, change password) show —
+  // everything else renders as a locked "Unlocks in Phase 2" row instead.
+  notificationsFull: false,
   // Internship progress, flagged members, milestone replay.
   // Team pulse, department check-in, and the streak card are always on —
   // see dashboard/page.tsx.

@@ -279,11 +279,11 @@ p { margin: 0; }
 
 .logo-char {
   display: inline-block;
-  --color-base:   rgba(255, 255, 255, 0.82);
-  --color-peak:   #f0fff8;
-  --s-core:       rgba(255, 255, 255, 0.92);
-  --s-mid:        rgba(255, 255, 255, 0.30);
-  --s-outer:      rgba(255, 255, 255, 0.07);
+  --color-base:   rgba(212, 175, 55, 0.85);
+  --color-peak:   #ffe27a;
+  --s-core:       rgba(255, 223, 128, 0.92);
+  --s-mid:        rgba(212, 175, 55, 0.35);
+  --s-outer:      rgba(184, 134, 11, 0.12);
   color: var(--color-base);
   animation: letter-ignite 10s ease-in-out calc(var(--i) * 0.42s + 1.4s) infinite;
 }
@@ -2030,6 +2030,47 @@ p { margin: 0; }
 .notif-empty .text-sm, .notif-empty .text-xs { color: var(--color-black); }
 .notif-empty .text-xs { color: var(--color-grey-text); }
 
+/* Phase-2 locked teaser row — sits below the live list in the bell dropdown. */
+.notif-locked {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px;
+  margin: 2px 6px;
+  border-top: 1px solid var(--color-border);
+}
+.notif-locked-icon {
+  width: 30px; height: 30px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-grey-text);
+}
+.notif-locked-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.notif-locked-text > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notif-locked-pill {
+  flex-shrink: 0;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-grey-text);
+}
+
+/* Phase-2 locked full-page state — /notifications history. */
+.notif-locked-page {
+  padding: 40px 20px; text-align: center;
+  display: flex; flex-direction: column; align-items: center;
+}
+.notif-locked-page-icon {
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  border-radius: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-grey-text);
+  margin-bottom: 4px;
+}
+
 /* ===== Calendar day tags ===== */
 .calendar-cell { overflow: hidden; }
 .cal-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: auto; }
@@ -3009,187 +3050,30 @@ p { margin: 0; }
 }
 .error-state {
   text-align: center;
-  max-width: 480px;
+  max-width: 380px;
   width: 100%;
 }
 .error-state-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 108px;
-  height: 108px;
+  width: 76px;
+  height: 76px;
   border-radius: 50%;
   color: var(--color-green-primary);
   background: color-mix(in srgb, var(--color-green-primary) 10%, var(--color-card));
   border: 1px solid color-mix(in srgb, var(--color-green-primary) 24%, var(--color-border));
-  animation: error-bot-wobble 2.4s ease-in-out infinite;
+  margin-bottom: 20px;
 }
-@keyframes error-bot-wobble {
-  0%, 100% { transform: rotate(0deg) translateY(0); }
-  18% { transform: rotate(-9deg) translateY(-2px); }
-  36% { transform: rotate(7deg) translateY(0); }
-  54% { transform: rotate(-5deg) translateY(-1px); }
-  72% { transform: rotate(3deg) translateY(0); }
-  86% { transform: rotate(-1deg) translateY(0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .error-state-icon { animation: none; }
-}
-.error-bot-btn {
-  position: relative;
-  display: inline-flex;
-  background: none;
-  border: none;
-  padding: 0;
-  margin-bottom: 24px;
-  cursor: pointer;
-}
-/* Ambient "this is alive" signal — two soft rings expanding out from behind
-   the bot and fading, staggered a beat apart (sonar/radar ping), instead of
-   a floating text badge. Reads as "interactive" through motion alone. */
-.error-bot-sonar {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1.5px solid var(--color-green-primary);
-  animation: error-bot-sonar 2.8s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
-  pointer-events: none;
-}
-.error-bot-sonar.r2 { animation-delay: 1.4s; }
-@keyframes error-bot-sonar {
-  0% { transform: scale(1); opacity: 0.45; }
-  100% { transform: scale(1.55); opacity: 0; }
-}
-/* A small ripple mimicking a fingertip tap, appearing at the bot's corner
-   every few seconds — a wordless "try touching this" cue. Gone for good
-   (per browser) the moment anyone actually taps it. */
-.error-bot-tap-ripple {
-  position: absolute;
-  right: -2px;
-  bottom: 4px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--color-green-primary);
-  animation: error-bot-tap-ripple 2.2s ease-in-out infinite;
-  pointer-events: none;
-}
-.error-bot-tap-ripple::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1.5px solid var(--color-green-primary);
-  animation: error-bot-tap-ripple-ring 2.2s ease-in-out infinite;
-}
-@keyframes error-bot-tap-ripple {
-  0%, 60%, 100% { transform: scale(1); opacity: 0.9; }
-  15% { transform: scale(0.78); opacity: 1; }
-  30% { transform: scale(1); opacity: 0.9; }
-}
-@keyframes error-bot-tap-ripple-ring {
-  0%, 60% { transform: scale(1); opacity: 0; }
-  75% { transform: scale(1.9); opacity: 0.5; }
-  100% { transform: scale(2.4); opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .error-bot-sonar, .error-bot-tap-ripple, .error-bot-tap-ripple::after { animation: none; }
-}
-/* The bot is clickable — bonk it for a new excuse. .error-bot-bonk wraps
-   .error-state-icon (which keeps its own continuous ambient wobble); the
-   bonk itself is a one-shot squash-and-pop, replayed each click via the
-   nonce-keyed remount in error.tsx, composing on top of the ambient wobble
-   rather than fighting it. */
-.error-bot-bonk {
-  display: inline-block;
-  animation: error-bot-bonk 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@keyframes error-bot-bonk {
-  0% { transform: scale(1) rotate(0deg); }
-  30% { transform: scale(0.86) rotate(-8deg); }
-  60% { transform: scale(1.12) rotate(5deg); }
-  100% { transform: scale(1) rotate(0deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .error-bot-bonk { animation: none; }
-}
-.error-state h3 { color: var(--color-black); font-size: 27px; font-weight: 700; margin-bottom: 10px; }
-.error-state p { font-size: 15px; color: var(--color-grey-text); line-height: 1.6; margin: 0 0 4px; }
-.error-state-sub { font-size: 13px; opacity: 0.85; margin-top: 4px; margin-bottom: 0; }
-
-/* Actions as a card list — icon, title, one-line description, trailing
-   affordance — instead of a thin row of pill buttons. Reuses the same
-   hover-lift language every .card on the app already has. */
-.error-action-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 32px;
-  text-align: left;
-}
-.error-action-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 14px 16px;
-  border-radius: var(--radius-lg);
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  cursor: pointer;
-  text-decoration: none;
-  color: inherit;
-  transition: transform 200ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 200ms ease, border-color 160ms ease;
-}
-.error-action-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lift);
-  border-color: color-mix(in srgb, var(--color-green-primary) 30%, var(--color-border));
-}
-.error-action-card:active { transform: translateY(0); }
-.error-action-card.done {
-  border-color: color-mix(in srgb, var(--color-green-primary) 40%, var(--color-border));
-  background: color-mix(in srgb, var(--color-green-primary) 6%, var(--color-card));
-  cursor: default;
-}
-.error-action-icon {
+.error-state h3 { color: var(--color-black); font-size: 21px; font-weight: 700; margin-bottom: 8px; }
+.error-state p { font-size: 14px; color: var(--color-grey-text); line-height: 1.6; margin: 0; }
+.error-simple-actions {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  color: var(--color-green-primary);
-  background: color-mix(in srgb, var(--color-green-primary) 12%, var(--color-bg));
-}
-.error-action-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--color-border);
-  border-top-color: var(--color-green-primary);
-  border-radius: 50%;
-  animation: spin 800ms linear infinite;
-}
-/* Title + description centered within their own column — the icon anchors
-   left and the chevron/incident pill anchors right, but everything above
-   this list (bot, headline, quip) is centered, and left-aligned text here
-   read as an inconsistent jump. Centering just the text block (not the
-   whole row — icon/trailing stay put) keeps the row's left-icon/right-arrow
-   shape while matching the rest of the page. */
-.error-action-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; text-align: center; }
-.error-action-title { font-size: 14.5px; font-weight: 600; color: var(--color-black); }
-.error-action-desc { font-size: 12.5px; color: var(--color-grey-text); }
-.error-action-card > svg { flex-shrink: 0; color: var(--color-grey-text); }
-.error-action-incident {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--color-grey-text);
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  letter-spacing: 0.02em;
-}
-@media (max-width: 480px) {
-  .error-action-desc { display: none; }
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
 }
 
 .spinner {
@@ -5513,14 +5397,14 @@ body { font-size: 15px; }
 .brand-wordmark-line {
   background: linear-gradient(
     180deg,
-    #ffffff 0%,
-    #e8e8ea 18%,
-    #9a9aa0 85%,
-    #8a8a8f 42%,
-    #f5f5f7 52%,
-    #6c6c72 68%,
-    #d9d9dc 84%,
-    #f8f8fa 100%
+    #fff6da 0%,
+    #f0dba0 18%,
+    #b8860b 85%,
+    #9c6f14 42%,
+    #ffe27a 52%,
+    #6b4a10 68%,
+    #e8c364 84%,
+    #fff2c2 100%
   );
   background-clip: text;
   -webkit-background-clip: text;
@@ -9826,6 +9710,171 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
   pointer-events: none;
 }
 
+/* ---------------------------------------------------------------------
+   Company holidays showcase (Leaves page) — Upcoming/Past segmented view.
+   See HolidaysShowcase in LeavesView.tsx. Responsive auto-fill grid so it
+   reflows from a single column on phones up to several per row on desktop
+   without any breakpoint-specific column counts.
+--------------------------------------------------------------------- */
+.holiday-showcase-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.holiday-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+/* Name sits alone on its own row (nothing squeezing it from the right
+   anymore — edit/delete moved to a pill at the bottom), so a typical holiday
+   name fits on one line; an unusually long one ellipsizes rather than
+   wrapping the card taller. */
+.holiday-chip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  animation: card-in 280ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.holiday-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+  border-color: var(--color-gold-primary);
+}
+.holiday-chip-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.holiday-chip-emoji {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 15px;
+  background: var(--color-gold-light);
+}
+.holiday-chip-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Edit/Delete as one pill, split by a divider — sits below the date row so
+   it never competes with the name for width. */
+.holiday-chip-manage {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.holiday-pill-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-grey-text);
+  background: transparent;
+  transition: background 120ms ease, color 120ms ease;
+}
+.holiday-pill-btn:hover { background: var(--color-green-light); color: var(--color-green-primary); }
+.holiday-pill-btn-danger:hover { background: var(--color-red-bg); color: var(--color-red); }
+.holiday-pill-sep { width: 1px; background: var(--color-border); }
+.holiday-chip-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-left: 42px; /* aligns under the name, past the emoji badge */
+}
+.holiday-chip-date {
+  font-size: 11.5px;
+  color: var(--color-grey-text);
+  white-space: nowrap;
+}
+.holiday-chip-tag {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+/* Today — the star of the row: a gold glow, not just a tinted pill. */
+.holiday-chip.is-today {
+  background: linear-gradient(135deg, var(--color-gold-light) 0%, var(--color-bg) 65%);
+  border-color: var(--color-gold-primary);
+  box-shadow: var(--shadow-gold);
+}
+.holiday-chip.is-today .holiday-chip-emoji {
+  background: var(--color-gold-primary);
+}
+.holiday-chip-tag.is-today {
+  background: var(--color-gold-primary);
+  color: var(--color-white);
+}
+/* Soon (this week) and further out both read as "upcoming", just with
+   different urgency — soon gets the brand green, later gets a quieter
+   tint of the same colour. */
+.holiday-chip-tag.is-soon { background: var(--color-green-light); color: var(--color-green-primary); }
+.holiday-chip-tag.is-future { background: var(--color-green-light); color: var(--color-green-primary); opacity: 0.75; }
+/* Past — visually receded so the eye lands on what's ahead first. */
+.holiday-chip.is-past { opacity: 0.62; }
+.holiday-chip.is-past:hover { opacity: 1; }
+.holiday-chip.is-past .holiday-chip-emoji { background: var(--color-border); filter: grayscale(0.4); }
+.holiday-chip-tag.is-past { background: var(--color-border); color: var(--color-grey-text); }
+
+/* Inline edit — replaces a chip's display content in place, same grid cell,
+   so editing never reflows the rest of the grid. */
+.holiday-chip.is-editing {
+  border-color: var(--color-green-primary);
+  gap: 10px;
+}
+.holiday-chip-edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.holiday-chip-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.holiday-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--color-grey-text);
+  font-size: 13px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+@media (max-width: 480px) {
+  .holiday-grid { grid-template-columns: 1fr; }
+}
 
 /* =====================================================================
    Mobile responsiveness pass

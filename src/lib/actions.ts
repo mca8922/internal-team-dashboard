@@ -914,6 +914,12 @@ export async function toggleChecklistItem(itemId: string, done: boolean) {
 // the "due today" checklist logic. Upserts on (item_id, user_id, report_date) so
 // re-submitting the same day edits the existing report. RLS limits writes to the
 // caller's own rows.
+//
+// The upsert AND the checklist tick happen together in one DB function
+// (submit_work_report) rather than as two separate client round-trips — that
+// used to let the report save while the tick silently failed (or the reverse),
+// so the member saw the completion celebration without the task actually
+// ticking, and had to submit a second time to get it to register.
 export async function submitWorkReport(
   itemId: string,
   body: string,
@@ -923,16 +929,11 @@ export async function submitWorkReport(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) {
     return { ok: false, error: 'Invalid report date.' };
   }
-  const { error } = await supabase.from('goal_work_reports').upsert(
-    {
-      item_id: itemId,
-      user_id: userId,
-      report_date: reportDate,
-      body,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'item_id,user_id,report_date' },
-  );
+  const { error } = await supabase.rpc('submit_work_report', {
+    p_item_id: itemId,
+    p_body: body,
+    p_report_date: reportDate,
+  });
   if (error) return { ok: false, error: error.message };
   // Ping reviewers on every submit — new reports and edits/resubmits alike — so
   // managers and the Board always see the latest version is ready to review.
@@ -1488,6 +1489,12 @@ export async function createHoliday(date: string, name: string) {
 export async function deleteHoliday(id: string) {
   const { supabase } = await requireUser();
   await supabase.from('holidays').delete().eq('id', id);
+  revalidatePath('/leaves');
+}
+
+export async function updateHoliday(id: string, date: string, name: string) {
+  const { supabase } = await requireUser();
+  await supabase.from('holidays').update({ holiday_date: date, name }).eq('id', id);
   revalidatePath('/leaves');
 }
 

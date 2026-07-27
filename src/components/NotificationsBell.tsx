@@ -20,6 +20,7 @@ import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
 import { createClient } from '@/lib/supabase/client';
 import { markNotificationsRead, deleteNotification, clearNotifications } from '@/lib/actions';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { playChime, playPunchChime } from '@/lib/sound';
 import type { Notification, NotificationType } from '@/lib/types';
 import {
@@ -172,8 +173,12 @@ export function NotificationsBell({
           const n = payload.new as Notification;
           if (mutedInAppRef.current.has(n.type)) return; // member muted this type
           setNotifs((cur) => (cur.some((x) => x.id === n.id) ? cur : [n, ...cur]));
-          toast(n.body ? `${n.title}: ${n.body}` : n.title, 'warning');
-          playChime();
+          // Phase 1: these types are locked in the UI — keep syncing state
+          // (for the locked row's count) but stay quiet.
+          if (FEATURE_FLAGS.notificationsFull) {
+            toast(n.body ? `${n.title}: ${n.body}` : n.title, 'warning');
+            playChime();
+          }
         },
       )
       // Keep an open tab in sync when rows change elsewhere — a read toggled on
@@ -241,6 +246,9 @@ export function NotificationsBell({
   // grouped into a single message ("Alice and 2 others punched in") rather
   // than one toast per person.
   React.useEffect(() => {
+    // Phase 1: punch in/out announcements are locked — skip the subscription
+    // entirely rather than subscribe-and-mute.
+    if (!FEATURE_FLAGS.notificationsFull) return;
     const supabase = createClient();
     const nameCache = new Map<string, string>();
     const batch = { ins: [] as string[], outs: [] as string[] };
@@ -342,7 +350,11 @@ export function NotificationsBell({
     };
   }, [open]);
 
-  const unreadCount = notifs.filter((n) => !n.is_read).length;
+  // Phase 1: stored notifications are locked out of the badge/list — only
+  // the pinned device reminders count as "unread" for the bell.
+  const unreadCount = FEATURE_FLAGS.notificationsFull
+    ? notifs.filter((n) => !n.is_read).length
+    : 0;
 
   // Opening the panel counts as "seen" — persist read state and clear the
   // unread badge. Done once per open, only when something is actually unread.
@@ -442,25 +454,28 @@ export function NotificationsBell({
   }
 
   // Stored notifications — goal assignments + leave events, newest first.
-  notifs.forEach((n) => {
-    const meta = TYPE_META[n.type] ?? { icon: 'target', tone: 'info' };
-    items.push({
-      key: 'n-' + n.id,
-      icon: meta.icon,
-      title: n.title,
-      detail: n.body ?? '',
-      time: timeAgo(n.created_at),
-      href: n.href || '/goals',
-      tone: meta.tone,
-      unread: !n.is_read,
-      dismissible: true,
-      notifId: n.id,
-      section: classifyNotif(n.type, n.department, viewer),
+  // Phase 1: locked; contribute to hiddenCount below instead of the list.
+  if (FEATURE_FLAGS.notificationsFull) {
+    notifs.forEach((n) => {
+      const meta = TYPE_META[n.type] ?? { icon: 'target', tone: 'info' };
+      items.push({
+        key: 'n-' + n.id,
+        icon: meta.icon,
+        title: n.title,
+        detail: n.body ?? '',
+        time: timeAgo(n.created_at),
+        href: n.href || '/goals',
+        tone: meta.tone,
+        unread: !n.is_read,
+        dismissible: true,
+        notifId: n.id,
+        section: classifyNotif(n.type, n.department, viewer),
+      });
     });
-  });
+  }
 
   // Board members see leave requests that still need a decision.
-  if (isBoard && pendingLeaves > 0) {
+  if (FEATURE_FLAGS.notificationsFull && isBoard && pendingLeaves > 0) {
     items.push({
       key: 'leaves',
       icon: 'plane',
@@ -474,6 +489,12 @@ export function NotificationsBell({
       section: NEEDS_SECTION,
     });
   }
+
+  // How many locked notifications are waiting behind the Phase 2 gate —
+  // shown as a small count in the locked row, not counted in the badge.
+  const hiddenCount = FEATURE_FLAGS.notificationsFull
+    ? 0
+    : notifs.length + (isBoard && pendingLeaves > 0 ? pendingLeaves : 0);
 
   // Badge counts the genuinely-actionable items: every derived reminder plus
   // any not-yet-seen notification.
@@ -573,7 +594,7 @@ export function NotificationsBell({
         <div className="notif-panel" role="dialog" aria-label="Notifications">
           <div className="notif-panel-head">
             <span className="fw-bold">Notifications</span>
-            {notifs.length > 0 ? (
+            {FEATURE_FLAGS.notificationsFull && notifs.length > 0 ? (
               <span className="notif-head-actions">
                 {unreadCount > 0 ? (
                   <button className="notif-head-action" onClick={markAllRead}>
@@ -615,7 +636,9 @@ export function NotificationsBell({
               <Icon name="check" size={26} />
               <div className="text-sm fw-medium mt-2">You are all caught up</div>
               <div className="text-xs text-grey mt-1">
-                New goal assignments, logs and leaves will show up here.
+                {FEATURE_FLAGS.notificationsFull
+                  ? 'New goal assignments, logs and leaves will show up here.'
+                  : 'Profile and security reminders will show up here.'}
               </div>
             </div>
           ) : sectioned ? (
@@ -660,6 +683,22 @@ export function NotificationsBell({
           ) : (
             <div className="notif-list">{items.map(renderRow)}</div>
           )}
+
+          {!FEATURE_FLAGS.notificationsFull ? (
+            <div className="notif-locked">
+              <span className="notif-locked-icon">
+                <Icon name="lock" size={14} />
+              </span>
+              <span className="notif-locked-text">
+                <span className="text-sm fw-medium">More notifications</span>
+                <span className="text-xs text-grey">
+                  Goal, leave &amp; punch updates
+                  {hiddenCount > 0 ? ` · ${hiddenCount} waiting` : ''}
+                </span>
+              </span>
+              <span className="notif-locked-pill">Phase 2</span>
+            </div>
+          ) : null}
 
           <button className="notif-see-all" onClick={() => go('/notifications')}>
             See all notifications

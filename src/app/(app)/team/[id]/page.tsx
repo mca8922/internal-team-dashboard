@@ -264,7 +264,7 @@ export default async function EmployeePage({
             <AvatarLightbox
               name={u.name}
               avatarUrl={u.avatar_url}
-              roleBadge={isFounder(u) ? 'Founder' : u.role === 'board' ? 'Board' : null}
+              roleBadge={isFounder(u) ? 'Founder' : u.role === 'board' ? 'Director' : null}
               jobTitle={u.job_title || null}
               department={u.department}
               joinedLabel={fmtFriendly(parseDate(u.joined_date))}
@@ -277,7 +277,7 @@ export default async function EmployeePage({
                 {isFounder(u) ? (
                   <span className="badge badge-black">Founder</span>
                 ) : u.role === 'board' ? (
-                  <span className="badge badge-black">Board</span>
+                  <span className="badge badge-black">Director</span>
                 ) : null}
               </div>
               <div className="page-subtitle">

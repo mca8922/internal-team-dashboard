@@ -18,22 +18,27 @@ export function canAccess(role: UserRole, feature: string): boolean {
   return FEATURES[feature].includes(role);
 }
 
+// "Director" is the current display name for the `role: 'board'` tier (same
+// underlying permissions the app has always called "Board Member" — is_board()
+// RLS, FOUNDER_USER_IDS, etc. are all unchanged, this only renames the label).
+// fte/pte/intern double as both the old role value AND the new "Type" concept
+// (see the Team "Manage member" modal), so their labels are unchanged.
 export function roleLabel(role: UserRole): string {
   return (
-    { board: 'Board Member', fte: 'Full-Time', pte: 'Part-Time', intern: 'Intern' }[role] || role
+    { board: 'Director', fte: 'Full-Time', pte: 'Part-Time', intern: 'Intern' }[role] || role
   );
 }
 
-// How to title someone who reviewed a work report: the Board are "Board Member",
-// an appointed head of department is "Department Manager", everyone else falls
-// back to their plain role label. Used on each rating/comment so the member sees
-// WHO gave the feedback.
+// How to title someone who reviewed a work report: the Board are "Director",
+// an appointed head of department is "Manager", everyone else falls back to
+// their plain role label. Used on each rating/comment so the member sees WHO
+// gave the feedback.
 export function reviewerLabel(p: {
   role: UserRole;
   is_manager?: boolean | null;
 }): string {
-  if (p.role === 'board') return 'Board Member';
-  if (p.is_manager) return 'Department Manager';
+  if (p.role === 'board') return 'Director';
+  if (p.is_manager) return 'Manager';
   return roleLabel(p.role);
 }
 

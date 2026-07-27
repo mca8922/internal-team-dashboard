@@ -41,6 +41,7 @@ Everything else stays in the codebase, gated off via `FEATURE_FLAGS`
 | `analyticsFilters` | Month/Week stepper + CSV export on Personal Analytics; range control (7/14/30/all/month/custom) on Team Analytics | `analytics/page.tsx`, `analytics/team/page.tsx`, `analytics/team/TeamAnalyticsShell.tsx` |
 | `goalsCleanup` | "Clean up" button + archive/export/restore modal on Goals | `goals/GoalsView.tsx` |
 | `settingsNotifications` | "Notifications" card (push/sound toggles) + per-event notification prefs card on Settings | `settings/SettingsView.tsx` |
+| `notificationsFull` | Bell + `/notifications` history for goal/leave/punch/work-report events, incl. their toasts/chimes and teammate punch-in/out toasts. Only the two undismissable device reminders (upload avatar, change password) stay on; everything else shows a locked "Unlocks in Phase 2" row/state instead | `NotificationsBell.tsx`, `notifications/NotificationsHistory.tsx` |
 | ~~`dashboardExtras`~~ | ~~Internship progress card, flagged members card, milestone replay button~~ — re-enabled, see below | `dashboard/page.tsx` |
 
 ## Removed (not gated, deleted entirely)
@@ -84,6 +85,10 @@ come back:
 - Goals cleanup/export (`goalsCleanup`)
 - Settings → Notifications section (`settingsNotifications`) — explicitly
   deferred by the user to Phase 2
+- Full notification pipeline — goal/leave/punch/work-report bell items,
+  toasts, teammate punch-in/out toasts, and `/notifications` history
+  (`notificationsFull`) — explicitly deferred by the user to Phase 2; only
+  the avatar/password device reminders stay on in Phase 1
 
 `dashboardExtras` (internship progress, flagged members, milestone replay)
 was flipped back to `true` ahead of the rest of this list, after a report

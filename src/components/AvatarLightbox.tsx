@@ -16,7 +16,7 @@ export function AvatarLightbox({
 }: {
   name: string;
   avatarUrl: string | null;
-  /** "Founder" | "Board" | null — omitted for regular members */
+  /** "Founder" | "Director" | null — omitted for regular members */
   roleBadge: string | null;
   jobTitle: string | null;
   department: string;

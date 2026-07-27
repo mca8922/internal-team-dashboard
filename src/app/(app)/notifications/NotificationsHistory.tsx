@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui';
 import { useConfirm } from '@/components/ConfirmDialog';
 import { fmtRelative, fmtTime } from '@/lib/dates';
 import { clearNotifications, markNotificationsRead } from '@/lib/actions';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import {
   type SectionDef,
   classifyNotif,
@@ -130,6 +131,29 @@ export function NotificationsHistory({
       </button>
     );
   };
+
+  // Phase 1: this entire history is stored notification types (goal, leave,
+  // punch, work-report) — all locked. Show a single locked state instead of
+  // the search/filter list; flip FEATURE_FLAGS.notificationsFull to restore it.
+  if (!FEATURE_FLAGS.notificationsFull) {
+    return (
+      <div className="card">
+        <div className="notif-locked-page">
+          <span className="notif-locked-page-icon">
+            <Icon name="lock" size={20} />
+          </span>
+          <div className="text-sm fw-medium mt-2">Notification history unlocks in Phase 2</div>
+          <div className="text-xs text-grey mt-1" style={{ maxWidth: 360 }}>
+            Goal, leave, punch and work-report updates will appear here once this
+            feature is switched on.
+            {notifications.length > 0
+              ? ` ${notifications.length} waiting behind the scenes.`
+              : ''}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="card">

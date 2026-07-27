@@ -17,9 +17,11 @@ import {
   getDepartmentColors,
   getPendingChangeRequestCount,
   getPendingPunchChangeRequestCount,
+  getHolidays,
 } from '@/lib/queries';
 import { isManager, FOUNDER_USER_IDS } from '@/lib/roles';
 import { ensureFounderIntegrity, sweepMissedPunchOuts, sweepGoalDeadlines } from '@/lib/actions';
+import { fmtDate } from '@/lib/dates';
 
 // The reminder sweeps don't need to block rendering: their notifications
 // stream into the bell live via Realtime, so nothing on the page waits for
@@ -53,6 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     deptColors,
     pendingChangeRequests,
     pendingPunchRequests,
+    holidays,
   ] = await Promise.all([
     isBoard ? getLeaves() : Promise.resolve([]),
     getNotifications(profile.id),
@@ -64,11 +67,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     (FOUNDER_USER_IDS as readonly string[]).includes(profile.id)
       ? getPendingPunchChangeRequestCount()
       : Promise.resolve(0),
+    getHolidays(),
   ]);
 
   const pendingRequests = pendingChangeRequests + pendingPunchRequests;
   const pendingLeaves = allLeaves.filter((l) => l.status === 'pending').length;
   const deptColor = deptColors[profile.department] ?? null;
+  const today = fmtDate(new Date());
+  const holidayToday = holidays.find((h) => h.holiday_date === today) ?? null;
 
   return (
     <ToastProvider>
@@ -85,6 +91,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             deptColor={deptColor}
             deptColors={deptColors}
             pendingRequests={pendingRequests}
+            holidayToday={holidayToday}
           >
             {children}
           </Shell>

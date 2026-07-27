@@ -108,7 +108,7 @@ const TeamCard = React.memo(function TeamCard({
               ) : null}
               {u.role === 'intern' ? <span className="badge badge-slate">Intern</span> : null}
               {u.role === 'board' && !u.isFounder ? (
-                <span className="badge badge-black" style={boardColor ? { background: boardColor, color: '#fff' } : undefined}>Board</span>
+                <span className="badge badge-black" style={boardColor ? { background: boardColor, color: '#fff' } : undefined}>Director</span>
               ) : null}
               {u.isManager ? (
                 <span
@@ -134,7 +134,7 @@ const TeamCard = React.memo(function TeamCard({
                 className="text-xs fw-medium mt-1"
                 style={{ color: 'var(--color-black)', letterSpacing: '0.02em' }}
               >
-                {u.isFounder ? 'Founder' : u.role === 'board' ? 'Board' : roleLabel(u.role)}
+                {u.isFounder ? 'Founder' : roleLabel(u.role)}
                 {' · '}
                 {u.jobTitle}
               </div>
@@ -383,7 +383,7 @@ export function TeamGrid({
             {(
               [
                 { id: 'all', label: 'All' },
-                { id: 'board', label: 'Board' },
+                { id: 'board', label: 'Directors' },
                 { id: 'fte', label: 'Full-Time' },
                 { id: 'pte', label: 'Part-Time' },
                 { id: 'intern', label: 'Interns' },
@@ -425,7 +425,7 @@ export function TeamGrid({
         <section className="team-dept">
           <div className="team-dept-head">
             <span className="team-dept-accent" style={{ background: 'linear-gradient(180deg, #4285F4 0%, #EA4335 33%, #FBBC04 66%, #34A853 100%)' }} />
-            <span className="team-dept-name">Board Members</span>
+            <span className="team-dept-name">Directors</span>
             <span className="team-dept-count">{boardGroup.members.length}</span>
             {boardGroup.inCount > 0 ? (
               <span className="team-dept-in">

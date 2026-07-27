@@ -28,6 +28,11 @@ interface TourStep {
   // CSS selector of the element to spotlight. Omit for a centered card.
   selector?: string;
   boardOnly?: boolean;
+  // Shown to department managers only (not the Board, not plain members) —
+  // for steps whose content differs by leadership scope (e.g. the Team page
+  // is a full org roster for the Board but a department-scoped status view
+  // for a manager; see ManagerTeamPage in team/page.tsx).
+  managerOnly?: boolean;
   // Only shown while this feature flag is on — see PHASE.md / featureFlags.ts.
   // The step's route (e.g. `/log`) redirects away entirely while its flag is
   // off, so skipping the step is required, not just tidy.
@@ -117,11 +122,34 @@ const STEPS: TourStep[] = [
     selector: '[data-tour="nav-goals"]',
   },
   {
+    icon: 'target',
+    title: 'Managing goals for your department',
+    managerOnly: true,
+    intro:
+      'As a department manager, you get the same execution tools as the Board — scoped to your own department.',
+    points: [
+      'Search and filter your department’s goals by status or what’s overdue.',
+      'Use the ⋮ menu on a card to change a goal’s status or reassign it to someone on your team.',
+      'A teammate on approved leave is marked “On leave” and left out of that day’s progress automatically.',
+    ],
+    route: '/dashboard',
+    selector: '[data-tour="nav-goals"]',
+  },
+  {
     icon: 'users',
     title: 'The Team page',
     boardOnly: true,
     intro:
       'As a board member you manage everyone from here. Add new members, edit their details, set their daily hours, and offboard anyone who leaves.',
+    route: '/dashboard',
+    selector: '[data-tour="nav-team"]',
+  },
+  {
+    icon: 'users',
+    title: 'Your department’s Team page',
+    managerOnly: true,
+    intro:
+      'As a department manager, this page shows your team at a glance: who is punched in, on leave, or running short on hours today, plus their weekly totals.',
     route: '/dashboard',
     selector: '[data-tour="nav-team"]',
   },
@@ -209,14 +237,27 @@ function placeTooltip(target: DOMRect, tw: number, th: number) {
   return { top, left };
 }
 
-export function OnboardingTour({ isBoard, tourSeen }: { isBoard: boolean; tourSeen: boolean }) {
+export function OnboardingTour({
+  isBoard,
+  isMgr,
+  tourSeen,
+}: {
+  isBoard: boolean;
+  isMgr: boolean;
+  tourSeen: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const toast = useToast();
   const steps = React.useMemo(
     () =>
-      STEPS.filter((s) => (!s.boardOnly || isBoard) && (!s.flag || FEATURE_FLAGS[s.flag])),
-    [isBoard],
+      STEPS.filter(
+        (s) =>
+          (!s.boardOnly || isBoard) &&
+          (!s.managerOnly || isMgr) &&
+          (!s.flag || FEATURE_FLAGS[s.flag]),
+      ),
+    [isBoard, isMgr],
   );
 
   const [open, setOpen] = React.useState(false);

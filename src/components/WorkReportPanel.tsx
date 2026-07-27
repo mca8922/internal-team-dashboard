@@ -67,8 +67,19 @@ export function WorkReportPanel({
   }, [effectiveBody, templateBody]);
 
   // A blocked tick in the checklist bumps openSignal to bring the member here.
+  // Track which value we've already acted on (in a ref, not state) rather than
+  // depending on `openEditor` itself: that callback's identity changes whenever
+  // `effectiveBody` changes — including right after OUR OWN successful submit,
+  // which flips effectiveBody from null to the just-saved body. Depending on it
+  // here reran this effect post-submit, re-opening the editor we'd just closed
+  // (openSignal itself hadn't changed, but the effect still re-fired), so the
+  // member had to submit a second time before it actually stuck.
+  const lastOpenSignal = React.useRef(openSignal);
   React.useEffect(() => {
-    if (openSignal > 0) openEditor();
+    if (openSignal > 0 && openSignal !== lastOpenSignal.current) {
+      lastOpenSignal.current = openSignal;
+      openEditor();
+    }
   }, [openSignal, openEditor]);
 
   const submit = () => {

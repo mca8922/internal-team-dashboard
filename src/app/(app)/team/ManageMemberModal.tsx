@@ -28,7 +28,6 @@ import {
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { roleLabel, weeklyTargetFromDaily } from '@/lib/roles';
 import { MemberGoalsHandoff } from '@/components/MemberGoalsHandoff';
-import type { UserRole } from '@/lib/types';
 import { addMonths, fmtFriendly, parseDate } from '@/lib/dates';
 import { DepartmentSelect } from '@/components/DepartmentSelect';
 import { TENURE_OPTIONS } from './CreateMemberModal';
@@ -55,7 +54,13 @@ export function ManageMemberModal({
   const [email, setEmail] = React.useState('');
   const [commuteEmail, setCommuteEmail] = React.useState('');
   const [department, setDepartment] = React.useState('');
-  const [role, setRole] = React.useState<UserRole>('fte');
+  // "Role" is now a 3-way tier (Director/Manager/Executive) rather than the
+  // raw 4-value UserRole enum — Director maps to role='board' (same
+  // permissions as the old "Board Member"), Manager maps to the existing
+  // is_manager/managed_department mechanism, and only Executive exposes a
+  // Type (the old fte/pte/intern choice, now a distinct concept from Role).
+  const [uiRole, setUiRole] = React.useState<'director' | 'manager' | 'executive'>('executive');
+  const [type, setType] = React.useState<'fte' | 'pte' | 'intern'>('fte');
   const [jobTitle, setJobTitle] = React.useState('');
   const [targetInput, setTargetInput] = React.useState('');
   const [tenure, setTenure] = React.useState('');
@@ -74,7 +79,8 @@ export function ManageMemberModal({
       setEmail(member.email);
       setCommuteEmail(member.commuteEmail ?? '');
       setDepartment(member.department);
-      setRole(member.role);
+      setUiRole(member.role === 'board' ? 'director' : member.isManager ? 'manager' : 'executive');
+      setType(member.role === 'board' ? 'fte' : member.role);
       setJobTitle(member.jobTitle || '');
       setTargetInput(member.targetHours != null ? String(member.targetHours) : '');
       setTenure(member.internshipMonths != null ? String(member.internshipMonths) : '');
@@ -118,7 +124,39 @@ export function ManageMemberModal({
   const saveDept = () =>
     run(() => updateMemberDepartment(member.id, department), 'Department updated');
 
-  const saveRole = () => run(() => updateMemberRole(member.id, role), 'Role updated');
+  // What Role/Type/managed-department the member ACTUALLY has right now
+  // (server state), so Save only enables on a real change and so we only
+  // touch the underlying role/is_manager rows that actually need to move.
+  const initialUiRole: 'director' | 'manager' | 'executive' =
+    member.role === 'board' ? 'director' : member.isManager ? 'manager' : 'executive';
+  const initialType = member.role === 'board' ? 'fte' : member.role;
+  const initialHeadDeptForRole = member.managedDepartment || member.department;
+
+  const roleFieldChanged =
+    uiRole !== initialUiRole ||
+    (uiRole === 'executive' && type !== initialType) ||
+    (uiRole === 'manager' &&
+      headDept.trim() !== '' &&
+      headDept.trim() !== initialHeadDeptForRole);
+
+  const saveRole = () =>
+    run(async () => {
+      if (uiRole === 'director') {
+        // A Director can't simultaneously head a department — clear that
+        // first so the data stays consistent, not just UI-hidden.
+        if (member.isManager) await unsetManager(member.id);
+        if (member.role !== 'board') await updateMemberRole(member.id, 'board');
+      } else if (uiRole === 'manager') {
+        // Managers need a real fte/pte/intern role underneath (Type is just
+        // hidden for them, not absent) — only forced to 'fte' when coming
+        // FROM Director, since 'board' isn't a valid manager role.
+        if (member.role === 'board') await updateMemberRole(member.id, type);
+        await setMemberAsManager(member.id, headDept.trim() || member.department);
+      } else {
+        if (member.isManager) await unsetManager(member.id);
+        if (member.role !== type) await updateMemberRole(member.id, type);
+      }
+    }, 'Role updated');
 
   const saveJobTitle = () =>
     run(() => updateMemberJobTitle(member.id, jobTitle), 'Job title updated');
@@ -161,12 +199,6 @@ export function ManageMemberModal({
 
   const toggleTeam = (id: string) =>
     setTeam((t) => (t.includes(id) ? t.filter((x) => x !== id) : [...t, id]));
-
-  const makeManager = () =>
-    run(
-      () => setMemberAsManager(member!.id, headDept),
-      `${member!.name} is now Head of ${headDept}`,
-    );
 
   const saveTeam = () =>
     run(() => setManagerTeam(member!.id, team), 'Team updated');
@@ -332,36 +364,71 @@ export function ManageMemberModal({
           </div>
         </Field>
 
-        {/* Role / employment type — the permission level. Moving out of
-            "Intern" clears the tenure window. The Founder is protected, and you
-            can't change your own role (would risk locking yourself out). */}
+        {/* Role — the permission tier (Director/Manager/Executive). Executive
+            is the only tier with a Type (employment classification); Director
+            and Manager don't need one, same as the old "Board Member" never
+            had an fte/pte/intern distinction. The Founder is protected, and
+            you can't change your own role (would risk locking yourself out). */}
         <Field
           label="Role"
           hint={
             isSelf
               ? 'You cannot change your own role.'
-              : 'Sets permissions and the default daily hours. Board Members manage the team.'
+              : 'Sets permissions and the default daily hours. Directors manage the whole team; Managers head one department.'
           }
         >
-          <div className="flex items-center gap-2">
-            <div style={{ flex: 1 }}>
-              <select
-                className="select"
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                disabled={founderProtected || isSelf}
-              >
-                <option value="board">Board Member</option>
-                <option value="fte">Full-Time</option>
-                <option value="pte">Part-Time</option>
-                <option value="intern">Intern</option>
-              </select>
+          <select
+            className="select"
+            value={uiRole}
+            onChange={(e) => setUiRole(e.target.value as typeof uiRole)}
+            disabled={founderProtected || isSelf}
+          >
+            <option value="director">Director</option>
+            <option value="manager">Manager</option>
+            <option value="executive">Executive</option>
+          </select>
+
+          {uiRole === 'executive' ? (
+            <div className="mt-2">
+              <Field label="Type">
+                <select
+                  className="select"
+                  value={type}
+                  onChange={(e) => setType(e.target.value as typeof type)}
+                  disabled={founderProtected || isSelf}
+                >
+                  <option value="fte">Full-Time</option>
+                  <option value="pte">Part-Time</option>
+                  <option value="intern">Intern</option>
+                </select>
+              </Field>
             </div>
+          ) : null}
+
+          {uiRole === 'manager' ? (
+            <div className="mt-2">
+              <Field label="Department to head">
+                <DepartmentSelect
+                  value={headDept}
+                  departments={departments}
+                  onChange={setHeadDept}
+                />
+              </Field>
+            </div>
+          ) : null}
+
+          <div className="flex justify-end mt-2">
             <Button
               size="sm"
               variant="secondary"
               onClick={saveRole}
-              disabled={pending || founderProtected || isSelf || role === member.role}
+              disabled={
+                pending ||
+                founderProtected ||
+                isSelf ||
+                !roleFieldChanged ||
+                (uiRole === 'manager' && !headDept.trim())
+              }
             >
               Save
             </Button>
@@ -476,8 +543,12 @@ export function ManageMemberModal({
           </Field>
         )}
 
-        {/* Department Manager (Head of Department) */}
-        {member.role !== 'board' && !member.isFounder && member.isActive ? (
+        {/* Department Manager (Head of Department) — appointing a Manager now
+            happens via the Role field above (which sets is_manager + the
+            managed department in one Save); this panel only shows once
+            they're one, for the responsibilities + team-assignment detail
+            that doesn't fit in that compact selector. */}
+        {member.role !== 'board' && !member.isFounder && member.isActive && member.isManager ? (
           <div
             style={{
               borderTop: '1px solid var(--color-border)',
@@ -494,116 +565,78 @@ export function ManageMemberModal({
               >
                 Department Manager
               </span>
-              {member.isManager ? (
-                <span className="badge badge-green">Head of {member.managedDepartment}</span>
-              ) : null}
+              <span className="badge badge-green">Head of {member.managedDepartment}</span>
             </div>
 
-            {!member.isManager ? (
-              <>
-                <div className="text-xs text-grey">
-                  Appoint {member.name} as the Head of a department. They gain team analytics,
-                  goal editing and email visibility for that department, but never see daily
-                  logs.
-                </div>
-                <Field label="Department to head">
-                  <div className="flex items-center gap-2">
-                    <div style={{ flex: 1 }}>
-                      <DepartmentSelect
-                        value={headDept}
-                        departments={departments}
-                        onChange={setHeadDept}
-                      />
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={makeManager}
-                      disabled={pending || !headDept.trim()}
-                      icon="crown"
-                    >
-                      Make Manager
-                    </Button>
-                  </div>
-                </Field>
-              </>
-            ) : (
-              <>
-                <Field
-                  label="Role & responsibilities"
-                  hint="Shown at the top of this manager's team page, above the members they lead. Supports basic formatting."
+            <Field
+              label="Role & responsibilities"
+              hint="Shown at the top of this manager's team page, above the members they lead. Supports basic formatting."
+            >
+              <RichTextEditor
+                value={responsibilities}
+                onChange={setResponsibilities}
+                ariaLabel="Role and responsibilities"
+                placeholder="Describe what this manager owns: goals, decisions, the team they're accountable for…"
+              />
+              <div className="mt-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={saveResponsibilities}
+                  disabled={pending || responsibilities === (member.managerResponsibilities || '')}
                 >
-                  <RichTextEditor
-                    value={responsibilities}
-                    onChange={setResponsibilities}
-                    ariaLabel="Role and responsibilities"
-                    placeholder="Describe what this manager owns: goals, decisions, the team they're accountable for…"
-                  />
-                  <div className="mt-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={saveResponsibilities}
-                      disabled={pending || responsibilities === (member.managerResponsibilities || '')}
-                    >
-                      Save responsibilities
-                    </Button>
-                  </div>
-                </Field>
+                  Save responsibilities
+                </Button>
+              </div>
+            </Field>
 
-                <Field
-                  label={`Team in ${member.managedDepartment}`}
-                  hint="Pick the members this manager leads. Only members of the department they head are shown."
-                >
-                  {teamCandidates.length === 0 ? (
-                    <div className="text-xs text-grey">
-                      No other active members in {headDept} to assign yet.
-                    </div>
-                  ) : (
-                    <div
-                      className="grid gap-1"
-                      style={{
-                        maxHeight: 200,
-                        overflow: 'auto',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 6,
-                        padding: 8,
-                      }}
-                    >
-                      {teamCandidates.map((m) => (
-                        <label
-                          key={m.id}
-                          className="flex items-center gap-2"
-                          style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: 4 }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={team.includes(m.id)}
-                            onChange={() => toggleTeam(m.id)}
-                          />
-                          <Avatar name={m.name} size="sm" src={m.avatarUrl} />
-                          <span className="text-sm fw-medium">{m.name}</span>
-                          <span className="text-xs text-grey">· {roleLabel(m.role)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </Field>
-                <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
-                  <Button size="sm" onClick={saveTeam} disabled={pending}>
-                    Save team
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={removeManager}
-                    disabled={pending}
-                  >
-                    Remove manager status
-                  </Button>
-                  <span className="text-xs text-grey">{team.length} selected</span>
+            <Field
+              label={`Team in ${member.managedDepartment}`}
+              hint="Pick the members this manager leads. Only members of the department they head are shown."
+            >
+              {teamCandidates.length === 0 ? (
+                <div className="text-xs text-grey">
+                  No other active members in {headDept} to assign yet.
                 </div>
-              </>
-            )}
+              ) : (
+                <div
+                  className="grid gap-1"
+                  style={{
+                    maxHeight: 200,
+                    overflow: 'auto',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 6,
+                    padding: 8,
+                  }}
+                >
+                  {teamCandidates.map((m) => (
+                    <label
+                      key={m.id}
+                      className="flex items-center gap-2"
+                      style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: 4 }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={team.includes(m.id)}
+                        onChange={() => toggleTeam(m.id)}
+                      />
+                      <Avatar name={m.name} size="sm" src={m.avatarUrl} />
+                      <span className="text-sm fw-medium">{m.name}</span>
+                      <span className="text-xs text-grey">· {roleLabel(m.role)}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </Field>
+            <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+              <Button size="sm" onClick={saveTeam} disabled={pending}>
+                Save team
+              </Button>
+              <Button size="sm" variant="secondary" onClick={removeManager} disabled={pending}>
+                Remove manager status
+              </Button>
+              <span className="text-xs text-grey">{team.length} selected</span>
+            </div>
           </div>
         ) : null}
 

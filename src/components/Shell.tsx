@@ -12,6 +12,7 @@ import { OnboardingTour } from './OnboardingTour';
 import { CommandPalette } from './CommandPalette';
 import { MilestoneCelebration } from './MilestoneCelebration';
 import { MilestoneAmbiance } from './MilestoneAmbiance';
+import { HolidayCelebration } from './HolidayCelebration';
 import { NotificationsBell, type OnlineUser } from './NotificationsBell';
 import { createClient } from '@/lib/supabase/client';
 import { playPresenceChime } from '@/lib/sound';
@@ -22,7 +23,7 @@ import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { AvatarLightbox } from '@/components/AvatarLightbox';
 import { fmtTimeFull, fmtFriendly, fmtDateDMY, parseDate } from '@/lib/dates';
 import { getThemePref, setThemePref, applyTheme, type ThemePref } from '@/lib/theme';
-import type { Profile, Notification, NotificationType } from '@/lib/types';
+import type { Profile, Notification, NotificationType, Holiday } from '@/lib/types';
 
 const LOGO_LINES = ['MAHESH CHANDRA', '& ASSOCIATES'] as const;
 
@@ -404,6 +405,7 @@ function TopBar({
   online,
   stripMax,
   onlineBell,
+  holidayToday,
 }: {
   user: Profile;
   themePref: ThemePref;
@@ -417,6 +419,7 @@ function TopBar({
   online: OnlineUser[];
   stripMax: number;
   onlineBell: OnlineUser[];
+  holidayToday: Holiday | null;
 }) {
   const pathname = usePathname();
 
@@ -483,6 +486,11 @@ function TopBar({
       )}
       <div className="topbar-spacer" />
       <div className="topbar-right">
+        {holidayToday ? (
+          <span className="badge badge-amber" title={holidayToday.name}>
+            🎉 Holiday · {holidayToday.name}
+          </span>
+        ) : null}
         <OnlineNowStrip online={online} max={stripMax} />
         <Clock />
         <button
@@ -516,7 +524,7 @@ function TopBar({
         <AvatarLightbox
           name={user.name}
           avatarUrl={user.avatar_url}
-          roleBadge={isFounder(user) ? 'Founder' : user.role === 'board' ? 'Board' : null}
+          roleBadge={isFounder(user) ? 'Founder' : user.role === 'board' ? 'Director' : null}
           jobTitle={user.job_title || null}
           department={user.department}
           joinedLabel={fmtFriendly(parseDate(user.joined_date))}
@@ -538,6 +546,7 @@ export function Shell({
   deptColor,
   deptColors,
   pendingRequests,
+  holidayToday,
   children,
 }: {
   user: Profile;
@@ -547,6 +556,7 @@ export function Shell({
   deptColor: string | null;
   deptColors: Record<string, string>;
   pendingRequests: number;
+  holidayToday: Holiday | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -719,6 +729,7 @@ export function Shell({
           online={online}
           stripMax={stripMax}
           onlineBell={online.slice(stripMax)}
+          holidayToday={holidayToday}
         />
         <div className="page fade-in" key={pathname}>
           {children}
@@ -736,8 +747,8 @@ export function Shell({
         pendingLeaves={pendingLeaves}
         pendingRequests={pendingRequests}
       />
-      <OnboardingTour isBoard={user.role === 'board'} tourSeen={user.tour_seen} />
-      <CommandPalette isBoard={user.role === 'board'} />
+      <OnboardingTour isBoard={user.role === 'board'} isMgr={isManager(user)} tourSeen={user.tour_seen} />
+      <CommandPalette isBoard={user.role === 'board'} isMgr={isManager(user)} />
       <MilestoneCelebration
         userId={user.id}
         name={user.name}
@@ -745,6 +756,9 @@ export function Shell({
         role={user.role}
         internshipMonths={user.internship_months}
       />
+      {holidayToday ? (
+        <HolidayCelebration date={holidayToday.holiday_date} name={holidayToday.name} />
+      ) : null}
     </div>
   );
 }

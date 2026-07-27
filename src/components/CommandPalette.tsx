@@ -7,6 +7,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './Icon';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
 interface Cmd {
   id: string;
@@ -17,26 +18,47 @@ interface Cmd {
   run: () => void;
 }
 
-export function CommandPalette({ isBoard }: { isBoard: boolean }) {
+export function CommandPalette({ isBoard, isMgr }: { isBoard: boolean; isMgr: boolean }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState('');
   const [active, setActive] = React.useState(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  // Board + department managers both get the "leadership" destinations —
+  // matches Shell's buildNavGroups, which is what actually gates the sidebar.
+  const canLead = isBoard || isMgr;
 
   const commands: Cmd[] = React.useMemo(() => {
     const go = (path: string) => () => {
       setOpen(false);
       router.push(path);
     };
+    // Mirrors Shell's buildNavGroups exactly — same items, same flags, same
+    // role gates — so the palette never offers a destination the sidebar
+    // itself hides (e.g. Daily Log / Emails / Apps while their FEATURE_FLAGS
+    // are off in this phase).
     const list: (Cmd | null)[] = [
       { id: 'dashboard', label: 'Dashboard', icon: 'home', run: go('/dashboard') },
       { id: 'punch', label: 'Punch', icon: 'clock', keywords: 'time clock in out', run: go('/punch') },
-      { id: 'log', label: 'Daily Log', icon: 'edit', keywords: 'journal write', run: go('/log') },
+      FEATURE_FLAGS.dailyLog
+        ? { id: 'log', label: 'Daily Log', icon: 'edit', keywords: 'journal write', run: go('/log') }
+        : null,
       { id: 'goals', label: 'Goals', icon: 'target', keywords: 'tasks checklist', run: go('/goals') },
-      isBoard ? { id: 'team', label: 'Team', icon: 'users', keywords: 'members people', run: go('/team') } : null,
       { id: 'analytics', label: 'Analytics', icon: 'chart', keywords: 'stats hours', run: go('/analytics') },
-      isBoard
+      { id: 'leaves', label: 'Leaves', icon: 'plane', keywords: 'time off holiday', run: go('/leaves') },
+      canLead
+        ? { id: 'team', label: 'Team', icon: 'users', keywords: 'members people', run: go('/team') }
+        : null,
+      canLead && FEATURE_FLAGS.teamRequests
+        ? {
+            id: 'team-requests',
+            label: 'Requests',
+            icon: 'inbox',
+            keywords: 'change requests review approve punch',
+            run: go('/team/requests'),
+          }
+        : null,
+      canLead
         ? {
             id: 'team-analytics',
             label: 'Team analytics',
@@ -46,8 +68,12 @@ export function CommandPalette({ isBoard }: { isBoard: boolean }) {
             run: go('/analytics/team'),
           }
         : null,
-      { id: 'leaves', label: 'Leaves', icon: 'plane', keywords: 'time off holiday', run: go('/leaves') },
-      isBoard ? { id: 'emails', label: 'Emails', icon: 'mail', run: go('/email') } : null,
+      isBoard && FEATURE_FLAGS.emails
+        ? { id: 'emails', label: 'Emails', icon: 'mail', run: go('/email') }
+        : null,
+      FEATURE_FLAGS.apps
+        ? { id: 'apps', label: 'Apps', icon: 'monitor', keywords: 'links tools department', run: go('/apps') }
+        : null,
       { id: 'settings', label: 'Settings', icon: 'settings', keywords: 'profile password theme', run: go('/settings') },
       {
         id: 'tour',
@@ -61,7 +87,7 @@ export function CommandPalette({ isBoard }: { isBoard: boolean }) {
       },
     ];
     return list.filter(Boolean) as Cmd[];
-  }, [isBoard, router]);
+  }, [canLead, isBoard, router]);
 
   const filtered = React.useMemo(() => {
     const s = q.trim().toLowerCase();

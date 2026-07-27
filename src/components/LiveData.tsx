@@ -37,6 +37,9 @@ const TABLE_ROUTES: Record<string, string[]> = {
   goal_templates: ['/goals'],
   leaves: ['/', '/dashboard', '/leaves', '/team'],
   logs: ['/', '/dashboard', '/log', '/team', '/analytics'],
+  // A declared/removed holiday should surface everywhere at once (the topbar
+  // badge + shell-mounted confetti), not just on the pages that read it.
+  holidays: ['/'],
 };
 
 function matchesRoute(pathname: string, prefixes: string[]): boolean {

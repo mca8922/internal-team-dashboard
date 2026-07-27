@@ -179,10 +179,17 @@ export function GoalChecklist({
     commit(it, true);
   };
 
-  // A "Report Work" item's report was just submitted: tick the item (if due and
-  // not already done) and play the party popper over the whole box — once.
+  // A "Report Work" item's report was just submitted: the server (see
+  // submit_work_report in actions.ts) already ticked the item in the SAME
+  // transaction as the report save, so this only mirrors that locally — no
+  // second toggleChecklistItem round-trip. Two separate calls here is exactly
+  // what used to let the celebration fire while the actual tick silently
+  // failed, requiring a second submit to "take". Then play the party popper
+  // over the whole box — once.
   const onReportSubmitted = (it: GoalChecklistItem) => {
-    if (isDueToday(it) && !isChecked(it)) commit(it, true);
+    if (isDueToday(it) && !isChecked(it)) {
+      setMine((cur) => ({ ...cur, [it.id]: new Date().toISOString() }));
+    }
     setCelebrate({ id: it.id, n: Date.now() });
   };
 
