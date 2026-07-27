@@ -331,8 +331,21 @@ const Clock = React.memo(function Clock() {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+  // Date and time are separate spans so the topbar can drop the date on narrow
+  // phones (where the whole right-hand pill would otherwise outgrow the screen)
+  // without the clock disappearing entirely.
   return (
-    <div className="clock">{now ? `${fmtDateDMY(now)} | ${fmtTimeFull(now)}` : ''}</div>
+    <div className="clock">
+      {now ? (
+        <>
+          <span className="clock-date">{fmtDateDMY(now)}</span>
+          <span className="clock-sep"> | </span>
+          <span className="clock-time">{fmtTimeFull(now)}</span>
+        </>
+      ) : (
+        ''
+      )}
+    </div>
   );
 });
 

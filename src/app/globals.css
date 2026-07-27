@@ -9825,3 +9825,441 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
   filter: blur(1.5px) saturate(0.7);
   pointer-events: none;
 }
+
+
+/* =====================================================================
+   Mobile responsiveness pass
+   ---------------------------------------------------------------------
+   Everything below is scoped to phone-sized viewports; desktop and tablet
+   layouts are untouched. Three reported bugs, three root causes:
+
+   1. "Switching sections auto-zooms the screen."
+      iOS Safari force-zooms whenever a focused form control has a font-size
+      under 16px, and it never zooms back — so the whole app stayed magnified
+      after tapping any search box. Every text-entry control goes to 16px
+      below 768px (S2). Pinch-zoom stays enabled on purpose: killing it with
+      maximum-scale would "fix" this by breaking accessibility.
+
+   2. "There is a gap on the right and content sticks to the left."
+      That is the document scrolling sideways: something inside the page was
+      wider than the viewport, so the sticky topbar and the fixed bottom nav
+      (both viewport-width) ran out before the content did. S1 contains the
+      page so nothing can widen the document, and S5-S7 give the genuinely
+      wide things (tables, chip rows, the goal canvas) their own scroll
+      container instead of letting them push the page.
+      `overflow-x: clip` is used rather than `hidden` deliberately: `hidden`
+      turns the element into a scroll container, which re-anchors every
+      `position: sticky` descendant (the topbar, the goals toolbar). `clip`
+      clips without creating a scrollport, so sticky keeps working.
+
+   3. "The Goals section does not render properly."
+      Its toolbar, status chips, cards, per-person bars, board checklist,
+      table and canvas were all laid out at desktop width. S6 reworks each
+      of them for a single narrow column.
+   ===================================================================== */
+
+/* ---- S1 - Containment: nothing may widen the document ---------------- */
+@media (max-width: 768px) {
+  .app-shell { max-width: 100%; }
+  /* Grid/flex children default to min-width:auto, which lets one wide child
+     inflate its own track past the viewport. Zero it along the layout spine. */
+  .app-shell > *,
+  .main > * {
+    min-width: 0;
+  }
+  .main { max-width: 100%; }
+  /* The clip lives on `.page`, not on `.app-shell` or `.main`: those two are
+     ancestors of the sticky topbar and of the fixed bottom nav / More sheet,
+     and keeping any clipping away from them means neither can be affected.
+     `.page` holds 100% of the route content, which is where the overflow was
+     coming from. */
+  .page {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  /* Same story one level down: cards and grid cells must be allowed to be
+     narrower than their content instead of stretching the row. */
+  .page .grid > *,
+  .page .card,
+  .card > .grid > * {
+    min-width: 0;
+  }
+  .page img,
+  .page svg,
+  .page video,
+  .page canvas,
+  .page iframe {
+    max-width: 100%;
+  }
+  /* Long unbroken strings (URLs, IDs, addresses) pasted into a log or work
+     report are a classic silent overflow source. */
+  .page .rich-text,
+  .work-report-body,
+  .board-cl-report-body,
+  .goal-check-desc,
+  .goal-desc,
+  .gb-title {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* ---- S2 - Form controls: 16px so iOS never focus-zooms ---------------- */
+@media (max-width: 768px) {
+  .input,
+  .select,
+  .textarea,
+  .datepicker-trigger,
+  .gb-toolbar-input,
+  .gb-views-nameinput,
+  .gb-cmdk-input,
+  .cmdk-input,
+  .tag-input-wrap input,
+  .tag-legend-name-input,
+  /* contentEditable counts too — this is the work-report editor, one of the
+     most-used mobile surfaces in the app. */
+  .rte-input,
+  input[type='text'],
+  input[type='search'],
+  input[type='email'],
+  input[type='password'],
+  input[type='number'],
+  input[type='tel'],
+  input[type='url'],
+  input[type='date'],
+  input[type='time'],
+  textarea,
+  select {
+    /* 16px is the exact threshold Safari uses. Anything below it zooms. */
+    font-size: 16px;
+  }
+  /* The compact selects were sized around a 12.5px label; give the taller
+     16px text room so it does not look cramped. */
+  .gb-table-group .select,
+  .gb-toolbar-dept,
+  .gb-toolbar-due {
+    padding: 8px 10px;
+    height: auto;
+    min-height: 42px;
+  }
+  /* Comfortable touch targets. */
+  .btn { min-height: 40px; }
+  .btn-sm { min-height: 36px; }
+  .icon-btn { min-width: 40px; min-height: 40px; }
+}
+
+/* ---- S3 - Topbar ----------------------------------------------------- */
+@media (max-width: 768px) {
+  /* The right-hand pill is the non-negotiable part; the breadcrumb yields. */
+  .topbar .crumb,
+  .topbar .crumb-dash {
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .topbar-right {
+    flex-shrink: 0;
+    gap: 6px;
+    padding: 4px 6px 4px 10px;
+  }
+  /* Presence avatars are a desktop nicety - the bell already lists everyone
+     online, and on a phone this was the single widest topbar element. */
+  .topbar-online-strip { display: none; }
+  .topbar .clock { white-space: nowrap; }
+  /* The "Holiday · <name>" badge is the one variable-width item in the pill.
+     Let it ellipsize instead of squeezing the clock and the controls (the
+     full name is still on its title tooltip). */
+  .topbar-right > .badge {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 34vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 560px) {
+  /* Below this the date + time + three controls stop fitting. Keep the live
+     time (the useful half) and drop the date. */
+  .topbar .clock-date,
+  .topbar .clock-sep { display: none; }
+}
+@media (max-width: 380px) {
+  .topbar .clock { display: none; }
+}
+
+/* ---- S4 - Page chrome ------------------------------------------------ */
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .page-header-actions { width: 100%; }
+  /* Full-width stacked actions beat two half-width buttons squeezed together. */
+  .page-header-actions > .btn { flex: 1 1 160px; justify-content: center; }
+  .modal {
+    padding: 20px 18px;
+    width: min(560px, calc(100vw - 24px));
+    max-height: min(90vh, calc(100dvh - 24px));
+  }
+  .modal-actions > .btn { flex: 1 1 140px; justify-content: center; }
+  .toast-wrap { left: 12px; right: 12px; }
+  .toast { min-width: 0; width: 100%; }
+}
+
+/* ---- S5 - Wide content gets its own scroll container ----------------- */
+@media (max-width: 768px) {
+  /* Tables keep every column and scroll inside the card rather than
+     stretching the page. `display: block` makes the <table> itself the
+     scrollport; the rows still lay out as a table inside it. */
+  .data-table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  /* Horizontal chip/tab strips: scroll, no visible scrollbar. */
+  .gb-status-filter,
+  .gb-viewswitch,
+  .gb-table-controls,
+  .gb-nav-controls {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .gb-status-filter::-webkit-scrollbar,
+  .gb-viewswitch::-webkit-scrollbar,
+  .gb-table-controls::-webkit-scrollbar,
+  .gb-nav-controls::-webkit-scrollbar { display: none; }
+}
+
+/* ---- S6 - Goals ------------------------------------------------------ */
+@media (max-width: 768px) {
+  /* Toolbar: pinning it under the topbar cost ~120px of a phone screen once
+     it wrapped to three rows. Let it scroll away instead. */
+  .gb-toolbar {
+    position: static;
+    top: auto;
+    padding: 10px;
+    gap: 8px;
+  }
+  .gb-toolbar-search {
+    flex: 1 1 100%;
+    min-width: 0;
+    height: 42px;
+  }
+  /* The two dropdowns share one row instead of each demanding 160/130px. */
+  .gb-toolbar-dept,
+  .gb-toolbar-due {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    width: auto;
+  }
+  /* Five nowrap chips needed ~350px - more than a 360px phone has after
+     padding, and it was pushing the whole document sideways. */
+  .gb-status-filter {
+    flex: 1 1 100%;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+  }
+  .gb-status-chip { flex: 0 0 auto; }
+  .gb-member-search { max-width: 100%; }
+
+  /* View switcher / palette row */
+  .gb-nav-controls { flex-wrap: nowrap; gap: 8px; }
+  .gb-viewswitch,
+  .gb-cmdk-trigger,
+  .gb-views-wrap { flex: 0 0 auto; }
+  .gb-views-wrap { margin-left: 0; }
+  .gb-views-menu,
+  .gb-menu { width: min(260px, calc(100vw - 32px)); }
+
+  /* Goal cards */
+  .gb-card { padding: 16px 14px; }
+  .gb-hero { padding: 18px 16px; }
+  .gb-hero .gb-title { font-size: 18px; }
+  .gb-title { font-size: 16px; }
+  .gb-card-top { gap: 6px; }
+  /* `margin-left: auto` pushed the due date onto its own overflowing line
+     once the badges wrapped. In one column it just follows the badges. */
+  .gb-due { margin-left: 0; }
+  .gb-assigned-by { max-width: 100%; min-width: 0; }
+  .gb-card-tools {
+    margin-left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .gb-card-foot { flex-wrap: wrap; gap: 4px; }
+  .gb-assignee-chips { flex-wrap: wrap; }
+  .gb-assignee-chip { max-width: 100%; min-width: 0; }
+
+  /* Per-person progress rows: the name ellipsizes, the bar takes what is
+     left, the count never wraps. */
+  .gb-pp-row { gap: 8px; }
+  .gb-pp-name {
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .gb-pp-bar { flex: 1 1 auto; min-width: 48px; }
+  .gb-pp-count { flex: 0 0 auto; }
+
+  /* Board "team checklist status" panel */
+  .board-checklist-head { flex-wrap: wrap; gap: 6px; }
+  .board-preview-toggle { margin-left: 0; }
+  .board-cl-member-header { flex-wrap: wrap; gap: 6px; }
+  .board-cl-member-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Item rows stop being tick | body | tag across one line. The tag column
+     drops onto its own line, indented to line up under the body text (20px
+     tick + 11px gap). Forcing the body to claim the full remaining width is
+     what makes the tag wrap in the first place - without it flexbox squeezes
+     the body to near-zero and long words spill out under the tag. */
+  .board-cl-item { flex-wrap: wrap; row-gap: 8px; }
+  .board-cl-label { flex: 1 1 auto; min-width: calc(100% - 31px); }
+  .board-cl-label + .board-cl-done-col,
+  .board-cl-label + .board-cl-done-tag,
+  .board-cl-label + .board-cl-pending-tag,
+  .board-cl-label + .board-cl-notdue-tag { margin-left: 31px; }
+  .board-cl-done-col { align-items: flex-start; }
+
+  /* Task/Report/Comment spine labels: the vertical gutter pill ate 30px of a
+     narrow screen and squeezed the text beside it into a ribbon. Lay the
+     label above its content instead. */
+  .cl-section { flex-direction: column; gap: 5px; }
+  .cl-spine {
+    flex-direction: row;
+    width: auto;
+    align-self: flex-start;
+    padding: 4px 10px;
+  }
+  .cl-spine-text {
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+    letter-spacing: 1.4px;
+  }
+
+  /* Member checklist - same fix as the board panel above.
+     On one line the row is: box | title | completed-at pill | recurrence
+     badge. The pill and badge are both `white-space: nowrap` and
+     `flex-shrink: 0`, so on a phone they took ~200px of a ~300px row and
+     flexbox squeezed the title to almost nothing. The title then spilled its
+     own box and painted underneath the pill (and the badge was clipped off
+     the right edge by the row's `overflow: hidden`).
+     Giving the title the full width past the checkbox forces both chips onto
+     a second line, indented to sit under the title. */
+  .goal-checklist { padding: 12px; }
+  .goal-check-row { flex-wrap: wrap; row-gap: 8px; }
+  .goal-check-label { flex: 1 1 auto; min-width: calc(100% - 31px); }
+  .goal-check-completed-at,
+  .goal-check-recur { align-self: flex-start; }
+  /* Indent whichever chip starts the second line - never both, or the one
+     after it would be pushed a further 31px in. */
+  .goal-check-label + .goal-check-completed-at,
+  .goal-check-label + .goal-check-recur { margin-left: 31px; }
+  /* The rotated "DONE" watermark is sized off the viewport, which on a phone
+     left it as wide as the task text it sits over. Scale it back so it reads
+     as a background stamp rather than competing with the title. */
+  .board-cl-item.board-cl-done .cl-section-task::after,
+  .goal-check-item-wrap.has-report.done .cl-section-task::after {
+    font-size: clamp(20px, 5vw, 30px);
+    letter-spacing: 2px;
+    padding: 1px 10px;
+    border-width: 2px;
+  }
+
+  /* Pinboard: 220px sticky notes plus 28px of canvas padding overflowed a
+     360px screen. One note per row, full width. */
+  .gb-pinboard { padding: 16px 12px; gap: 14px; }
+  .gb-pin-card,
+  .gb-pin-add { width: 100%; min-height: 0; }
+
+  /* Filtered results headers */
+  .gb-results-head,
+  .gb-dept-head { flex-wrap: wrap; gap: 8px; }
+
+  /* Table view - three columns, nothing nowrap-wide. */
+  .gb-tr {
+    grid-template-columns: 30px minmax(0, 1fr) 64px;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+  .gb-th-status,
+  .gb-td-status,
+  .gb-th-team,
+  .gb-td-team,
+  .gb-th-due,
+  .gb-td-due { display: none; }
+  .gb-td-title { min-width: 0; flex-wrap: wrap; gap: 6px; }
+  .gb-td-name { min-width: 0; }
+  .gb-table-foldbtns { margin-left: 0; }
+  .gb-pager { flex-wrap: wrap; gap: 10px; }
+
+  /* Canvas - it pans and zooms with pointer events (touch-action: none), so
+     it already works by touch; it just needs phone-sized chrome. */
+  .gb-canvas-viewport {
+    height: min(68vh, 460px);
+    min-height: 300px;
+    max-width: 100%;
+  }
+  .gb-canvas-fullscreen {
+    height: 100dvh !important;
+    width: 100%;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .gb-canvas-topbar { left: 10px; top: 10px; }
+  .gb-canvas-controls {
+    right: 10px;
+    bottom: 10px;
+    flex-wrap: wrap;
+    max-width: calc(100% - 20px);
+  }
+}
+
+/* ---- S7 - Everything else ------------------------------------------- */
+@media (max-width: 768px) {
+  /* Punch */
+  .punch-button { width: min(160px, 58vw); height: min(160px, 58vw); }
+
+  /* Stat rows */
+  .gb-stats { flex-wrap: wrap; }
+
+  /* Rich-text editor: the formatting buttons wrap onto a second row rather
+     than running off the side of the card. */
+  .rte-toolbar { flex-wrap: wrap; row-gap: 4px; }
+  .rte-btn { min-width: 32px; height: 32px; }
+
+  /* Month calendar: keep seven columns (a six-day week makes no sense) but
+     tighten the cells so they shrink instead of the grid overflowing. */
+  .calendar { gap: 4px; }
+  .calendar-cell { padding: 4px; gap: 2px; }
+  .calendar-cell .day-num { font-size: 11.5px; }
+  .cal-day-header { font-size: 9.5px; letter-spacing: 0.03em; }
+
+  /* Right-anchored popovers stay on screen. */
+  .notif-panel,
+  .avatar-lb-card,
+  .datepicker-pop { max-width: calc(100vw - 24px); }
+
+  /* Command palettes clear the on-screen keyboard and the tab bar. */
+  .cmdk-overlay,
+  .gb-cmdk-backdrop {
+    padding-top: 8vh;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .cmdk { width: 100%; max-width: 100%; }
+}

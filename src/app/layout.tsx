@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Montserrat, JetBrains_Mono } from 'next/font/google';
 import { NO_FLASH_SCRIPT } from '@/lib/theme';
 import { FaviconSwitcher } from '@/components/FaviconSwitcher';
@@ -28,6 +28,18 @@ export const metadata: Metadata = {
   icons: {
     icon: '/logo-light.png',
   },
+};
+
+// Explicit viewport (Next's default omits viewport-fit, which the safe-area
+// insets the bottom tab bar and "More" sheet rely on need to be non-zero on
+// notched phones). `maximumScale`/`userScalable` are deliberately left alone —
+// blocking pinch-zoom is an accessibility regression. The phone auto-zoom the
+// app used to do on focus is fixed properly in globals.css by making form
+// controls 16px on small screens, which is what actually triggers it on iOS.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
