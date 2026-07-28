@@ -30,6 +30,7 @@ import {
   isWeekend,
 } from '@/lib/dates';
 import { roleLabel, isFounder, isManager, weeklyTargetHours } from '@/lib/roles';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { Progress } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { BarChart, LineChart } from '@/components/charts';
@@ -40,6 +41,28 @@ import { PresenceLine } from './PresenceLine';
 import { AvatarLightbox } from '@/components/AvatarLightbox';
 
 export const metadata = { title: 'Employee · Mahesh Chandra & Associates' };
+
+// Tag frequency + Work logs are both derived from Daily Log entries, which is
+// gated off in this phase (FEATURE_FLAGS.dailyLog) — nobody can write a log,
+// so these would only ever show an empty state anyway. Rather than hide the
+// cards outright, show a locked placeholder (same lock-icon + badge language
+// as the Founder-only punch-corrections card below) so it reads as "coming
+// back later", not "broken/missing".
+function LockedCard({ title, blurb }: { title: string; blurb: string }) {
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div>
+          <div className="card-subtitle">
+            <Icon name="lock" size={14} /> {title}
+          </div>
+          <div className="text-xs text-grey mt-1">{blurb}</div>
+        </div>
+        <span className="badge badge-slate">Phase 2</span>
+      </div>
+    </div>
+  );
+}
 
 export default async function EmployeePage({
   params,
@@ -431,28 +454,35 @@ export default async function EmployeePage({
         }}
       >
         {canSeeLogs ? (
-        <div className="card">
-          <div className="card-subtitle mb-3">Tag frequency</div>
-          {tagEntries.length === 0 ? (
-            <div className="text-grey text-sm">No tags yet.</div>
-          ) : (
-            <div className="grid gap-2">
-              {tagEntries.map(([t, n]) => (
-                <div key={t} className="flex items-center gap-2">
-                  <div style={{ minWidth: 100 }}>
-                    <span className="tag-chip">{t}</span>
-                  </div>
-                  <div className="flex-1">
-                    <Progress value={(n / tagEntries[0][1]) * 100} />
-                  </div>
-                  <div className="text-xs text-grey" style={{ minWidth: 24, textAlign: 'right' }}>
-                    {n}
-                  </div>
+          FEATURE_FLAGS.dailyLog ? (
+            <div className="card">
+              <div className="card-subtitle mb-3">Tag frequency</div>
+              {tagEntries.length === 0 ? (
+                <div className="text-grey text-sm">No tags yet.</div>
+              ) : (
+                <div className="grid gap-2">
+                  {tagEntries.map(([t, n]) => (
+                    <div key={t} className="flex items-center gap-2">
+                      <div style={{ minWidth: 100 }}>
+                        <span className="tag-chip">{t}</span>
+                      </div>
+                      <div className="flex-1">
+                        <Progress value={(n / tagEntries[0][1]) * 100} />
+                      </div>
+                      <div className="text-xs text-grey" style={{ minWidth: 24, textAlign: 'right' }}>
+                        {n}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
+          ) : (
+            <LockedCard
+              title="Tag frequency"
+              blurb={`Unlocks with Daily Log — tags ${u.name.split(' ')[0]} uses most often.`}
+            />
+          )
         ) : null}
         {canSeeLeave ? (
         <div className="card">
@@ -483,7 +513,14 @@ export default async function EmployeePage({
 
       {canSeeLogs ? (
         <div className="mt-4">
-          <MemberLogs logs={logDates} />
+          {FEATURE_FLAGS.dailyLog ? (
+            <MemberLogs logs={logDates} />
+          ) : (
+            <LockedCard
+              title="Work logs"
+              blurb={`Unlocks with Daily Log — ${u.name.split(' ')[0]}'s full log history.`}
+            />
+          )}
         </div>
       ) : null}
 
