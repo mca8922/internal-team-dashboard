@@ -1348,12 +1348,16 @@ export async function createLeave(input: {
       .eq('role', 'board')
       .eq('is_active', true),
   ]);
-  if (boards && boards.length) {
+  // Never notify the requester about their own request — a Board Member
+  // applying for leave can't review it (see reviewLeave below), so pinging
+  // them to "review" their own submission would be both noisy and wrong.
+  const reviewers = (boards ?? []).filter((b) => b.id !== userId);
+  if (reviewers.length) {
     const range = leaveRange(input.startDate, input.endDate, input.isHalfDay);
     const leaveTitle = `${me?.name ?? 'A teammate'} requested leave`;
     const leaveBody = `${input.type.toUpperCase()} · ${range}`;
     await admin.from('notifications').insert(
-      boards.map((b) => ({
+      reviewers.map((b) => ({
         user_id: b.id,
         type: 'leave_requested',
         title: leaveTitle,
@@ -1361,7 +1365,7 @@ export async function createLeave(input: {
         href: leaveHref,
       })),
     );
-    const boardIds = boards.map((b) => b.id);
+    const boardIds = reviewers.map((b) => b.id);
     after(() => sendPush(boardIds, { title: leaveTitle, body: leaveBody, url: leaveHref }, 'leave_requested'));
   }
 
@@ -1385,6 +1389,11 @@ export async function reviewLeave(
     .single();
   if (!leave) return;
 
+  // A Board Member can never review their own leave request — accepting or
+  // finalising your own time off isn't a real review. Someone else on the
+  // Board (another Director, or the other Founder) has to do it.
+  if (leave.user_id === userId) throw new Error('You cannot review your own leave request');
+
   // A Board Member who is NOT the Founder can only *accept* a request — that
   // records a pre-approval and pings the Founder for the final say. The
   // request stays pending until the Founder finalises it. (Rejections are
@@ -1405,11 +1414,17 @@ export async function reviewLeave(
       .eq('id', userId)
       .single();
     {
+      // If the requester is themselves a Founder, they can't finalise their
+      // own (now-accepted) leave — exclude them so only the OTHER Founder
+      // gets pinged to act.
+      const founderReviewers = (FOUNDER_USER_IDS as readonly string[]).filter(
+        (id) => id !== leave.user_id,
+      );
       const body = `Needs your final approval · ${(leave.type as string).toUpperCase()} · ${leaveRange(leave.start_date, leave.end_date, !!leave.is_half_day)}${comment ? ` · "${comment}"` : ''}`;
       const href = `/leaves?leave=${leaveId}`;
       const title = `${acceptor?.name ?? 'A Board Member'} accepted a leave`;
       await supabase.from('notifications').insert(
-        FOUNDER_USER_IDS.map((id) => ({
+        founderReviewers.map((id) => ({
           user_id: id,
           type: 'leave_requested',
           title,
@@ -1418,7 +1433,7 @@ export async function reviewLeave(
         })),
       );
       after(() => sendPush(
-        FOUNDER_USER_IDS as unknown as string[],
+        founderReviewers,
         { title, body, url: href },
         'leave_requested',
       ));
@@ -2823,8 +2838,8 @@ export async function reportError(input: {
     `Error: ${input.message || 'No message'}`,
   ].join('\n');
 
-  const html = renderTransactionalEmail({ name: 'Nishit', title, body, ctaUrl: input.pageUrl, ctaLabel: 'Open the page' });
-  const text = transactionalPlainText({ name: 'Nishit', title, body, ctaUrl: input.pageUrl, ctaLabel: 'Open the page' });
+  const html = renderTransactionalEmail({ name: 'MCA', title, body, ctaUrl: input.pageUrl, ctaLabel: 'Open the page' });
+  const text = transactionalPlainText({ name: 'MCA', title, body, ctaUrl: input.pageUrl, ctaLabel: 'Open the page' });
 
   const admin = createAdminClient();
   try {
@@ -2832,7 +2847,7 @@ export async function reportError(input: {
     await admin.from('transactional_email_logs').insert({
       recipient_id: null,
       recipient_email: BUG_REPORT_TO,
-      recipient_name: 'Nishit (Founder)',
+      recipient_name: 'MCA (Founder)',
       event_type: 'bug_report',
       subject,
       status: 'sent',
@@ -2843,7 +2858,7 @@ export async function reportError(input: {
     await admin.from('transactional_email_logs').insert({
       recipient_id: null,
       recipient_email: BUG_REPORT_TO,
-      recipient_name: 'Nishit (Founder)',
+      recipient_name: 'MCA (Founder)',
       event_type: 'bug_report',
       subject,
       status: 'failed',

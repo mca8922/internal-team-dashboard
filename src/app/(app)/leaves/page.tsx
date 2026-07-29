@@ -35,6 +35,7 @@ export default async function LeavesPage() {
     <LeavesView
       isBoard={isBoard}
       isFounder={isFounder(profile)}
+      currentUserId={profile.id}
       usage={usage}
       myLeaves={myLeaves}
       allLeaves={allLeaves.map((l) => ({
@@ -44,6 +45,7 @@ export default async function LeavesPage() {
         preApproverName: l.pre_approved_by
           ? (nameById.get(l.pre_approved_by) ?? 'A Board Member')
           : null,
+        reviewedByName: l.reviewed_by ? (nameById.get(l.reviewed_by) ?? 'A Board Member') : null,
       }))}
       holidays={holidays}
     />

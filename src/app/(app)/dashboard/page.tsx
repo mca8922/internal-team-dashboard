@@ -240,6 +240,10 @@ export default async function DashboardPage() {
       (u) => !punchedSet.has(u.id) && !isOnLeave(allLeaves, u.id, today),
     ).length;
     const pendingList = allLeaves.filter((l) => l.status === 'pending');
+    // The "needs your review" widget below excludes the viewer's own request
+    // — a Board Member can't review their own leave (see reviewLeave), so
+    // showing it here with review buttons would be both wrong and useless.
+    const reviewableList = pendingList.filter((l) => l.user_id !== profile.id);
 
     const depts: Record<string, { name: string; total: number; punched: number; color: string }> =
       {};
@@ -266,7 +270,7 @@ export default async function DashboardPage() {
           u.id !== profile.id && !punchedSet.has(u.id) && !isOnLeave(allLeaves, u.id, today),
       ),
       flaggedLog: [],
-      pendingLeaves: pendingList.slice(0, 3).map((l) => {
+      pendingLeaves: reviewableList.slice(0, 3).map((l) => {
         const u = profiles.find((p) => p.id === l.user_id);
         const acc = l.pre_approved_by
           ? profiles.find((p) => p.id === l.pre_approved_by)

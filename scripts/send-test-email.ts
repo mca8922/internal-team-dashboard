@@ -35,7 +35,7 @@ const transactional = [
   {
     from: DASH_FROM,
     title: 'You forgot to punch out',
-    body: 'Your session from Monday, June 8, 2026 is still running. Please ask Nishit Rathod (Founder) to correct your punch - message them on WhatsApp.',
+    body: 'Your session from Monday, June 8, 2026 is still running. Please ask MCA (Founder) to correct your punch - message them on WhatsApp.',
     ctaUrl: `${APP_URL}/punch?missed=2026-06-08`,
   },
 ];

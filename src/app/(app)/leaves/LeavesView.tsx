@@ -28,6 +28,7 @@ type LeaveWithName = Leave & {
   userName: string;
   userAvatarUrl?: string | null;
   preApproverName?: string | null;
+  reviewedByName?: string | null;
 };
 
 const TYPE_META = [
@@ -391,6 +392,7 @@ function HolidayManager({ holidays, onClose }: { holidays: Holiday[]; onClose: (
 export function LeavesView({
   isBoard,
   isFounder,
+  currentUserId,
   usage,
   myLeaves,
   allLeaves,
@@ -398,6 +400,7 @@ export function LeavesView({
 }: {
   isBoard: boolean;
   isFounder: boolean;
+  currentUserId: string;
   usage: LeaveUsage;
   myLeaves: Leave[];
   allLeaves: LeaveWithName[];
@@ -534,12 +537,12 @@ export function LeavesView({
         await reviewLeave(id, status, comment);
         toast(
           preApproveOnly(status)
-            ? 'Accepted · sent to Nishit for final approval'
+            ? 'Accepted · sent for Founder approval'
             : `Leave ${status}`,
         );
-      } catch {
+      } catch (e) {
         setLeaves(baseLeaves); // revert to server truth
-        toast('Could not update the leave request.', 'error');
+        toast((e as Error).message || 'Could not update the leave request.', 'error');
       }
     });
   };
@@ -578,7 +581,17 @@ export function LeavesView({
   };
 
   // Action buttons for one pending request, varying by who is reviewing.
+  // A Board Member can never review (or delete) their own request — that
+  // isn't a real review — so this is checked before the Founder/Director
+  // branches below, regardless of role.
   const reviewActions = (l: LeaveWithName) => {
+    if (l.user_id === currentUserId) {
+      return (
+        <span className="badge badge-amber">
+          {l.pre_approved_by ? 'Awaiting Founder approval' : "Awaiting another Director's review"}
+        </span>
+      );
+    }
     if (isFounder) {
       return (
         <>
@@ -595,7 +608,7 @@ export function LeavesView({
     return (
       <>
         {l.pre_approved_by ? (
-          <span className="badge badge-amber">Awaiting Nishit</span>
+          <span className="badge badge-amber">Awaiting Founder approval</span>
         ) : (
           <Button size="sm" icon="check" onClick={() => openReview(l, 'approved')}>
             Accept
@@ -700,7 +713,7 @@ export function LeavesView({
                     {l.reason}
                     {l.pre_approved_by ? (
                       <div className="text-xs" style={{ color: 'var(--color-amber-text)' }}>
-                        Accepted by {l.preApproverName ?? 'a Board Member'} · awaiting final
+                        Accepted by {l.preApproverName ?? 'a Board Member'} · awaiting Founder
                         approval
                       </div>
                     ) : null}
@@ -785,6 +798,11 @@ export function LeavesView({
                     >
                       {l.status === 'pending' && l.pre_approved_by ? 'accepted' : l.status}
                     </span>
+                    {l.status !== 'pending' && l.reviewedByName ? (
+                      <div className="text-xs text-grey mt-1">
+                        {l.status === 'approved' ? 'Approved' : 'Declined'} by {l.reviewedByName}
+                      </div>
+                    ) : null}
                     {l.review_note ? (
                       <div
                         className="text-xs text-grey mt-1"

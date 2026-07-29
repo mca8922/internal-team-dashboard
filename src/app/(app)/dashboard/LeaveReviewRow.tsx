@@ -1,8 +1,10 @@
 'use client';
 
-// One pending-leave row on the dashboard. A Board Member who is not the
-// Founder can only *accept* (a pre-approval awaiting Nishit); the Founder
-// finalises and may delete the log.
+// One pending-leave row on the dashboard. Excludes the viewer's own request
+// (see dashboard/page.tsx's reviewableList — you can't review your own
+// leave). A Board Member who is not the Founder can only *accept* (a
+// pre-approval awaiting Founder sign-off); the Founder finalises and may
+// delete the log.
 import * as React from 'react';
 import { Avatar, Button } from '@/components/ui';
 import { useToast } from '@/components/Toast';
@@ -36,7 +38,7 @@ export function LeaveReviewRow({
       await reviewLeave(id, status);
       toast(
         status === 'approved' && !isFounder
-          ? 'Accepted · sent to Nishit'
+          ? 'Accepted · sent for Founder approval'
           : `Leave ${status}`,
       );
     } catch (e) {
@@ -77,7 +79,7 @@ export function LeaveReviewRow({
         </div>
         {preApproverName ? (
           <div className="text-xs" style={{ color: 'var(--color-amber-text)' }}>
-            Accepted by {preApproverName} · {isFounder ? 'awaiting you' : 'awaiting Nishit'}
+            Accepted by {preApproverName} · {isFounder ? 'awaiting you' : 'awaiting Founder approval'}
           </div>
         ) : null}
       </div>
@@ -104,7 +106,7 @@ export function LeaveReviewRow({
         </>
       ) : preApproverName ? (
         <>
-          <span className="badge badge-amber">Awaiting Nishit</span>
+          <span className="badge badge-amber">Awaiting Founder approval</span>
           <Button
             size="sm"
             variant="ghost"

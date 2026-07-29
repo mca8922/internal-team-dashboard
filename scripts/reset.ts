@@ -34,7 +34,7 @@ const admin = createClient(url, serviceKey, {
 // seed the new account gets a new user id — set FOUNDER_USER_ID in
 // src/lib/roles.ts to it so the app recognises the Founder.
 const BOARD = {
-  name: 'Nishit Rathod',
+  name: 'MCA',
   email: 'ceo@restrucai.com',
   password: boardPassword,
   department: 'Strategy',
