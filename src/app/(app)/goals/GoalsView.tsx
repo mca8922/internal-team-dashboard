@@ -1914,7 +1914,7 @@ export function GoalsView({
     <div className="page-header">
       <div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
-          <h1 className="page-title">Goals</h1>
+          <h1 className="page-title">Tasks</h1>
           <span className="page-title" style={{ color: 'var(--color-grey-text)', fontWeight: 400, fontStyle: 'italic' }}>
             We Believe in{' '}
             <span className="text-shine page-title" style={{ fontStyle: 'normal' }}>

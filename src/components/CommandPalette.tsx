@@ -43,7 +43,7 @@ export function CommandPalette({ isBoard, isMgr }: { isBoard: boolean; isMgr: bo
       FEATURE_FLAGS.dailyLog
         ? { id: 'log', label: 'Daily Log', icon: 'edit', keywords: 'journal write', run: go('/log') }
         : null,
-      { id: 'goals', label: 'Goals', icon: 'target', keywords: 'tasks checklist', run: go('/goals') },
+      { id: 'goals', label: 'Tasks', icon: 'target', keywords: 'tasks checklist goals', run: go('/goals') },
       { id: 'analytics', label: 'Analytics', icon: 'chart', keywords: 'stats hours', run: go('/analytics') },
       { id: 'leaves', label: 'Leaves', icon: 'plane', keywords: 'time off holiday', run: go('/leaves') },
       canLead
