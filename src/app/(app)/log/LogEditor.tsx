@@ -654,7 +654,7 @@ export function LogEditor({
               <Icon name="target" size={16} />
             </span>
             <span>
-              Revisit the <span className="log-footer__link">Goals</span> assigned to you,
+              Revisit the <span className="log-footer__link">Tasks</span> assigned to you,
               mark your progress, and plan your next day.
             </span>
             <Icon name="arrow-right" size={14} style={{ marginLeft: 'auto', flexShrink: 0 }} />

@@ -67,13 +67,13 @@ export function GoalCommandPalette({
 
   return (
     <div className="gb-cmdk-backdrop" onClick={onClose} role="presentation">
-      <div className="gb-cmdk" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Jump to goal">
+      <div className="gb-cmdk" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Jump to task">
         <div className="gb-cmdk-input-wrap">
           <Icon name="search" size={16} />
           <input
             ref={inputRef}
             className="gb-cmdk-input"
-            placeholder="Jump to a goal…"
+            placeholder="Jump to a task…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onKeyDown}
@@ -82,7 +82,7 @@ export function GoalCommandPalette({
         </div>
         <div className="gb-cmdk-list">
           {matches.length === 0 ? (
-            <div className="gb-cmdk-empty">No goals match “{q}”.</div>
+            <div className="gb-cmdk-empty">No tasks match “{q}”.</div>
           ) : (
             matches.map((g, i) => (
               <button

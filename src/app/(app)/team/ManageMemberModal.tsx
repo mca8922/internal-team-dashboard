@@ -754,7 +754,7 @@ export function ManageMemberModal({
       onClose={() => setHandoffOpen(false)}
       memberId={member.id}
       memberName={member.name}
-      contextLabel="Reassign their open goals to teammates, then offboard. Their data is kept."
+      contextLabel="Reassign their open tasks to teammates, then offboard. Their data is kept."
       confirmLabel="Offboard now"
       onConfirm={async () => {
         await markMemberLeft(member.id);

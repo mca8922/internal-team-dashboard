@@ -15,8 +15,8 @@ type Audience = 'all' | 'reviewer' | 'board';
 // Curated, friendly rows. `audience` hides types a member never receives:
 // 'reviewer' = Board or a Manager; 'board' = Board only.
 const ROWS: { type: NotificationType; label: string; hint: string; audience: Audience }[] = [
-  { type: 'goal_assigned', label: 'Goal assigned', hint: 'A goal is assigned to you', audience: 'all' },
-  { type: 'goal_due_soon', label: 'Goal due soon', hint: 'A goal you own is almost due', audience: 'all' },
+  { type: 'goal_assigned', label: 'Task assigned', hint: 'A task is assigned to you', audience: 'all' },
+  { type: 'goal_due_soon', label: 'Task due soon', hint: 'A task you own is almost due', audience: 'all' },
   { type: 'work_report_reviewed', label: 'Work reviewed', hint: 'Your work report gets rated', audience: 'all' },
   { type: 'leave_approved', label: 'Leave approved', hint: 'Your leave request is approved', audience: 'all' },
   { type: 'leave_rejected', label: 'Leave declined', hint: 'Your leave request is declined', audience: 'all' },

@@ -912,7 +912,7 @@ export function LeavesView({
           onClose={() => setHandoff(null)}
           memberId={handoff.memberId}
           memberName={handoff.memberName}
-          contextLabel={`On leave · ${handoff.range}. Optionally reassign their goals to cover.`}
+          contextLabel={`On leave · ${handoff.range}. Optionally reassign their tasks to cover.`}
         />
       ) : null}
     </div>

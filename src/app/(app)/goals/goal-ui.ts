@@ -19,10 +19,10 @@ export const LEVEL_META: Record<
   GoalLevel,
   { label: string; tone: 'hero' | 'monthly' | 'weekly' | 'daily'; child: GoalLevel | null }
 > = {
-  yearly: { label: 'Yearly Goal', tone: 'hero', child: 'monthly' },
+  yearly: { label: 'Yearly Task', tone: 'hero', child: 'monthly' },
   monthly: { label: 'Monthly Milestone', tone: 'monthly', child: 'weekly' },
-  weekly: { label: 'Weekly Goal', tone: 'weekly', child: 'daily' },
-  daily: { label: 'Daily Goal', tone: 'daily', child: null },
+  weekly: { label: 'Weekly Task', tone: 'weekly', child: 'daily' },
+  daily: { label: 'Daily Task', tone: 'daily', child: null },
 };
 
 // Tier order used to sort filtered results top-down (Yearly → Daily).

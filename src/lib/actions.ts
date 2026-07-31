@@ -311,7 +311,7 @@ export async function sweepGoalDeadlines(): Promise<void> {
     rows.push({
       user_id: a.user_id,
       type: 'goal_due_soon',
-      title: daysLeft === 1 ? 'Goal due tomorrow' : 'Goal due in 2 days',
+      title: daysLeft === 1 ? 'Task due tomorrow' : 'Task due in 2 days',
       body: goal.title,
       href: `/goals?goal=${a.goal_id}`,
       goal_id: a.goal_id,
@@ -661,15 +661,15 @@ async function notifyAssignees(
     userIds.map((user_id) => ({
       user_id,
       type: 'goal_assigned' as const,
-      title: 'New goal assigned to you',
+      title: 'New task assigned to you',
       body: goalTitle,
       href: `/goals?goal=${goalId}`,
       goal_id: goalId,
       department: goal?.department ?? null,
     })),
   );
-  after(() => sendPush(userIds, { title: 'New goal assigned to you', body: goalTitle, url: `/goals?goal=${goalId}` }, 'goal_assigned'));
-  after(() => notifyByEmail(userIds, { eventType: 'goal_assigned', title: 'New goal assigned to you', body: goalTitle, href: `/goals?goal=${goalId}` }));
+  after(() => sendPush(userIds, { title: 'New task assigned to you', body: goalTitle, url: `/goals?goal=${goalId}` }, 'goal_assigned'));
+  after(() => notifyByEmail(userIds, { eventType: 'goal_assigned', title: 'New task assigned to you', body: goalTitle, href: `/goals?goal=${goalId}` }));
 }
 
 // Replaces a goal's assignee set with exactly `userIds`, and notifies only
@@ -779,7 +779,7 @@ export async function setGoalAssignees(goalId: string, userIds: string[]) {
     .select('title')
     .eq('id', goalId)
     .single();
-  await replaceAssigneesAndNotify(supabase, goalId, goal?.title ?? 'a goal', userIds, userId);
+  await replaceAssigneesAndNotify(supabase, goalId, goal?.title ?? 'a task', userIds, userId);
   revalidatePath('/goals');
   revalidatePath('/dashboard');
 }
@@ -881,7 +881,7 @@ export async function updateGoal(
       .select('title')
       .eq('id', id)
       .single();
-    await replaceAssigneesAndNotify(supabase, id, goal?.title ?? 'a goal', assigneeIds, userId);
+    await replaceAssigneesAndNotify(supabase, id, goal?.title ?? 'a task', assigneeIds, userId);
   }
   revalidatePath('/goals');
   revalidatePath('/dashboard');
@@ -1121,7 +1121,7 @@ async function notifyReportOwnerOfReview(
   const { data: goal } = item
     ? await admin.from('goals').select('id, title, department').eq('id', item.goal_id).single()
     : { data: null as { id: string; title: string; department: string | null } | null };
-  const goalTitle = goal?.title ?? 'your goal';
+  const goalTitle = goal?.title ?? 'your task';
   const top = stars === 5;
   const title = top ? '⭐ Top marks on your work!' : 'Your work was reviewed';
   const body = top
@@ -1895,7 +1895,7 @@ export async function deleteDepartment(name: string) {
   if ((memberCount ?? 0) > 0 || (goalCount ?? 0) > 0) {
     const parts = [];
     if (memberCount) parts.push(`${memberCount} member${memberCount > 1 ? 's' : ''}`);
-    if (goalCount) parts.push(`${goalCount} goal${goalCount > 1 ? 's' : ''}`);
+    if (goalCount) parts.push(`${goalCount} task${goalCount > 1 ? 's' : ''}`);
     throw new Error(
       `Can't delete "${dept}": ${parts.join(' and ')} still use it. Reassign them first.`,
     );

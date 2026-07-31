@@ -62,7 +62,7 @@ export function CommandPalette({ isBoard, isMgr }: { isBoard: boolean; isMgr: bo
         ? {
             id: 'team-analytics',
             label: 'Team analytics',
-            hint: 'Goals & org roll-ups',
+            hint: 'Tasks & org roll-ups',
             icon: 'chart',
             keywords: 'goals completion overdue department',
             run: go('/analytics/team'),

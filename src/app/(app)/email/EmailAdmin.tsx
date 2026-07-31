@@ -24,7 +24,7 @@ type Member = Pick<
 const EVENT_LABEL: Record<string, string> = {
   leave_approved: 'Leave approved',
   leave_rejected: 'Leave declined',
-  goal_assigned: 'Goal assigned',
+  goal_assigned: 'Task assigned',
   punch_missing: 'Missed punch',
   bug_report: 'Bug report',
 };
@@ -99,7 +99,7 @@ export function EmailAdmin({
     const order: { key: string; label: string }[] = [
       { key: 'leave_approved', label: 'Leave OK' },
       { key: 'leave_rejected', label: 'Leave no' },
-      { key: 'goal_assigned', label: 'Goal' },
+      { key: 'goal_assigned', label: 'Task' },
       { key: 'punch_missing', label: 'Punch' },
       { key: 'bug_report', label: 'Bug' },
     ];
@@ -139,7 +139,7 @@ export function EmailAdmin({
 
   const eventSwitches: { key: 'on_leave' | 'on_goal' | 'on_punch'; label: string; hint: string }[] = [
     { key: 'on_leave', label: 'Leave decisions', hint: 'Approved / declined emails to the requester' },
-    { key: 'on_goal', label: 'Goal assignments', hint: 'When a goal is assigned to a member' },
+    { key: 'on_goal', label: 'Task assignments', hint: 'When a task is assigned to a member' },
     { key: 'on_punch', label: 'Missed punches', hint: 'Forgot-to-punch-out reminders' },
   ];
 

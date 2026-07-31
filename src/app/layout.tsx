@@ -22,7 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: 'Mahesh Chandra & Associates · Internal Team Dashboard',
-  description: 'Punch in, log work, ship goals. All in one place.',
+  description: 'Punch in, log work, ship tasks. All in one place.',
   // Default favicon — the inline script + FaviconSwitcher then swap it to
   // the light/dark variant that matches the active theme.
   icons: {

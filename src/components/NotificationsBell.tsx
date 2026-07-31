@@ -654,7 +654,7 @@ export function NotificationsBell({
               <div className="text-sm fw-medium mt-2">You are all caught up</div>
               <div className="text-xs text-grey mt-1">
                 {FEATURE_FLAGS.notificationsFull
-                  ? 'New goal assignments, logs and leaves will show up here.'
+                  ? 'New task assignments, logs and leaves will show up here.'
                   : 'Profile and security reminders will show up here.'}
               </div>
             </div>

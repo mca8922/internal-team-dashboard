@@ -65,7 +65,7 @@ const STEPS: TourStep[] = [
   },
   {
     icon: 'target',
-    title: 'Your goals for the week',
+    title: 'Your tasks for the week',
     intro:
       'This card lists what you are working toward this week. Each bar fills up as the work gets done, so your priorities are always in plain sight.',
     route: '/dashboard',
@@ -95,11 +95,11 @@ const STEPS: TourStep[] = [
   },
   {
     icon: 'target',
-    title: 'The Goals page',
+    title: 'The Tasks page',
     intro:
-      'Open Goals from the sidebar to see the big picture: the company’s yearly goals broken down into monthly, weekly and daily work.',
+      'Open Tasks from the sidebar to see the big picture: the company’s yearly tasks broken down into monthly, weekly and daily work.',
     points: [
-      'Most goals carry a checklist you tick off as you go, and your progress updates on its own.',
+      'Most tasks carry a checklist you tick off as you go, and your progress updates on its own.',
       'Finish your last item due for the day and you get a little celebration. 🎉',
       'Descriptions can be richly formatted (bold, lists and more) so “done” is always clear.',
     ],
@@ -108,14 +108,14 @@ const STEPS: TourStep[] = [
   },
   {
     icon: 'target',
-    title: 'Managing goals across the team',
+    title: 'Managing tasks across the team',
     boardOnly: true,
     intro:
-      'As a board member, the Goals page is your command centre for execution across every department.',
+      'As a board member, the Tasks page is your command centre for execution across every department.',
     points: [
-      'Search any goal by title or description, and filter by department, status or what’s overdue.',
+      'Search any task by title or description, and filter by department, status or what’s overdue.',
       'A health strip up top shows totals, active, overdue and completed at a glance. Click any to filter.',
-      'Use the ⋮ menu on a card to change a goal’s status or reassign members on the spot, or Duplicate it to hand it to someone else.',
+      'Use the ⋮ menu on a card to change a task’s status or reassign members on the spot, or Duplicate it to hand it to someone else.',
       'A teammate on approved leave is marked “On leave” and left out of that day’s progress automatically.',
     ],
     route: '/dashboard',
@@ -123,13 +123,13 @@ const STEPS: TourStep[] = [
   },
   {
     icon: 'target',
-    title: 'Managing goals for your department',
+    title: 'Managing tasks for your department',
     managerOnly: true,
     intro:
       'As a department manager, you get the same execution tools as the Board — scoped to your own department.',
     points: [
-      'Search and filter your department’s goals by status or what’s overdue.',
-      'Use the ⋮ menu on a card to change a goal’s status or reassign it to someone on your team.',
+      'Search and filter your department’s tasks by status or what’s overdue.',
+      'Use the ⋮ menu on a card to change a task’s status or reassign it to someone on your team.',
       'A teammate on approved leave is marked “On leave” and left out of that day’s progress automatically.',
     ],
     route: '/dashboard',
