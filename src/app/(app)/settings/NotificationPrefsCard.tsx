@@ -22,6 +22,8 @@ const ROWS: { type: NotificationType; label: string; hint: string; audience: Aud
   { type: 'leave_rejected', label: 'Leave declined', hint: 'Your leave request is declined', audience: 'all' },
   { type: 'punch_missing', label: 'Punch reminder', hint: 'You forgot to punch out', audience: 'all' },
   { type: 'work_anniversary', label: 'Milestones', hint: 'Your work anniversaries and milestones', audience: 'all' },
+  { type: 'birthday', label: 'Birthdays', hint: 'Your birthday reminder and wishes from teammates', audience: 'all' },
+  { type: 'birthday_wish_reply', label: 'Birthday replies', hint: 'A celebrant replies to your birthday wish', audience: 'all' },
   { type: 'work_report_submitted', label: 'Reports to review', hint: 'A team member submits a work report', audience: 'reviewer' },
   { type: 'leave_requested', label: 'Leave requests', hint: 'A leave request needs a decision', audience: 'board' },
 ];

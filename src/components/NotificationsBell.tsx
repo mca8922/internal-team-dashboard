@@ -81,6 +81,8 @@ const TYPE_META: Record<NotificationType, { icon: IconName; tone: 'warning' | 'i
   punch_missing: { icon: 'clock', tone: 'warning' },
   goal_due_soon: { icon: 'target', tone: 'warning' },
   work_anniversary: { icon: 'sparkles', tone: 'info' },
+  birthday: { icon: 'sparkles', tone: 'info' },
+  birthday_wish_reply: { icon: 'mail', tone: 'info' },
   work_report_submitted: { icon: 'inbox', tone: 'info' },
   work_report_reviewed: { icon: 'star', tone: 'info' },
   task_unlocked: { icon: 'lock', tone: 'info' },
@@ -99,6 +101,7 @@ export function NotificationsBell({
   pendingLeaves,
   isBoard,
   hasAvatar,
+  hasDob,
   initialNotifications,
   departmentColors = {},
   mutedInApp = [],
@@ -113,6 +116,7 @@ export function NotificationsBell({
   pendingLeaves: number;
   isBoard: boolean;
   hasAvatar: boolean;
+  hasDob: boolean;
   initialNotifications: Notification[];
   departmentColors?: Record<string, string>;
   mutedInApp?: NotificationType[];
@@ -434,6 +438,19 @@ export function NotificationsBell({
       icon: 'user',
       title: 'Upload your profile picture',
       detail: 'A photo helps your team recognise you',
+      href: '/settings',
+      tone: 'warning',
+      section: PINNED_SECTION,
+    });
+  }
+
+  // Date of birth missing — undismissable until they set one.
+  if (!hasDob) {
+    items.push({
+      key: 'dob',
+      icon: 'calendar',
+      title: 'Add your date of birth',
+      detail: 'So your team can celebrate with you',
       href: '/settings',
       tone: 'warning',
       section: PINNED_SECTION,

@@ -42,6 +42,18 @@ export function parseDate(s: string | Date): Date {
   return new Date(y, m - 1, d);
 }
 
+// Age in whole years as of `on` (defaults to now), given a YYYY-MM-DD date of
+// birth — subtracts a year if this year's birthday hasn't occurred yet.
+export function calcAge(dob: string, on: Date = new Date()): number {
+  const birth = parseDate(dob);
+  let age = on.getFullYear() - birth.getFullYear();
+  const beforeBirthdayThisYear =
+    on.getMonth() < birth.getMonth() ||
+    (on.getMonth() === birth.getMonth() && on.getDate() < birth.getDate());
+  if (beforeBirthdayThisYear) age -= 1;
+  return age;
+}
+
 // Epoch ms at 00:00 IST of a given calendar day (YYYY-MM-DD). IST is a fixed
 // UTC+05:30 offset with no DST, so the wall-clock midnight maps to one exact
 // instant. Used to split a punch session across the IST midnight boundary so

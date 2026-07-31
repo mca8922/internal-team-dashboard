@@ -17,6 +17,7 @@ import {
   setMemberTargetHours,
   setInternshipMonths,
   setMemberOnboardDate,
+  setMemberDateOfBirth,
   markMemberLeft,
   reinstateMember,
   deleteMember,
@@ -28,7 +29,7 @@ import {
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { roleLabel, weeklyTargetFromDaily } from '@/lib/roles';
 import { MemberGoalsHandoff } from '@/components/MemberGoalsHandoff';
-import { addMonths, fmtFriendly, parseDate } from '@/lib/dates';
+import { addMonths, calcAge, fmtFriendly, parseDate } from '@/lib/dates';
 import { DepartmentSelect } from '@/components/DepartmentSelect';
 import { TENURE_OPTIONS } from './CreateMemberModal';
 import type { TeamMember } from './TeamGrid';
@@ -65,6 +66,7 @@ export function ManageMemberModal({
   const [targetInput, setTargetInput] = React.useState('');
   const [tenure, setTenure] = React.useState('');
   const [onboard, setOnboard] = React.useState('');
+  const [dob, setDob] = React.useState('');
   const [pending, setPending] = React.useState(false);
   const [handoffOpen, setHandoffOpen] = React.useState(false);
   // Department-manager controls.
@@ -85,6 +87,7 @@ export function ManageMemberModal({
       setTargetInput(member.targetHours != null ? String(member.targetHours) : '');
       setTenure(member.internshipMonths != null ? String(member.internshipMonths) : '');
       setOnboard(member.joinedDate);
+      setDob(member.dateOfBirth ?? '');
       setHeadDept(member.managedDepartment || member.department);
       setTeam(allMembers.filter((m) => m.managerId === member.id).map((m) => m.id));
       setResponsibilities(member.managerResponsibilities || '');
@@ -181,6 +184,14 @@ export function ManageMemberModal({
       return;
     }
     return run(() => setMemberOnboardDate(member.id, onboard), 'Onboard date updated');
+  };
+
+  const saveDob = () => {
+    if (!dob) {
+      toast('Pick a date of birth.', 'warning');
+      return;
+    }
+    return run(() => setMemberDateOfBirth(member.id, dob), 'Date of birth updated');
   };
 
   // ---- Department Manager controls ----
@@ -477,6 +488,32 @@ export function ManageMemberModal({
               variant="secondary"
               onClick={saveOnboard}
               disabled={pending || founderProtected || !onboard || onboard === member.joinedDate}
+            >
+              Save
+            </Button>
+          </div>
+        </Field>
+
+        {/* Date of birth */}
+        <Field label="Date of birth" hint="Drives their Age and the birthday wishing card.">
+          <div className="flex items-center gap-2">
+            <DatePicker
+              value={dob}
+              onChange={(v) => setDob(v)}
+              ariaLabel="Date of birth"
+              max={new Date().toISOString().slice(0, 10)}
+            />
+            {dob ? (
+              <span className="age-badge">
+                <span className="age-badge-num">{calcAge(dob)}</span>
+                <span className="age-badge-label">years old</span>
+              </span>
+            ) : null}
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={saveDob}
+              disabled={pending || founderProtected || !dob || dob === (member.dateOfBirth || '')}
             >
               Save
             </Button>

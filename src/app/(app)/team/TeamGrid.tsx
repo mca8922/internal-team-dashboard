@@ -29,6 +29,7 @@ export interface TeamMember {
   roleDefaultHours: number;
   internshipMonths: number | null;
   joinedDate: string;
+  dateOfBirth: string | null;
   jobTitle: string;
   isFounder: boolean;
   isManager: boolean;

@@ -13,6 +13,7 @@ import { CommandPalette } from './CommandPalette';
 import { MilestoneCelebration } from './MilestoneCelebration';
 import { MilestoneAmbiance } from './MilestoneAmbiance';
 import { HolidayCelebration } from './HolidayCelebration';
+import { BirthdayCelebration } from './BirthdayCelebration';
 import { NotificationsBell, type OnlineUser } from './NotificationsBell';
 import { createClient } from '@/lib/supabase/client';
 import { playPresenceChime } from '@/lib/sound';
@@ -515,6 +516,7 @@ function TopBar({
             pendingLeaves={pendingLeaves}
             isBoard={user.role === 'board'}
             hasAvatar={!!user.avatar_url}
+            hasDob={!!user.date_of_birth}
             initialNotifications={notifications}
             departmentColors={deptColors}
             mutedInApp={mutedInApp}
@@ -759,6 +761,7 @@ export function Shell({
       {holidayToday ? (
         <HolidayCelebration date={holidayToday.holiday_date} name={holidayToday.name} />
       ) : null}
+      <BirthdayCelebration userId={user.id} name={user.name} dateOfBirth={user.date_of_birth} />
     </div>
   );
 }

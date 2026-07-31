@@ -15,6 +15,7 @@ export default async function SettingsPage() {
       department={profile.department}
       roleText={roleLabel(profile.role)}
       avatarUrl={profile.avatar_url}
+      dateOfBirth={profile.date_of_birth}
       notificationPrefs={notificationPrefs}
       isBoard={profile.role === 'board'}
       isManager={isManager(profile)}

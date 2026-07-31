@@ -42,6 +42,8 @@ import type {
   SavedView,
   GoalViewConfig,
   DepartmentApp,
+  BirthdayWish,
+  BirthdayWishRow,
 } from '@/lib/types';
 import { parseGoalTemplate, type GoalTemplate } from '@/lib/goal-templates';
 
@@ -852,5 +854,158 @@ export const getTransactionalEmailLogs = cache(
       .order('created_at', { ascending: false })
       .limit(limit);
     return (data ?? []) as TransactionalEmailLog[];
+  },
+);
+
+// Active, non-departed members whose date of birth is today (month/day match,
+// IST calendar day) — feeds the dashboard birthday wishing card.
+export const getTodaysBirthdays = cache(
+  async (): Promise<{ id: string; name: string; avatarUrl: string | null; department: string }[]> => {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, name, avatar_url, department, date_of_birth')
+      .eq('is_active', true)
+      .is('left_at', null)
+      .not('date_of_birth', 'is', null);
+    const today = parseDate(fmtDate(new Date()));
+    return (data ?? [])
+      .filter((u) => {
+        const b = parseDate(u.date_of_birth as string);
+        return b.getMonth() === today.getMonth() && b.getDate() === today.getDate();
+      })
+      .map((u) => ({ id: u.id, name: u.name, avatarUrl: u.avatar_url, department: u.department }));
+  },
+);
+
+// Minimal identity for a set of member ids — resolves wish senders' names /
+// avatars for the birthday card. Everyone can already see this via Team.
+export const getBasicProfiles = cache(
+  async (ids: string[]): Promise<{ id: string; name: string; avatarUrl: string | null }[]> => {
+    if (ids.length === 0) return [];
+    const supabase = await createClient();
+    const { data } = await supabase.from('profiles').select('id, name, avatar_url').in('id', ids);
+    return (data ?? []).map((u) => ({ id: u.id, name: u.name, avatarUrl: u.avatar_url }));
+  },
+);
+
+// "Who wished whom, and were they replied to" — NEVER the message text. Calls
+// the birthday_wishers() SECURITY DEFINER function (migration
+// 0056_birthday_privacy.sql) so any authenticated member can see who wished a
+// celebrant without RLS granting them the message column itself.
+export const getBirthdayWishers = cache(
+  async (
+    celebrantIds: string[],
+  ): Promise<{ id: string; birthday_user_id: string; author_id: string; created_at: string; has_reply: boolean }[]> => {
+    if (celebrantIds.length === 0) return [];
+    const supabase = await createClient();
+    const { data } = await supabase.rpc('birthday_wishers', { targets: celebrantIds });
+    return data ?? [];
+  },
+);
+
+// The viewer's OWN wishes sent toward today's celebrants, full text included
+// — RLS allows this because `author_id = auth.uid()`.
+export const getMyBirthdayWishes = cache(
+  async (celebrantIds: string[], viewerId: string): Promise<BirthdayWishRow[]> => {
+    if (celebrantIds.length === 0) return [];
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from('birthday_wishes')
+      .select('*')
+      .eq('author_id', viewerId)
+      .in('birthday_user_id', celebrantIds);
+    return (data ?? []) as BirthdayWishRow[];
+  },
+);
+
+// Every wish addressed to the signed-in member (only ever called when they
+// ARE today's celebrant) — RLS allows this because `birthday_user_id = auth.uid()`.
+export const getBirthdayWishesToMe = cache(
+  async (celebrantId: string): Promise<BirthdayWishRow[]> => {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from('birthday_wishes')
+      .select('*')
+      .eq('birthday_user_id', celebrantId)
+      .order('created_at', { ascending: true });
+    return (data ?? []) as BirthdayWishRow[];
+  },
+);
+
+// Assembles the privacy-safe Celebrant[] the dashboard's BirthdayBanner
+// renders: for the viewer's own celebrant card, every wish is fully
+// populated (they're allowed to read all of them); for every other
+// celebrant, only the viewer's own wish (if any) carries real message/reply
+// text — everyone else's entry exposes just who wished, matching
+// birthday_wishers()'s columns.
+export const getBirthdayCelebrants = cache(
+  async (
+    viewerId: string,
+  ): Promise<
+    {
+      id: string;
+      name: string;
+      avatar_url: string | null;
+      department: string;
+      isViewerCelebrant: boolean;
+      wishes: BirthdayWish[];
+    }[]
+  > => {
+    const todays = await getTodaysBirthdays();
+    if (todays.length === 0) return [];
+    const celebrantIds = todays.map((c) => c.id);
+    const viewerIsCelebrant = todays.some((c) => c.id === viewerId);
+
+    const [wishers, myWishes, wishesToMe] = await Promise.all([
+      getBirthdayWishers(celebrantIds),
+      getMyBirthdayWishes(celebrantIds, viewerId),
+      viewerIsCelebrant ? getBirthdayWishesToMe(viewerId) : Promise.resolve([] as BirthdayWishRow[]),
+    ]);
+
+    const senderIds = new Set([
+      ...wishers.map((w) => w.author_id),
+      ...wishesToMe.map((w) => w.author_id),
+    ]);
+    const senders = await getBasicProfiles([...senderIds]);
+    const senderById = new Map(senders.map((s) => [s.id, s]));
+    const toReply = (msg: string | null, at: string | null) => (msg ? { message: msg, created_at: at! } : null);
+
+    return todays.map((c) => {
+      const isViewerCelebrant = c.id === viewerId;
+      if (isViewerCelebrant) {
+        const wishes: BirthdayWish[] = wishesToMe.map((w) => {
+          const sender = senderById.get(w.author_id);
+          return {
+            id: w.id,
+            sender_id: w.author_id,
+            sender_name: sender?.name ?? 'Someone',
+            sender_avatar_url: sender?.avatarUrl ?? null,
+            message: w.message,
+            created_at: w.created_at,
+            reply: toReply(w.reply_message, w.reply_created_at),
+          };
+        });
+        return { id: c.id, name: c.name, avatar_url: c.avatarUrl, department: c.department, isViewerCelebrant, wishes };
+      }
+
+      const mine = myWishes.find((w) => w.birthday_user_id === c.id);
+      const wishes: BirthdayWish[] = wishers
+        .filter((w) => w.birthday_user_id === c.id)
+        .map((w) => {
+          const sender = senderById.get(w.author_id);
+          const isMine = w.author_id === viewerId;
+          return {
+            id: w.id,
+            sender_id: w.author_id,
+            sender_name: sender?.name ?? 'Someone',
+            sender_avatar_url: sender?.avatarUrl ?? null,
+            message: isMine && mine ? mine.message : '',
+            created_at: w.created_at,
+            reply: isMine && mine ? toReply(mine.reply_message, mine.reply_created_at) : null,
+          };
+        });
+      return { id: c.id, name: c.name, avatar_url: c.avatarUrl, department: c.department, isViewerCelebrant, wishes };
+    });
   },
 );

@@ -419,6 +419,57 @@ export async function previewMilestonePing(userId: string, kind: MilestoneKind):
   after(() => sendPush(userId, { title, body, url: href }, 'work_anniversary'));
 }
 
+// Daily sweep: ping members whose date of birth is today (bell notification +
+// web push), so they get their personal reminder regardless of the
+// notificationsFull flag (which only hides the bell rendering, not the
+// underlying reminder) — same shape as sweepWorkAnniversaries. De-duped so a
+// member is pinged once per day.
+export async function sweepBirthdays(): Promise<void> {
+  const admin = createAdminClient();
+  const now = new Date();
+  const today = parseDate(fmtDate(now)); // today's IST calendar day
+
+  const { data: members } = await admin
+    .from('profiles')
+    .select('id, name, date_of_birth')
+    .eq('is_active', true)
+    .is('left_at', null)
+    .not('date_of_birth', 'is', null);
+  if (!members || members.length === 0) return;
+
+  const todaysBirthdays = members.filter((m) => {
+    if (!m.date_of_birth) return false;
+    const b = parseDate(m.date_of_birth);
+    return b.getMonth() === today.getMonth() && b.getDate() === today.getDate();
+  });
+  if (todaysBirthdays.length === 0) return;
+
+  const todayStartISO = new Date(istDayStartMs(fmtDate(now))).toISOString();
+  const { data: existing } = await admin
+    .from('notifications')
+    .select('user_id')
+    .eq('type', 'birthday')
+    .gte('created_at', todayStartISO)
+    .in(
+      'user_id',
+      todaysBirthdays.map((m) => m.id),
+    );
+  const seen = new Set((existing ?? []).map((n) => n.user_id));
+  const fresh = todaysBirthdays.filter((m) => !seen.has(m.id));
+  if (fresh.length === 0) return;
+
+  const rows = fresh.map((m) => ({
+    user_id: m.id,
+    type: 'birthday' as const,
+    title: '🎂 Happy Birthday!',
+    body: 'The whole team is wishing you a great day.',
+    href: '/dashboard',
+  }));
+  await admin.from('notifications').insert(rows);
+  const tasks = rows.map((r) => sendPush(r.user_id, { title: r.title, body: r.body, url: r.href }, 'birthday'));
+  await Promise.allSettled(tasks);
+}
+
 // ---- punch ----
 
 // Punch in.
@@ -1309,6 +1360,73 @@ export async function markNotificationsRead(ids?: string[]) {
   await q;
 }
 
+// Posts a wish on a teammate's birthday card, or (when `parentId` is given) a
+// reply. Re-checks that it's actually the celebrant's birthday today
+// server-side — never trust the client on which day it is.
+export async function sendBirthdayWish(celebrantId: string, message: string) {
+  const { supabase, userId } = await requireUser();
+  const trimmed = message.trim();
+  if (!trimmed) throw new Error('Write a message first.');
+  if (trimmed.length > 240) throw new Error('Keep it under 240 characters.');
+
+  const { data: bday } = await supabase
+    .from('profiles')
+    .select('date_of_birth')
+    .eq('id', celebrantId)
+    .single();
+  if (!bday?.date_of_birth) throw new Error('Not a birthday today.');
+  const today = parseDate(fmtDate(new Date()));
+  const b = parseDate(bday.date_of_birth);
+  if (b.getMonth() !== today.getMonth() || b.getDate() !== today.getDate()) {
+    throw new Error('Not a birthday today.');
+  }
+
+  await supabase.from('birthday_wishes').insert({
+    birthday_user_id: celebrantId,
+    author_id: userId,
+    message: trimmed,
+  });
+}
+
+// The celebrant replies to one wish addressed to them. The reply is stored
+// privately on that same row (reply_message/reply_created_at) and delivered
+// to the original sender ONLY as a notification — it's never posted where
+// anyone else can read it. RLS ("birthday_wishes: celebrant replies") backs
+// the ownership check below.
+export async function replyToBirthdayWish(wishId: string, message: string) {
+  const { supabase, userId } = await requireUser();
+  const trimmed = message.trim();
+  if (!trimmed) throw new Error('Write a reply first.');
+  if (trimmed.length > 240) throw new Error('Keep it under 240 characters.');
+
+  const { data: wish } = await supabase
+    .from('birthday_wishes')
+    .select('id, birthday_user_id, author_id')
+    .eq('id', wishId)
+    .single();
+  if (!wish || wish.birthday_user_id !== userId) {
+    throw new Error('You can only reply to wishes sent to you.');
+  }
+
+  await supabase
+    .from('birthday_wishes')
+    .update({ reply_message: trimmed, reply_created_at: new Date().toISOString() })
+    .eq('id', wishId);
+
+  const admin = createAdminClient();
+  const { data: me } = await supabase.from('profiles').select('name').eq('id', userId).single();
+  const title = `${me?.name ?? 'They'} replied to your birthday wish`;
+  const href = '/dashboard';
+  await admin.from('notifications').insert({
+    user_id: wish.author_id,
+    type: 'birthday_wish_reply',
+    title,
+    body: trimmed,
+    href,
+  });
+  after(() => sendPush(wish.author_id, { title, body: trimmed, url: href }, 'birthday_wish_reply'));
+}
+
 // ---- leaves ----
 
 // Human-friendly date range for a leave notification body.
@@ -1517,9 +1635,15 @@ export async function updateHoliday(id: string, date: string, name: string) {
 
 // A member may edit only their own display name here. Department and role
 // are board-controlled — RLS rejects any self-update that changes them.
-export async function updateProfile(patch: { name?: string }) {
+export async function updateProfile(patch: { name?: string; date_of_birth?: string | null }) {
   const { supabase, userId } = await requireUser();
-  await supabase.from('profiles').update({ name: patch.name }).eq('id', userId);
+  if (patch.date_of_birth != null && !/^\d{4}-\d{2}-\d{2}$/.test(patch.date_of_birth)) {
+    throw new Error('Invalid date.');
+  }
+  const update: { name?: string; date_of_birth?: string | null } = {};
+  if (patch.name !== undefined) update.name = patch.name;
+  if (patch.date_of_birth !== undefined) update.date_of_birth = patch.date_of_birth;
+  await supabase.from('profiles').update(update).eq('id', userId);
   revalidatePath('/settings');
   revalidatePath('/dashboard');
 }
@@ -1617,6 +1741,18 @@ export async function setMemberOnboardDate(memberId: string, date: string) {
   await supabase.from('profiles').update({ joined_date: date }).eq('id', memberId);
   revalidatePath('/team');
   revalidatePath('/dashboard');
+}
+
+// Board sets/corrects a member's date of birth (drives Age everywhere and the
+// birthday reminder/wishing card).
+export async function setMemberDateOfBirth(memberId: string, date: string) {
+  const { supabase, userId } = await requireBoard();
+  guardFounderTarget(memberId, userId, { allowSelf: true });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid date.');
+  await supabase.from('profiles').update({ date_of_birth: date }).eq('id', memberId);
+  revalidatePath('/team');
+  revalidatePath('/dashboard');
+  revalidatePath('/settings');
 }
 
 // Board edits a member's department.

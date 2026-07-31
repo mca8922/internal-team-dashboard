@@ -988,6 +988,295 @@ p { margin: 0; }
 .badge-red { background: var(--color-red-bg); color: var(--color-red); }
 .badge-violet { background: var(--color-violet-bg); color: var(--color-violet); }
 .badge-black { background: var(--color-black); color: #fff; }
+
+/* Age pill next to a Date of birth field — big number, small caps caption. */
+.age-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--color-green-primary);
+  background: var(--color-green-light);
+  color: var(--color-green-primary);
+  white-space: nowrap;
+}
+.age-badge-num {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+.age-badge-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+/* Password field — inline show/hide eye toggle. */
+.pw-input-wrap { position: relative; }
+.pw-input-wrap .input { padding-right: 36px; }
+.pw-eye-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--color-grey-text);
+}
+.pw-eye-btn:hover { color: var(--color-black); }
+
+/* Password strength meter + requirement chips. */
+.pw-strength-label {
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.pw-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-grey-text);
+}
+.pw-chip.met {
+  background: var(--color-green-light);
+  border-color: var(--color-green-primary);
+  color: var(--color-green-primary);
+}
+
+/* ===== Birthday banner (dashboard) ===== */
+.birthday-banner { display: grid; gap: 14px; }
+
+.birthday-card {
+  position: relative;
+  background: var(--color-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-amber-text);
+  padding: 18px;
+  overflow: hidden;
+}
+.birthday-card-celebrant {
+  border-color: var(--color-green-primary);
+  background: linear-gradient(160deg, var(--color-green-light) 0%, var(--color-card) 55%);
+}
+/* Content sits above the confetti layer, which is absolutely positioned and
+   spans the whole card. */
+.birthday-card-content,
+.birthday-card-celebrant > .birthday-card-head,
+.birthday-card-celebrant > .birthday-wishers,
+.birthday-card-celebrant > .text-xs {
+  position: relative;
+  z-index: 1;
+}
+
+.birthday-card-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.birthday-card-title { font-weight: 700; font-size: 14.5px; }
+.birthday-group-emoji, .birthday-celebrant-emoji { font-size: 26px; line-height: 1; }
+
+.birthday-wishers {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.birthday-wishers-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-grey-text);
+  margin-right: 2px;
+}
+.birthday-wisher-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  padding: 4px 12px 4px 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.birthday-wisher-chip.mine { border-color: var(--color-green-primary); color: var(--color-green-primary); }
+.birthday-wisher-chip-clickable {
+  cursor: pointer;
+  transition: border-color 140ms ease, transform 90ms ease;
+}
+.birthday-wisher-chip-clickable:hover { border-color: var(--color-green-primary); }
+.birthday-wisher-chip-clickable:active { transform: scale(0.97); }
+.birthday-wisher-chip-clickable.replied {
+  border-color: var(--color-amber-text);
+}
+.birthday-wisher-chip-clickable.replied::after {
+  content: '';
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--color-amber-text);
+  margin-left: 2px;
+}
+
+.birthday-sent-wrap { margin-top: 12px; }
+.birthday-sent-confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-green-primary);
+  background: var(--color-green-light);
+  color: var(--color-green-primary);
+  font-size: 13px;
+}
+.birthday-sent-confirm.clickable { cursor: pointer; }
+.birthday-sent-confirm-msg { font-weight: 600; overflow-wrap: anywhere; }
+.birthday-reply-toggle {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-amber-text);
+  background: var(--color-amber-bg);
+  color: var(--color-amber-text);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.birthday-reply-reveal {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+}
+.birthday-reply-reveal-meta { font-size: 12px; color: var(--color-grey-text); }
+.birthday-reply-reveal-msg { font-size: 13px; margin-top: 2px; }
+
+.birthday-compose { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.birthday-compose .input { flex: 1; min-width: 0; }
+
+.birthday-group-list { display: grid; gap: 8px; margin-top: 14px; }
+.birthday-group-row {
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+.birthday-group-row.expanded { border-color: var(--color-green-primary); }
+.birthday-group-row-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.birthday-group-row-name { font-weight: 600; font-size: 13px; }
+.birthday-group-row-check {
+  display: inline-flex;
+  color: var(--color-green-primary);
+}
+.birthday-group-row-chevron { margin-left: auto; color: var(--color-grey-text); display: inline-flex; }
+.birthday-group-row-body {
+  padding: 0 12px 12px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .birthday-sent-confirm { flex-direction: column; align-items: flex-start; }
+  .birthday-reply-toggle { margin-left: 0; }
+  .birthday-compose { flex-wrap: wrap; }
+  .birthday-compose .input { width: 100%; }
+  .birthday-group-row-head { flex-wrap: wrap; }
+  .birthday-group-row-head .text-xs { order: 3; width: 100%; margin-left: 38px; }
+}
+
+/* ===== Birthday confetti shower (persistent, celebrant card only) ===== */
+.bday-shower {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.bday-shower-piece {
+  position: absolute;
+  top: -12px;
+  opacity: 0.9;
+  animation: bdayFall linear infinite;
+}
+.bday-shower-piece.round { border-radius: 50%; }
+@keyframes bdayFall {
+  from { transform: translateY(-12px) rotate(0deg); opacity: 0.9; }
+  to { transform: translateY(360px) rotate(var(--rot)); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bday-shower-piece { animation: none; display: none; }
+}
+
+/* ===== Birthday wish modal ===== */
+.wish-modal-close { position: absolute; top: 12px; right: 12px; }
+.wish-modal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding-right: 24px; }
+.wish-modal-name { font-weight: 700; font-size: 15px; }
+.wish-modal-meta { font-size: 12px; color: var(--color-grey-text); margin-top: 2px; }
+.wish-modal-bubble {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.wish-modal-section { margin-top: 16px; }
+.wish-modal-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-grey-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+.wish-modal-reply {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--color-green-light);
+  color: var(--color-green-primary);
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
 /* Department Manager (Head of Department) marker — a premium gold gradient so a
    manager stands out from the Board / Founder / role badges at a glance. */
 .badge-manager {

@@ -28,6 +28,8 @@ const TYPE_META: Record<NotificationType, { icon: IconName; tone: 'warning' | 'i
   punch_missing: { icon: 'clock', tone: 'warning', label: 'Punch missing' },
   goal_due_soon: { icon: 'target', tone: 'warning', label: 'Goal due soon' },
   work_anniversary: { icon: 'sparkles', tone: 'info', label: 'Milestone' },
+  birthday: { icon: 'sparkles', tone: 'info', label: 'Birthday' },
+  birthday_wish_reply: { icon: 'mail', tone: 'info', label: 'Birthday reply' },
   work_report_submitted: { icon: 'inbox', tone: 'info', label: 'Report to review' },
   work_report_reviewed: { icon: 'star', tone: 'info', label: 'Work reviewed' },
   task_unlocked: { icon: 'lock', tone: 'info', label: 'Task opened' },

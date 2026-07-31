@@ -21,6 +21,7 @@ export interface Profile {
   role: UserRole;
   department: string;
   joined_date: string;
+  date_of_birth: string | null;
   confirmed_by_board: boolean;
   is_active: boolean;
   leave_balance: LeaveBalance;
@@ -279,7 +280,12 @@ export type NotificationType =
   | 'punch_change_requested'
   // The Founder approved / rejected a member's punch time change request.
   | 'punch_change_approved'
-  | 'punch_change_rejected';
+  | 'punch_change_rejected'
+  // A member's birthday reminder (sent to that member only).
+  | 'birthday'
+  // The celebrant replied to a birthday wish — delivered privately to the
+  // person who sent it, never posted publicly.
+  | 'birthday_wish_reply';
 
 export interface Notification {
   id: string;
@@ -296,6 +302,36 @@ export interface Notification {
   department: string | null;
   is_read: boolean;
   created_at: string;
+}
+
+// Raw `birthday_wishes` row. The message/reply text is only ever selectable
+// (per RLS) by the sender or the celebrant it's addressed to — see
+// migration 0056_birthday_privacy.sql. queries.ts reshapes this into the
+// privacy-safe, sender-joined `BirthdayWish` shape below before it ever
+// reaches a Server Component's rendered output.
+export interface BirthdayWishRow {
+  id: string;
+  birthday_user_id: string;
+  author_id: string;
+  message: string;
+  reply_message: string | null;
+  reply_created_at: string | null;
+  created_at: string;
+}
+
+// Client-facing wish shape — already privacy-filtered per viewer server-side
+// and joined with the sender's display info. A bystander only ever receives
+// this fully populated for their OWN wish; every other wish in the same list
+// has `message: ''` and `reply: null` (they only see who wished, never what
+// was said).
+export interface BirthdayWish {
+  id: string;
+  sender_id: string;
+  sender_name: string;
+  sender_avatar_url: string | null;
+  message: string;
+  created_at: string;
+  reply: { message: string; created_at: string } | null;
 }
 
 // A member's per-type notification mute, one row per type they've changed from
@@ -419,6 +455,7 @@ export interface Database {
           role?: UserRole;
           department?: string;
           joined_date?: string;
+          date_of_birth?: string | null;
           confirmed_by_board?: boolean;
           is_active?: boolean;
           leave_balance?: LeaveBalance;
@@ -440,6 +477,7 @@ export interface Database {
           role?: UserRole;
           department?: string;
           joined_date?: string;
+          date_of_birth?: string | null;
           confirmed_by_board?: boolean;
           is_active?: boolean;
           leave_balance?: LeaveBalance;

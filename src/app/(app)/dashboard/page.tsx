@@ -18,6 +18,7 @@ import {
   logStreak,
   isOnLeave,
   visibleGoals,
+  getBirthdayCelebrants,
 } from '@/lib/queries';
 import {
   fmtDate,
@@ -36,6 +37,7 @@ import { PunchWidget } from './PunchWidget';
 import { StreakCard } from './StreakCard';
 import { BlockRender } from '@/components/BlockEditor';
 import { LeaveReviewRow } from './LeaveReviewRow';
+import { BirthdayBanner } from './BirthdayBanner';
 import type { Profile, UserRole } from '@/lib/types';
 import { MilestoneReplayButton } from '@/components/MilestoneReplayButton';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
@@ -154,6 +156,14 @@ export default async function DashboardPage() {
   // Goals this member may see: assigned to them or their department
   // (the Board sees all).
   const goals = visibleGoals(allGoals, assignees, profile);
+
+  // Birthday banner — gated behind notificationsFull, same tier as the rest
+  // of the teammate-facing notification pipeline. Message privacy is enforced
+  // server-side in getBirthdayCelebrants (see migration
+  // 0056_birthday_privacy.sql), not just hidden in the UI.
+  const celebrants = FEATURE_FLAGS.notificationsFull
+    ? await getBirthdayCelebrants(profile.id)
+    : [];
 
   // Department-manager badge accent — getDepartmentColors is React.cache()d and
   // already fetched by the layout this request, so this is effectively free.
@@ -334,6 +344,10 @@ export default async function DashboardPage() {
             lastPunchIn={active?.punch_in ?? todayPunches[todayPunches.length - 1]?.punch_in ?? null}
             lastPunchOut={todayPunches[todayPunches.length - 1]?.punch_out ?? null}
           />
+
+          {FEATURE_FLAGS.notificationsFull && celebrants.length > 0 ? (
+            <BirthdayBanner celebrants={celebrants} viewerId={profile.id} />
+          ) : null}
 
           {FEATURE_FLAGS.dashboardExtras && internship ? (
             <div className="card" style={{ borderLeft: '3px solid var(--color-green-primary)' }}>

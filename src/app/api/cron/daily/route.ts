@@ -10,6 +10,7 @@ import {
   sweepMissedPunchOuts,
   sweepGoalDeadlines,
   sweepWorkAnniversaries,
+  sweepBirthdays,
   sweepOldNotifications,
 } from '@/lib/actions';
 
@@ -23,6 +24,7 @@ export async function GET(req: NextRequest) {
     sweepMissedPunchOuts(),
     sweepGoalDeadlines(),
     sweepWorkAnniversaries(),
+    sweepBirthdays(),
     sweepOldNotifications(),
   ]);
   const failed = sweeps.some((s) => s.status === 'rejected');

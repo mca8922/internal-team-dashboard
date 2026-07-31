@@ -136,6 +136,7 @@ export default async function TeamPage() {
       roleDefaultHours: roleDefaultHours(u.role),
       internshipMonths: u.internship_months,
       joinedDate: u.joined_date,
+      dateOfBirth: u.date_of_birth,
       jobTitle: u.job_title || '',
       isFounder: isFounder(u),
       isManager: !!u.is_manager,

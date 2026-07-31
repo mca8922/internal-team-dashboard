@@ -61,6 +61,8 @@ const PERSONAL_TYPES: ReadonlySet<NotificationType> = new Set<NotificationType>(
   'leave_rejected',
   'punch_missing',
   'work_anniversary',
+  'birthday',
+  'birthday_wish_reply',
   'punch_change_approved',
   'punch_change_rejected',
 ]);

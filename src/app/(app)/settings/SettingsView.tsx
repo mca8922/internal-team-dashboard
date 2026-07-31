@@ -9,6 +9,8 @@ import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
 import { updateProfile, updatePassword } from '@/lib/actions';
 import { getThemePref, setThemePref, type ThemePref } from '@/lib/theme';
+import { calcAge } from '@/lib/dates';
+import { DatePicker } from '@/components/DatePicker';
 import { AvatarUpload } from './AvatarUpload';
 import { NotificationPrefsCard } from './NotificationPrefsCard';
 import type { NotificationPref } from '@/lib/types';
@@ -30,6 +32,27 @@ const DEFAULT_PREFS: Prefs = {
   pushEnabled: false,
 };
 
+// Password strength — five independent checks; the bar/label reflect how
+// many are met (not the individual chip state, which is shown separately).
+function passwordChecks(pw: string) {
+  return {
+    length: pw.length >= 8,
+    upper: /[A-Z]/.test(pw),
+    lower: /[a-z]/.test(pw),
+    number: /[0-9]/.test(pw),
+    special: /[^A-Za-z0-9]/.test(pw),
+  };
+}
+
+const STRENGTH_META = [
+  { label: 'Very weak', color: 'var(--color-red)' },
+  { label: 'Weak', color: 'var(--color-red)' },
+  { label: 'Fair', color: 'var(--color-amber-text)' },
+  { label: 'Good', color: 'var(--color-amber-text)' },
+  { label: 'Strong', color: 'var(--color-green-primary)' },
+  { label: 'Very strong', color: 'var(--color-green-primary)' },
+] as const;
+
 export function SettingsView({
   userId,
   name,
@@ -37,6 +60,7 @@ export function SettingsView({
   department,
   roleText,
   avatarUrl,
+  dateOfBirth,
   notificationPrefs,
   isBoard,
   isManager,
@@ -47,13 +71,17 @@ export function SettingsView({
   department: string;
   roleText: string;
   avatarUrl: string | null;
+  dateOfBirth: string | null;
   notificationPrefs: NotificationPref[];
   isBoard: boolean;
   isManager: boolean;
 }) {
   const toast = useToast();
   const [form, setForm] = React.useState({ name, department, password: '', confirm: '' });
+  const [dob, setDob] = React.useState(dateOfBirth ?? '');
   const [err, setErr] = React.useState<Record<string, string>>({});
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirm, setShowConfirm] = React.useState(false);
   const [themePref, setThemePrefState] = React.useState<ThemePref>('device');
   const [prefs, setPrefs] = React.useState<Prefs>(DEFAULT_PREFS);
 
@@ -101,7 +129,7 @@ export function SettingsView({
     }
     setErr({});
     // Department is board-controlled and not sent from here.
-    await updateProfile({ name: form.name });
+    await updateProfile({ name: form.name, date_of_birth: dob || null });
     if (form.password) {
       try {
         await updatePassword(form.password);
@@ -158,24 +186,103 @@ export function SettingsView({
                 style={{ opacity: 0.7, cursor: 'not-allowed' }}
               />
             </Field>
+            <Field label="Date of birth" hint="So your team can celebrate with you">
+              <div className="flex items-center gap-3">
+                <DatePicker value={dob} onChange={setDob} ariaLabel="Date of birth" max={new Date().toISOString().slice(0, 10)} />
+                {dob ? (
+                  <span className="age-badge">
+                    <span className="age-badge-num">{calcAge(dob)}</span>
+                    <span className="age-badge-label">years old</span>
+                  </span>
+                ) : null}
+              </div>
+            </Field>
             <div className="grid grid-2col-even" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="New password" hint="Leave empty to keep current">
-                <input
-                  className="input"
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => set('password', e.target.value)}
-                />
+              <Field label="New password">
+                <div className="pw-input-wrap">
+                  <input
+                    className="input"
+                    type={showPassword ? 'text' : 'password'}
+                    value={form.password}
+                    onChange={(e) => set('password', e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="pw-eye-btn"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPassword((v) => !v)}
+                  >
+                    <Icon name={showPassword ? 'eye-off' : 'eye'} size={16} />
+                  </button>
+                </div>
               </Field>
-              <Field label="Confirm" error={err.confirm}>
-                <input
-                  className="input"
-                  type="password"
-                  value={form.confirm}
-                  onChange={(e) => set('confirm', e.target.value)}
-                />
+              <Field
+                label="Confirm"
+                error={
+                  err.confirm ||
+                  (form.confirm && form.password !== form.confirm ? 'Passwords do not match' : undefined)
+                }
+              >
+                <div className="pw-input-wrap">
+                  <input
+                    className="input"
+                    type={showConfirm ? 'text' : 'password'}
+                    value={form.confirm}
+                    onChange={(e) => set('confirm', e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="pw-eye-btn"
+                    aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowConfirm((v) => !v)}
+                  >
+                    <Icon name={showConfirm ? 'eye-off' : 'eye'} size={16} />
+                  </button>
+                </div>
               </Field>
             </div>
+
+            {form.password ? (
+              (() => {
+                const checks = passwordChecks(form.password);
+                const score = Object.values(checks).filter(Boolean).length;
+                const meta = STRENGTH_META[score];
+                return (
+                  <div className="grid gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="goal-progress" style={{ flex: 1 }}>
+                        <div
+                          className="goal-progress-fill"
+                          style={{ width: `${(score / 5) * 100}%`, background: meta.color }}
+                        />
+                      </div>
+                      <span className="pw-strength-label" style={{ color: meta.color }}>
+                        {meta.label}
+                      </span>
+                    </div>
+                    <div className="pw-chips">
+                      <span className={`pw-chip${checks.length ? ' met' : ''}`}>
+                        {checks.length ? '✓ ' : ''}8+ characters
+                      </span>
+                      <span className={`pw-chip${checks.upper ? ' met' : ''}`}>
+                        {checks.upper ? '✓ ' : ''}Uppercase letter
+                      </span>
+                      <span className={`pw-chip${checks.lower ? ' met' : ''}`}>
+                        {checks.lower ? '✓ ' : ''}Lowercase letter
+                      </span>
+                      <span className={`pw-chip${checks.number ? ' met' : ''}`}>
+                        {checks.number ? '✓ ' : ''}Number
+                      </span>
+                      <span className={`pw-chip${checks.special ? ' met' : ''}`}>
+                        {checks.special ? '✓ ' : ''}Special character
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()
+            ) : null}
+            <div className="text-xs text-grey">Leave empty to keep current</div>
+
             <div>
               <Button onClick={saveProfile} icon="check">
                 Save profile
