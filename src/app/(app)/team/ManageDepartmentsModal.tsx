@@ -96,7 +96,7 @@ function DepartmentRow({
   const remove = async () => {
     const ok = await confirm({
       title: `Delete "${dept.name}"?`,
-      message: 'This department is unused, so removing it affects no members or goals.',
+      message: 'This department is unused, so removing it affects no members or tasks.',
       confirmLabel: 'Delete department',
       tone: 'danger',
       icon: 'trash',
@@ -151,7 +151,7 @@ function DepartmentRow({
           icon="trash"
           onClick={remove}
           disabled={pending || inUse}
-          title={inUse ? 'Reassign its members and goals before deleting' : 'Delete department'}
+          title={inUse ? 'Reassign its members and tasks before deleting' : 'Delete department'}
         />
       </div>
       <div className="flex items-center gap-2 mt-2" style={{ flexWrap: 'wrap', paddingLeft: 20 }}>

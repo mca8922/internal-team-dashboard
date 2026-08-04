@@ -21,12 +21,12 @@ import type { Notification, NotificationType } from '@/lib/types';
 // Same icon/tone mapping the bell uses, kept local so the two can diverge if
 // needed without coupling.
 const TYPE_META: Record<NotificationType, { icon: IconName; tone: 'warning' | 'info'; label: string }> = {
-  goal_assigned: { icon: 'target', tone: 'info', label: 'Goal assigned' },
+  goal_assigned: { icon: 'target', tone: 'info', label: 'Task assigned' },
   leave_requested: { icon: 'plane', tone: 'warning', label: 'Leave requested' },
   leave_approved: { icon: 'check', tone: 'info', label: 'Leave approved' },
   leave_rejected: { icon: 'x', tone: 'warning', label: 'Leave declined' },
   punch_missing: { icon: 'clock', tone: 'warning', label: 'Punch missing' },
-  goal_due_soon: { icon: 'target', tone: 'warning', label: 'Goal due soon' },
+  goal_due_soon: { icon: 'target', tone: 'warning', label: 'Task due soon' },
   work_anniversary: { icon: 'sparkles', tone: 'info', label: 'Milestone' },
   birthday: { icon: 'sparkles', tone: 'info', label: 'Birthday' },
   birthday_wish_reply: { icon: 'mail', tone: 'info', label: 'Birthday reply' },
@@ -203,7 +203,7 @@ export function NotificationsHistory({
           title={notifications.length === 0 ? 'No notifications yet' : 'Nothing matches'}
           hint={
             notifications.length === 0
-              ? 'Goal assignments, leave updates and reminders will show up here.'
+              ? 'Task assignments, leave updates and reminders will show up here.'
               : 'Try a different search or filter.'
           }
         />

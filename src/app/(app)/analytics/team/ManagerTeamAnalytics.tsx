@@ -132,7 +132,7 @@ export async function ManagerTeamAnalytics({
           <div className="text-xs text-grey mt-1">Weekly target across your team</div>
         </div>
         <div className="card">
-          <div className="card-subtitle">Open goals</div>
+          <div className="card-subtitle">Open tasks</div>
           <div className="text-3xl fw-bold mt-1">
             {deptGoals.filter((g) => g.status !== 'achieved' && g.status !== 'not_met').length}
           </div>
@@ -144,7 +144,7 @@ export async function ManagerTeamAnalytics({
           <div className="text-xs text-grey mt-1">{gByStatus.achieved} completed</div>
         </div>
         <div className="card">
-          <div className="card-subtitle">Overdue goals</div>
+          <div className="card-subtitle">Overdue tasks</div>
           <div
             className="text-3xl fw-bold mt-1"
             style={{ color: gOverdue ? 'var(--color-red)' : undefined }}
@@ -167,9 +167,9 @@ export async function ManagerTeamAnalytics({
 
       <div className="analytics-bottom-row mb-6">
         <div className="card">
-          <div className="card-subtitle mb-4">Goals by status</div>
+          <div className="card-subtitle mb-4">Tasks by status</div>
           {statusDonut.length === 0 ? (
-            <div className="text-grey text-sm">No goals in this department yet.</div>
+            <div className="text-grey text-sm">No tasks in this department yet.</div>
           ) : (
             <div className="flex items-center gap-6">
               <div className="relative">
@@ -193,7 +193,7 @@ export async function ManagerTeamAnalytics({
               <div className="ml-auto text-right">
                 <div className="card-subtitle">Avg progress</div>
                 <div className="text-2xl fw-bold">{gAvgProgress}%</div>
-                <div className="text-xs text-grey">Active goals</div>
+                <div className="text-xs text-grey">Active tasks</div>
               </div>
             </div>
           )}

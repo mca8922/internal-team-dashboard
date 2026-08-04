@@ -372,7 +372,7 @@ export function SettingsView({
                     {
                       id: 'soundNotification',
                       label: 'Notification chime',
-                      hint: 'Play a sound for goals, leaves, and reminders',
+                      hint: 'Play a sound for tasks, leaves, and reminders',
                     },
                   ] as const
                 ).map((p) => (

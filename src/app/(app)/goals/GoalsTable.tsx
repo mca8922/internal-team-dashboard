@@ -195,7 +195,7 @@ export function GoalsTable({
     <div className="gb-tr gb-tr-head">
       <span className="gb-th gb-th-pin" aria-hidden />
       <button type="button" className="gb-th gb-th-title" onClick={() => toggleSort('title')}>
-        Goal <span className="gb-sort">{sortCaret('title')}</span>
+        Task <span className="gb-sort">{sortCaret('title')}</span>
       </button>
       <button type="button" className="gb-th gb-th-status" onClick={() => toggleSort('status')}>
         Status <span className="gb-sort">{sortCaret('status')}</span>
@@ -223,7 +223,7 @@ export function GoalsTable({
             className={`icon-btn gb-pin-star${pin ? ' active' : ''}`}
             onClick={(e) => { e.stopPropagation(); onTogglePin(g); }}
             aria-pressed={pin}
-            aria-label={pin ? 'Unpin goal' : 'Pin goal'}
+            aria-label={pin ? 'Unpin task' : 'Pin task'}
             title={pin ? 'Unpin from top' : 'Pin to top'}
           >
             <Icon name={pin ? 'star-filled' : 'star'} size={14} />
@@ -259,7 +259,7 @@ export function GoalsTable({
     <div className="gb-table-wrap">
       <div className="gb-table-controls">
         <span className="gb-table-count">
-          {total} goal{total !== 1 ? 's' : ''}
+          {total} task{total !== 1 ? 's' : ''}
           {pinnedGoals.length > 0 ? ` · ${pinnedGoals.length} pinned` : ''}
         </span>
         <label className="gb-table-group">
@@ -293,7 +293,7 @@ export function GoalsTable({
         ) : null}
 
         {total === 0 ? (
-          <div className="gb-table-empty">No goals match the current filters.</div>
+          <div className="gb-table-empty">No tasks match the current filters.</div>
         ) : flat ? (
           <>
             {pageRows.map(row)}

@@ -369,7 +369,7 @@ export default async function TeamAnalyticsPage({
           <div className="text-xs text-grey mt-1">Awaiting your review</div>
         </div>
         <div className="card">
-          <div className="card-subtitle">Open goals</div>
+          <div className="card-subtitle">Open tasks</div>
           <div className="text-3xl fw-bold mt-1">
             {goals.filter((g) => g.status !== 'achieved' && g.status !== 'not_met').length}
           </div>
@@ -379,12 +379,12 @@ export default async function TeamAnalyticsPage({
 
       {/* ── Goals analytics ── */}
       <div className="flex items-baseline gap-2 mb-3" style={{ marginTop: 8 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700 }}>Goals</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 700 }}>Tasks</h2>
         <span className="text-xs text-grey">Execution across every department</span>
       </div>
       <div className="grid grid-5 gap-4 mb-6">
         <div className="card">
-          <div className="card-subtitle">Total goals</div>
+          <div className="card-subtitle">Total tasks</div>
           <div className="text-3xl fw-bold mt-1">{gTotal}</div>
           <div className="text-xs text-grey mt-1">All tiers</div>
         </div>
@@ -416,15 +416,15 @@ export default async function TeamAnalyticsPage({
         <div className="card">
           <div className="card-subtitle">Avg progress</div>
           <div className="text-3xl fw-bold mt-1">{gAvgProgress}%</div>
-          <div className="text-xs text-grey mt-1">Active goals</div>
+          <div className="text-xs text-grey mt-1">Active tasks</div>
         </div>
       </div>
 
       <div className="analytics-bottom-row mb-6">
         <div className="card analytics-donut-card">
-          <div className="card-subtitle mb-4">Goals by status</div>
+          <div className="card-subtitle mb-4">Tasks by status</div>
           {statusDonut.length === 0 ? (
-            <div className="text-grey text-sm">No goals yet.</div>
+            <div className="text-grey text-sm">No tasks yet.</div>
           ) : (
             <DonutCard data={statusDonut} centerLabel="Total" centerValue={gTotal} />
           )}
@@ -435,7 +435,7 @@ export default async function TeamAnalyticsPage({
             <thead>
               <tr>
                 <th>Department</th>
-                <th style={{ textAlign: 'center' }}>Goals</th>
+                <th style={{ textAlign: 'center' }}>Tasks</th>
                 <th style={{ textAlign: 'center' }}>Done</th>
                 <th style={{ textAlign: 'center' }}>Overdue</th>
                 <th style={{ minWidth: 130 }}>Avg progress</th>

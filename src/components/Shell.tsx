@@ -81,7 +81,7 @@ function buildNavGroups(user: Profile) {
     { label: 'Dashboard', icon: 'home',   path: '/dashboard' },
     { label: 'Punch',     icon: 'clock',  path: '/punch' },
     ...(FEATURE_FLAGS.dailyLog ? [{ label: 'Daily Log', icon: 'edit' as const, path: '/log' }] : []),
-    { label: 'Goals',     icon: 'target', path: '/goals' },
+    { label: 'Tasks',     icon: 'target', path: '/goals' },
     { label: 'Analytics', icon: 'chart',  path: '/analytics' },
     { label: 'Leaves',    icon: 'plane',  path: '/leaves' },
   ];
@@ -184,7 +184,7 @@ const MOBILE_PRIMARY_ITEMS: NavItem[] = [
   { label: 'Home',  icon: 'home',   path: '/dashboard' },
   { label: 'Punch', icon: 'clock',  path: '/punch' },
   ...(FEATURE_FLAGS.dailyLog ? [{ label: 'Log', icon: 'edit' as const, path: '/log' }] : []),
-  { label: 'Goals', icon: 'target', path: '/goals' },
+  { label: 'Tasks', icon: 'target', path: '/goals' },
 ];
 
 function BottomNav({
@@ -428,7 +428,7 @@ function TopBar({
     dashboard: 'Dashboard',
     punch: 'Punch',
     log: 'Daily Log',
-    goals: 'Goals',
+    goals: 'Tasks',
     manage: 'Manage',
     team: 'Team',
     requests: 'Change requests',

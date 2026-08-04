@@ -244,13 +244,13 @@ export function GoalsCleanup({
         goals: list.map((g) => toJsonRecord(g, assigneesByGoal, checklistsByGoal)),
       });
     }
-    toast(`Exported ${list.length} goal${list.length !== 1 ? 's' : ''} as ${kind.toUpperCase()}`);
+    toast(`Exported ${list.length} task${list.length !== 1 ? 's' : ''} as ${kind.toUpperCase()}`);
   };
 
   const runArchive = async () => {
     const ids = selectedGoals.map((g) => g.id);
     const ok = await confirm({
-      title: `Archive ${ids.length} goal${ids.length !== 1 ? 's' : ''}?`,
+      title: `Archive ${ids.length} task${ids.length !== 1 ? 's' : ''}?`,
       message:
         'They disappear from the cascade, dashboard and analytics but are kept in the database. You can restore them anytime from the Archived tab.',
       confirmLabel: 'Archive them',
@@ -260,10 +260,10 @@ export function GoalsCleanup({
     setBusy(true);
     try {
       await archiveGoals(ids);
-      toast(`Archived ${ids.length} goal${ids.length !== 1 ? 's' : ''}`);
+      toast(`Archived ${ids.length} task${ids.length !== 1 ? 's' : ''}`);
       setSelMonths(new Set());
     } catch (e) {
-      toast((e as Error).message || 'Could not archive the goals.', 'error');
+      toast((e as Error).message || 'Could not archive the tasks.', 'error');
     } finally {
       setBusy(false);
     }
@@ -274,12 +274,12 @@ export function GoalsCleanup({
     setBusy(true);
     try {
       await deleteGoals(ids);
-      toast(`Permanently deleted ${ids.length} goal${ids.length !== 1 ? 's' : ''}`);
+      toast(`Permanently deleted ${ids.length} task${ids.length !== 1 ? 's' : ''}`);
       setConfirmText('');
       setDeleteArmed(false);
       after();
     } catch (e) {
-      toast((e as Error).message || 'Could not delete the goals.', 'error');
+      toast((e as Error).message || 'Could not delete the tasks.', 'error');
     } finally {
       setBusy(false);
     }
@@ -290,10 +290,10 @@ export function GoalsCleanup({
     setBusy(true);
     try {
       await restoreGoals(ids);
-      toast(`Restored ${ids.length} goal${ids.length !== 1 ? 's' : ''}`);
+      toast(`Restored ${ids.length} task${ids.length !== 1 ? 's' : ''}`);
       setSelArchived(new Set());
     } catch (e) {
-      toast((e as Error).message || 'Could not restore the goals.', 'error');
+      toast((e as Error).message || 'Could not restore the tasks.', 'error');
     } finally {
       setBusy(false);
     }
@@ -306,8 +306,8 @@ export function GoalsCleanup({
     <Modal
       open={open}
       onClose={onClose}
-      title="Clean up goals"
-      subtitle="Export past goals as a backup, then archive or delete them in one shot."
+      title="Clean up tasks"
+      subtitle="Export past tasks as a backup, then archive or delete them in one shot."
       width={720}
     >
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
@@ -330,7 +330,7 @@ export function GoalsCleanup({
       {tab === 'cleanup' ? (
         monthBuckets.length === 0 ? (
           <div className="text-grey" style={{ padding: '24px 8px', textAlign: 'center' }}>
-            No goals older than this month. Nothing to clean up yet.
+            No tasks older than this month. Nothing to clean up yet.
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 8, maxHeight: '46vh', overflowY: 'auto' }}>
@@ -349,7 +349,7 @@ export function GoalsCleanup({
                     <Icon name="calendar" size={14} />
                     <span className="fw-medium">{monthLabel(key)}</span>
                     <span className="badge badge-slate" style={{ marginLeft: 'auto' }}>
-                      {gs.length} goal{gs.length !== 1 ? 's' : ''}
+                      {gs.length} task{gs.length !== 1 ? 's' : ''}
                     </span>
                   </label>
                   {on ? (
@@ -368,7 +368,7 @@ export function GoalsCleanup({
         )
       ) : archivedGoals.length === 0 ? (
         <div className="text-grey" style={{ padding: '24px 8px', textAlign: 'center' }}>
-          No archived goals. Anything you archive shows up here to restore or delete for good.
+          No archived tasks. Anything you archive shows up here to restore or delete for good.
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 6, maxHeight: '46vh', overflowY: 'auto' }}>
@@ -401,7 +401,7 @@ export function GoalsCleanup({
       >
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className="fw-medium">
-            {activeList.length} goal{activeList.length !== 1 ? 's' : ''} selected
+            {activeList.length} task{activeList.length !== 1 ? 's' : ''} selected
           </span>
           <span style={{ flex: 1 }} />
           <Button
@@ -467,7 +467,7 @@ export function GoalsCleanup({
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <Icon name="trash" size={16} />
               <span className="fw-medium">
-                Permanently delete {activeList.length} goal{activeList.length !== 1 ? 's' : ''}?
+                Permanently delete {activeList.length} task{activeList.length !== 1 ? 's' : ''}?
               </span>
             </div>
             <div className="text-grey" style={{ fontSize: 13 }}>

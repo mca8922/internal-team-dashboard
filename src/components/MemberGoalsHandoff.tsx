@@ -63,7 +63,7 @@ export function MemberGoalsHandoff({
         setLoading(false);
       })
       .catch((e) => {
-        toast((e as Error).message || 'Could not load goals.', 'error');
+        toast((e as Error).message || 'Could not load tasks.', 'error');
         setLoading(false);
       });
   }, [open, memberId, toast]);
@@ -128,17 +128,17 @@ export function MemberGoalsHandoff({
     <Modal
       open={open}
       onClose={onClose}
-      title={`Hand off ${memberName}’s goals`}
+      title={`Hand off ${memberName}’s tasks`}
       subtitle={contextLabel}
       width={560}
     >
       {loading ? (
         <div className="text-grey text-sm" style={{ padding: '12px 0' }}>
-          Loading their goals…
+          Loading their tasks…
         </div>
       ) : goals.length === 0 ? (
         <div className="text-grey text-sm" style={{ padding: '12px 0' }}>
-          {memberName} has no open goals to hand off.
+          {memberName} has no open tasks to hand off.
         </div>
       ) : (
         <div className="mgh-list">

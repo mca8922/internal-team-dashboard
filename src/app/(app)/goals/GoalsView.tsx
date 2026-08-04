@@ -575,7 +575,7 @@ function GoalCard({
                 className={`icon-btn gb-pin-star${pinned ? ' active' : ''}`}
                 onClick={() => ctx.onTogglePin(goal)}
                 aria-pressed={pinned}
-                aria-label={pinned ? 'Unpin goal' : 'Pin goal'}
+                aria-label={pinned ? 'Unpin task' : 'Pin task'}
                 title={pinned ? 'Unpin from top' : 'Pin to top'}
               >
                 <Icon name={pinned ? 'star-filled' : 'star'} size={14} />
@@ -589,8 +589,8 @@ function GoalCard({
                 type="button"
                 className="icon-btn"
                 onClick={() => ctx.onEdit(goal)}
-                aria-label="Edit goal"
-                title="Edit goal"
+                aria-label="Edit task"
+                title="Edit task"
               >
                 <Icon name="edit" size={14} />
               </button>
@@ -598,8 +598,8 @@ function GoalCard({
                 type="button"
                 className="icon-btn"
                 onClick={() => ctx.onDuplicate(goal)}
-                aria-label="Duplicate goal"
-                title="Duplicate goal to reassign to another member"
+                aria-label="Duplicate task"
+                title="Duplicate task to reassign to another member"
               >
                 <Icon name="copy" size={14} />
               </button>
@@ -609,8 +609,8 @@ function GoalCard({
                   type="button"
                   className="icon-btn"
                   onClick={() => ctx.onDelete(goal)}
-                  aria-label="Archive goal"
-                  title="Archive goal"
+                  aria-label="Archive task"
+                  title="Archive task"
                 >
                   <Icon name="trash" size={14} />
                 </button>
@@ -1047,7 +1047,7 @@ function MemberSearchBar({
         <Icon name="search" size={15} />
         <input
           className="gb-toolbar-input"
-          placeholder="Search your goals…"
+          placeholder="Search your tasks…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -1105,7 +1105,7 @@ function BoardGoalsToolbar({
         <Icon name="search" size={15} />
         <input
           className="gb-toolbar-input"
-          placeholder="Search goals by title or description…"
+          placeholder="Search tasks by title or description…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -1185,7 +1185,7 @@ function BoardHealthStrip({
     <div className="gb-health">
       <div className="gb-health-tile">
         <span className="gb-health-num">{counts.total}</span>
-        <span className="gb-health-lbl">Total goals</span>
+        <span className="gb-health-lbl">Total tasks</span>
       </div>
       <button type="button" className="gb-health-tile amber" onClick={() => onStatus('active')}>
         <span className="gb-health-num">{counts.active}</span>
@@ -1227,7 +1227,7 @@ function BoardGoalsResults({
     return (
       <EmptyState
         icon="search"
-        title="No goals match"
+        title="No tasks match"
         hint="Try a different search, department or status, or clear the filters."
       />
     );
@@ -1236,7 +1236,7 @@ function BoardGoalsResults({
     <div className="gb-results">
       <div className="gb-results-head">
         <span className="gb-results-count">
-          {total} goal{total !== 1 ? 's' : ''} · {groups.length} department
+          {total} task{total !== 1 ? 's' : ''} · {groups.length} department
           {groups.length !== 1 ? 's' : ''}
         </span>
         <button type="button" className="gb-results-clear" onClick={onClear}>
@@ -1423,7 +1423,7 @@ export function GoalsView({
   React.useEffect(() => setMvDraft({ mission, vision }), [mission, vision]);
 
   const topLabel =
-    viewerRole === 'intern' && tenureMonths ? `${tenureMonths}-Month Goal` : 'Yearly Goal';
+    viewerRole === 'intern' && tenureMonths ? `${tenureMonths}-Month Task` : 'Yearly Task';
 
   const { yearly, monthly, weekly, daily, unlinked } = React.useMemo(() => {
     const yearly = goals.filter((g) => g.level === 'yearly');
@@ -1765,7 +1765,7 @@ export function GoalsView({
           data.assigneeIds,
           data.checklist,
         );
-        toast('Goal updated');
+        toast('Task updated');
       } else {
         await createGoal({
           level: data.level,
@@ -1780,11 +1780,11 @@ export function GoalsView({
           assigneeIds: data.assigneeIds,
           checklist: data.checklist,
         });
-        toast('Goal created');
+        toast('Task created');
       }
       setEditing(null);
     } catch (e) {
-      toast((e as Error).message || 'Could not save the goal.', 'error');
+      toast((e as Error).message || 'Could not save the task.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -1792,18 +1792,18 @@ export function GoalsView({
 
   const archive = async (g: Goal) => {
     const ok = await confirm({
-      title: 'Archive this goal?',
-      message: 'The goal is removed from the cascade. This cannot be undone.',
-      confirmLabel: 'Archive goal',
+      title: 'Archive this task?',
+      message: 'The task is removed from the cascade. This cannot be undone.',
+      confirmLabel: 'Archive task',
       tone: 'danger',
       icon: 'trash',
     });
     if (!ok) return;
     try {
       await deleteGoal(g.id);
-      toast('Goal archived');
+      toast('Task archived');
     } catch (e) {
-      toast((e as Error).message || 'Could not archive the goal.', 'error');
+      toast((e as Error).message || 'Could not archive the task.', 'error');
     }
   };
 
@@ -1914,7 +1914,7 @@ export function GoalsView({
     <div className="page-header">
       <div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
-          <h1 className="page-title">Goals</h1>
+          <h1 className="page-title">Tasks</h1>
           <span className="page-title" style={{ color: 'var(--color-grey-text)', fontWeight: 400, fontStyle: 'italic' }}>
             We Believe in{' '}
             <span className="text-shine page-title" style={{ fontStyle: 'normal' }}>
@@ -1923,7 +1923,7 @@ export function GoalsView({
           </span>
         </div>
         <div className="page-subtitle">
-          Mission → Vision → {topLabel.replace(' Goal', '')} → Month → Week → Day
+          Mission → Vision → {topLabel.replace(' Task', '')} → Month → Week → Day
         </div>
       </div>
       {isBoard ? (
@@ -1947,7 +1947,7 @@ export function GoalsView({
             </Button>
           ) : null}
           <Button icon="plus" onClick={() => setEditing({ level: 'weekly' })}>
-            Add Goal
+            Add Task
           </Button>
         </div>
       ) : null}
@@ -1991,7 +1991,7 @@ export function GoalsView({
   // main cascade return and the no-yearly flat return can render it.
   const navControls = (
     <div className="gb-nav-controls">
-      <div className="gb-viewswitch" role="group" aria-label="Goals view">
+      <div className="gb-viewswitch" role="group" aria-label="Tasks view">
         <button
           type="button"
           className={`gb-viewswitch-btn${viewMode === 'cascade' ? ' active' : ''}`}
@@ -2013,13 +2013,13 @@ export function GoalsView({
           className={`gb-viewswitch-btn${viewMode === 'canvas' ? ' active' : ''}`}
           onClick={() => chooseView('canvas')}
           aria-pressed={viewMode === 'canvas'}
-          title="Whole goal tree on one screen. Zoom and pan, no scrolling"
+          title="Whole task tree on one screen. Zoom and pan, no scrolling"
         >
           <Icon name="network" size={14} /> One-Shot
         </button>
       </div>
       <button type="button" className="gb-cmdk-trigger" onClick={() => setCmdkOpen(true)}>
-        <Icon name="search" size={14} /> Jump to goal
+        <Icon name="search" size={14} /> Jump to task
         <kbd className="gb-kbd">Ctrl K</kbd>
       </button>
       {isBoard ? (
@@ -2050,12 +2050,12 @@ export function GoalsView({
         disableBackdropClose
         title={
           editing?._template
-            ? 'New goal from template'
+            ? 'New task from template'
             : editing?._duplicate
-              ? 'Duplicate goal'
+              ? 'Duplicate task'
               : editing && editing.id
-                ? 'Edit goal'
-                : 'Add goal'
+                ? 'Edit task'
+                : 'Add task'
         }
         subtitle={
           editing?._template
@@ -2139,15 +2139,15 @@ export function GoalsView({
       <Modal
         open={tplOpen}
         onClose={() => setTplOpen(false)}
-        title="Goal templates"
-        subtitle="Reusable blueprints. Spin up a goal, then pick its assignees."
+        title="Task templates"
+        subtitle="Reusable blueprints. Spin up a task, then pick its assignees."
         width={520}
       >
         {goalTemplates.length === 0 ? (
           <EmptyState
             icon="copy"
             title="No templates yet"
-            hint="On any goal, open the ⋮ menu and choose “Save as template”. It’ll show up here for the whole Board to reuse."
+            hint="On any task, open the ⋮ menu and choose “Save as template”. It’ll show up here for the whole Board to reuse."
           />
         ) : (
           <div className="gb-tpl-list">
@@ -2206,7 +2206,7 @@ export function GoalsView({
         open={rtOpen}
         onClose={() => setRtOpen(false)}
         title="Report templates"
-        subtitle="The shape members should follow when they report work, one per department. Shown prefilled when a member reports on a Report Work goal."
+        subtitle="The shape members should follow when they report work, one per department. Shown prefilled when a member reports on a Report Work task."
         width={560}
       >
         {departments.length === 0 ? (
@@ -2305,7 +2305,7 @@ export function GoalsView({
                     setPeek(null);
                   }}
                 >
-                  Edit goal
+                  Edit task
                 </Button>
               ) : (
                 <Button
@@ -2316,7 +2316,7 @@ export function GoalsView({
                     if (g) jumpToGoal(g);
                   }}
                 >
-                  Go to goal
+                  Go to task
                 </Button>
               )}
             </div>
@@ -2359,11 +2359,11 @@ export function GoalsView({
         {missionVision}
         <EmptyState
           icon="target"
-          title="No goals yet"
+          title="No tasks yet"
           hint={
             isBoard
-              ? 'Click "Add Goal" to create the first one.'
-              : 'No goals have been assigned to you or your department yet.'
+              ? 'Click "Add Task" to create the first one.'
+              : 'No tasks have been assigned to you or your department yet.'
           }
         />
         {modals}
@@ -2389,8 +2389,8 @@ export function GoalsView({
         {isBoard ? (
           <>
             <div className="gb-section-head">
-              <h2 className="gb-section-title">Yearly Goals</h2>
-              <p className="gb-section-sub">Pin your big yearly goals here. Click a card to drill into the breakdown.</p>
+              <h2 className="gb-section-title">Yearly Tasks</h2>
+              <p className="gb-section-sub">Pin your big yearly tasks here. Click a card to drill into the breakdown.</p>
             </div>
             <div className="gb-pinboard-wrap">
               <div className="gb-pinboard">
@@ -2400,7 +2400,7 @@ export function GoalsView({
                   onClick={() => setEditing({ level: 'yearly' })}
                 >
                   <div className="gb-pin-add-icon">+</div>
-                  New Yearly Goal
+                  New Yearly Task
                 </button>
               </div>
             </div>
@@ -2410,21 +2410,21 @@ export function GoalsView({
           <>
             <div className="gb-section-head">
               <h2 className="gb-section-title">
-                {isBoard ? 'Unlinked Goals' : 'Your goals'}
+                {isBoard ? 'Unlinked Tasks' : 'Your tasks'}
               </h2>
               <p className="gb-section-sub">
                 {isBoard
-                  ? 'These goals exist but are not anchored to a yearly goal yet.'
-                  : 'Goals assigned to you or your department.'}
+                  ? 'These tasks exist but are not anchored to a yearly task yet.'
+                  : 'Tasks assigned to you or your department.'}
               </p>
             </div>
             {isBoard ? (
               <div className="gb-unlinked-banner">
                 <div className="gb-unlinked-icon">⚠</div>
                 <div className="gb-unlinked-text">
-                  <div className="gb-unlinked-title">Goals without a yearly anchor</div>
+                  <div className="gb-unlinked-title">Tasks without a yearly anchor</div>
                   <div className="gb-unlinked-sub">
-                    Create a yearly goal on the pinboard above, then edit each goal below and set its parent to link it into the cascade.
+                    Create a yearly task on the pinboard above, then edit each task below and set its parent to link it into the cascade.
                   </div>
                 </div>
                 <div className="gb-unlinked-count">{flat.length}</div>
@@ -2440,7 +2440,7 @@ export function GoalsView({
             ) : (
               <EmptyState
                 icon="search"
-                title="No goals match"
+                title="No tasks match"
                 hint="Try a different word, or clear the search."
               />
             )}
@@ -2548,7 +2548,7 @@ export function GoalsView({
       {isBoard ? (
         <div className="gb-cascade-tools">
           {focused ? (
-            <nav className="gb-breadcrumb" aria-label="Goal path">
+            <nav className="gb-breadcrumb" aria-label="Task path">
               {goalPath(focused, goals).map((c, i, arr) => (
                 <React.Fragment key={c.id}>
                   <button
@@ -2585,10 +2585,10 @@ export function GoalsView({
         />
       ) : null}
       <div className="gb-section-head">
-        <h2 className="gb-section-title">Goal breakdown</h2>
+        <h2 className="gb-section-title">Task breakdown</h2>
         <p className="gb-section-sub">
           Pick a {topLabel.toLowerCase()} to see how it breaks down into monthly, weekly and
-          daily goals.
+          daily tasks.
         </p>
       </div>
 
@@ -2632,8 +2632,8 @@ export function GoalsView({
                     <button
                       type="button"
                       className="gb-pin-action-btn"
-                      aria-label="View goal"
-                      title="View goal"
+                      aria-label="View task"
+                      title="View task"
                       onClick={() => setPeek(y)}
                     >
                       <Icon name="eye" size={13} />
@@ -2641,7 +2641,7 @@ export function GoalsView({
                     <button
                       type="button"
                       className="gb-pin-action-btn"
-                      aria-label="Edit goal"
+                      aria-label="Edit task"
                       onClick={() => ctx.onEdit(y)}
                     >
                       <Icon name="edit" size={13} />
@@ -2649,7 +2649,7 @@ export function GoalsView({
                     <button
                       type="button"
                       className="gb-pin-action-btn danger"
-                      aria-label="Delete goal"
+                      aria-label="Delete task"
                       onClick={() => ctx.onDelete(y)}
                     >
                       <Icon name="trash" size={13} />
@@ -2664,7 +2664,7 @@ export function GoalsView({
               onClick={() => setEditing({ level: 'yearly' })}
             >
               <div className="gb-pin-add-icon">+</div>
-              New Yearly Goal
+              New Yearly Task
             </button>
           </div>
         </div>
@@ -2702,7 +2702,7 @@ export function GoalsView({
                   </div>
                   <div>
                     <div className="gb-stat-num">{subtree.length}</div>
-                    <div className="gb-stat-lbl">Sub-goals</div>
+                    <div className="gb-stat-lbl">Sub-tasks</div>
                   </div>
                   <div>
                     <div className="gb-stat-num">{achievedUnder}</div>
@@ -2721,8 +2721,8 @@ export function GoalsView({
 
           {branches.length === 0 ? (
             <div className="gb-empty-branch">
-              No monthly milestones under this goal yet.
-              {isBoard ? ' Add one with "Add Goal".' : ''}
+              No monthly milestones under this task yet.
+              {isBoard ? ' Add one with "Add Task".' : ''}
             </div>
           ) : (
             <div className="gb-children">
@@ -2744,16 +2744,16 @@ export function GoalsView({
       {unlinked.length > 0 ? (
         <div className="mt-8">
           <div className="gb-section-head">
-            <h2 className="gb-section-title">Unlinked Goals</h2>
-            <p className="gb-section-sub">These goals are not connected to any {topLabel.toLowerCase()}.</p>
+            <h2 className="gb-section-title">Unlinked Tasks</h2>
+            <p className="gb-section-sub">These tasks are not connected to any {topLabel.toLowerCase()}.</p>
           </div>
           {isBoard ? (
             <div className="gb-unlinked-banner">
               <div className="gb-unlinked-icon">⚠</div>
               <div className="gb-unlinked-text">
-                <div className="gb-unlinked-title">Goals without a yearly anchor</div>
+                <div className="gb-unlinked-title">Tasks without a yearly anchor</div>
                 <div className="gb-unlinked-sub">
-                  Edit each goal below and set its parent to link it into the cascade under a yearly goal on the pinboard.
+                  Edit each task below and set its parent to link it into the cascade under a yearly task on the pinboard.
                 </div>
               </div>
               <div className="gb-unlinked-count">{unlinked.length}</div>

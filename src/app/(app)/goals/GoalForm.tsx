@@ -261,7 +261,7 @@ export function GoalForm({
     <div className="grid gap-3">
       {/* Level — the headline choice. Big segmented control so picking the
           tier is the obvious first step. */}
-      <Field label="Goal level">
+      <Field label="Task level">
         <div className="seg">
           {LEVELS.map((l) => (
             <button
@@ -290,7 +290,7 @@ export function GoalForm({
           value={form.description}
           onChange={(html) => set('description', html)}
           placeholder="What does done look like?"
-          ariaLabel="Goal description"
+          ariaLabel="Task description"
         />
       </Field>
 
@@ -372,7 +372,7 @@ export function GoalForm({
           </select>
         </Field>
         {parentOptions.length > 0 ? (
-          <Field label={`Parent (${parentLevel} goal)`}>
+          <Field label={`Parent (${parentLevel} task)`}>
             <select
               className="select"
               value={form.parentId || ''}
@@ -395,7 +395,7 @@ export function GoalForm({
           "Custom days" cadence lets you pick exact weekdays (e.g. Mon/Wed/Fri). */}
       <Field
         label="Checklist"
-        hint="Break the goal into steps. Assigned members tick these off and progress updates automatically."
+        hint="Break the task into steps. Assigned members tick these off and progress updates automatically."
       >
         <div className="checklist-editor">
           {checklist.map((item, i) => (
@@ -574,7 +574,7 @@ export function GoalForm({
             });
           }}
         >
-          {initial.id ? 'Save changes' : 'Add goal'}
+          {initial.id ? 'Save changes' : 'Add task'}
         </Button>
       </div>
     </div>

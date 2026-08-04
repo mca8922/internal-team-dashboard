@@ -404,10 +404,10 @@ export default async function DashboardPage() {
           <div className="card" data-tour="goals-card">
             <div className="card-header">
               <div>
-                <div className="card-subtitle">This week&apos;s goals</div>
+                <div className="card-subtitle">This week&apos;s tasks</div>
                 <div className="text-xs text-grey mt-1">
                   Week {weekNumber(new Date())} ·{' '}
-                  {isBoard ? 'all goals' : 'assigned to you'} · {weekGoals.length} active
+                  {isBoard ? 'all tasks' : 'assigned to you'} · {weekGoals.length} active
                 </div>
               </div>
               <span className="badge">Weekly</span>
@@ -415,8 +415,8 @@ export default async function DashboardPage() {
             {weekGoals.length === 0 ? (
               <div className="text-grey text-sm mt-2">
                 {isBoard
-                  ? 'No weekly goals set.'
-                  : 'No weekly goals assigned to you yet.'}
+                  ? 'No weekly tasks set.'
+                  : 'No weekly tasks assigned to you yet.'}
               </div>
             ) : (
               <div className="grid gap-3">
@@ -494,7 +494,7 @@ export default async function DashboardPage() {
               {FEATURE_FLAGS.dailyLog ? (
                 <Link href="/log" className="btn btn-secondary">Log today&apos;s work</Link>
               ) : null}
-              <Link href="/goals" className="btn btn-secondary">View goals</Link>
+              <Link href="/goals" className="btn btn-secondary">View tasks</Link>
               <Link href="/leaves" className="btn btn-secondary">Request leave</Link>
             </div>
           </div>

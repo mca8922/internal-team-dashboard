@@ -282,7 +282,7 @@ export function GoalsCanvas({
   if (nodes.length === 0) {
     return (
       <div className="gb-canvas-viewport gb-canvas-empty">
-        <EmptyState icon="target" title="Nothing to map yet" hint="Add a yearly goal to see it here." />
+        <EmptyState icon="target" title="Nothing to map yet" hint="Add a yearly task to see it here." />
       </div>
     );
   }
@@ -363,7 +363,7 @@ export function GoalsCanvas({
         <div className="gb-canvas-topbar">
           <button type="button" className="gb-canvas-topbar-btn" onClick={toggleExpandAll}>
             <Icon name={allExpanded ? 'chevron-down' : 'chevron-right'} size={13} />
-            {allExpanded ? 'Collapse daily goals' : 'Expand all daily goals'}
+            {allExpanded ? 'Collapse daily tasks' : 'Expand all daily tasks'}
           </button>
         </div>
       ) : null}
