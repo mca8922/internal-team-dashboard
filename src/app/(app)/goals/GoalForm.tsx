@@ -1,7 +1,8 @@
 'use client';
 
 // The single "Add / Edit goal" form, shown in a modal on the Goals page. One
-// form covers every tier (Yearly · Monthly · Weekly · Daily) plus the
+// form covers every tier (Yearly · Half-Yearly · Quarterly · Monthly · Daily)
+// plus the
 // checklist, cadence (including custom weekdays), status, progress and
 // per-member assignment.
 import * as React from 'react';
