@@ -243,3 +243,7 @@ drop trigger if exists profiles_hierarchy_consistent on profiles;
 create trigger profiles_hierarchy_consistent
   before insert or update of manager_id, department on profiles
   for each row execute function public.assert_hierarchy_consistent();
+
+-- It is a TRIGGER function; it is never meant to be invoked directly, and
+-- PostgREST exposing it at /rpc/ is pure surface area.
+revoke execute on function public.assert_hierarchy_consistent() from anon, authenticated;
