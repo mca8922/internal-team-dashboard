@@ -61,6 +61,16 @@ const DOT_LABEL: Record<TeamMember['status'], string> = {
 // Sort priority within a department: leadership first, interns last.
 const ROLE_ORDER: Record<UserRole, number> = { board: 0, fte: 1, pte: 2, intern: 3 };
 
+// Rank inside a department block, top of the chain first:
+// Director → Manager → Full-Time → Part-Time → Intern. A Manager outranks
+// their base role — someone who heads the department runs it even if they are
+// technically an intern, so they must not sort behind plain interns.
+function chainRank(u: TeamMember): number {
+  if (u.role === 'board') return 0;
+  if (u.isManager) return 1;
+  return 2 + ROLE_ORDER[u.role];
+}
+
 // Google brand palette — assigned by sort index (Founder first, then A-Z)
 // so every board member always gets a distinct colour.
 const BOARD_COLORS = ['#4285F4', '#EA4335', '#FBBC04', '#34A853'];
@@ -222,12 +232,16 @@ export function TeamGrid({
   members,
   currentUserId,
   viewerIsFounder,
+  viewerDepartment,
   goalDeptCounts,
   deptColors,
 }: {
   members: TeamMember[];
   currentUserId: string;
   viewerIsFounder: boolean;
+  // The department the viewer directs. Empty for a Founder, who belongs to
+  // none and sees every department (migration 0058).
+  viewerDepartment: string;
   goalDeptCounts: Record<string, number>;
   deptColors: Record<string, string>;
 }) {
@@ -299,42 +313,38 @@ export function TeamGrid({
     };
   }, [filtered]);
 
-  // Directors get their own section below Founders, regardless of
-  // department — leadership is easiest to find up top.
-  const boardGroup = React.useMemo(() => {
-    const mem = filtered.filter((u) => u.role === 'board' && !u.isFounder);
-    if (mem.length === 0) return null;
-    return {
-      inCount: mem.filter((m) => m.status === 'in').length,
-      members: mem.slice().sort((a, b) => a.name.localeCompare(b.name)),
-    };
-  }, [filtered]);
-
-  // Everyone else grouped by department, each group keeping its own header above
-  // its members. Within a department, the member who HEADS it (isManager) leads
-  // the group regardless of their base role — a Manager who is technically an
-  // intern still runs the department, so they shouldn't sort behind plain
-  // interns by ROLE_ORDER. After that, members fall back to role then name.
-  // Departments themselves are A–Z. The groups are laid out side by side (see
+  // The department is the org's security boundary (migration 0058), so it is
+  // also the unit the grid is built from. Every non-Founder — Directors
+  // included — falls into their own department block, ordered down the chain:
+  // Director → Manager → staff. Directors no longer get a separate global
+  // section; showing them detached from their department contradicted the
+  // scope they actually hold.
+  //
+  // Departments themselves are A–Z. The blocks are laid out side by side (see
   // the masonry container below) so small departments don't each hog a row.
   const deptGroups = React.useMemo(() => {
     const map = new Map<string, TeamMember[]>();
     for (const u of filtered) {
-      if (u.role === 'board') continue;
+      if (u.isFounder) continue; // Founders sit under no department
       const key = u.department || 'No department';
       (map.get(key) ?? map.set(key, []).get(key)!).push(u);
     }
     return Array.from(map.entries())
-      .map(([name, mem]) => ({
-        name,
-        color: deptColors[name] ?? 'var(--color-green-primary)',
-        inCount: mem.filter((m) => m.status === 'in').length,
-        members: mem.slice().sort((a, b) => {
-          if (a.isManager !== b.isManager) return a.isManager ? -1 : 1;
-          const pr = ROLE_ORDER[a.role] - ROLE_ORDER[b.role];
-          return pr !== 0 ? pr : a.name.localeCompare(b.name);
-        }),
-      }))
+      .map(([name, mem]) => {
+        const sorted = mem.slice().sort((a, b) => {
+          const cr = chainRank(a) - chainRank(b);
+          return cr !== 0 ? cr : a.name.localeCompare(b.name);
+        });
+        return {
+          name,
+          color: deptColors[name] ?? 'var(--color-green-primary)',
+          inCount: sorted.filter((m) => m.status === 'in').length,
+          // Named in the block header so it's obvious at a glance who owns the
+          // department. Usually one; the model allows several.
+          directors: sorted.filter((m) => m.role === 'board'),
+          members: sorted,
+        };
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [filtered, deptColors]);
 
@@ -344,14 +354,21 @@ export function TeamGrid({
         <div>
           <h1 className="page-title">Team</h1>
           <div className="page-subtitle">
+            {/* A Director's scope is one department, so say which — the counts
+                below are their department's, not the whole company's. */}
+            {viewerIsFounder ? null : `${viewerDepartment} · `}
             {active.length} active · {punchedIn} punched in today
             {former.length > 0 ? ` · ${former.length} former` : ''}
           </div>
         </div>
         <div className="page-header-actions">
-          <Button icon="building" variant="secondary" onClick={() => setDeptsOpen(true)}>
-            Departments
-          </Button>
+          {/* Renaming or removing a department redraws the security boundaries
+              themselves, so it stays with the Founders. */}
+          {viewerIsFounder ? (
+            <Button icon="building" variant="secondary" onClick={() => setDeptsOpen(true)}>
+              Departments
+            </Button>
+          ) : null}
           <Button icon="plus" onClick={() => setCreateOpen(true)}>
             Create account
           </Button>
@@ -361,6 +378,8 @@ export function TeamGrid({
       <CreateMemberModal
         open={createOpen}
         departments={departmentList}
+        viewerIsFounder={viewerIsFounder}
+        viewerDepartment={viewerDepartment}
         onClose={() => setCreateOpen(false)}
       />
       <ManageDepartmentsModal
@@ -464,27 +483,6 @@ export function TeamGrid({
         </section>
       ) : null}
 
-      {boardGroup ? (
-        <section className="team-dept">
-          <div className="team-dept-head">
-            <span className="team-dept-accent" style={{ background: 'linear-gradient(180deg, #4285F4 0%, #EA4335 33%, #FBBC04 66%, #34A853 100%)' }} />
-            <span className="team-dept-name">Directors</span>
-            <span className="team-dept-count">{boardGroup.members.length}</span>
-            {boardGroup.inCount > 0 ? (
-              <span className="team-dept-in">
-                <span className="dot dot-green" />
-                {boardGroup.inCount} on the clock
-              </span>
-            ) : null}
-          </div>
-          <div className="grid grid-3 gap-4">
-            {boardGroup.members.map((u, idx) => (
-              <TeamCard key={u.id} u={u} onManage={setManaging} boardColor={BOARD_COLORS[idx % BOARD_COLORS.length]} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       {deptGroups.length > 0 ? (
         <div className="team-depts">
           {deptGroups.map((g) => {
@@ -502,6 +500,16 @@ export function TeamGrid({
                   <span className="team-dept-accent" style={{ background: g.color }} />
                   <span className="team-dept-name">{g.name}</span>
                   <span className="team-dept-count">{g.members.length}</span>
+                  {g.directors.length > 0 ? (
+                    <span className="team-dept-director" title="Director of this department">
+                      <Icon name="shield" size={11} />
+                      {g.directors.map((d) => d.name).join(', ')}
+                    </span>
+                  ) : (
+                    <span className="team-dept-director team-dept-director--none">
+                      No Director
+                    </span>
+                  )}
                   {g.inCount > 0 ? (
                     <span className="team-dept-in">
                       <span className="dot dot-green" />
@@ -514,7 +522,18 @@ export function TeamGrid({
                   style={{ gridTemplateColumns: `repeat(${span}, minmax(0, 1fr))` }}
                 >
                   {g.members.map((u) => (
-                    <TeamCard key={u.id} u={u} onManage={setManaging} />
+                    <TeamCard
+                      key={u.id}
+                      u={u}
+                      onManage={setManaging}
+                      boardColor={
+                        u.role === 'board'
+                          ? BOARD_COLORS[
+                              g.directors.findIndex((d) => d.id === u.id) % BOARD_COLORS.length
+                            ]
+                          : undefined
+                      }
+                    />
                   ))}
                 </div>
               </section>

@@ -101,6 +101,14 @@ export function ManageMemberModal({
   // email, so changing it never affects founder status).
   const founderProtected = member.isFounder && !isSelf;
 
+  // Structural changes — Role (who is a Director / Manager / staff), the
+  // Department someone belongs to, and a Manager's team — reshape the
+  // hierarchy itself and move people between security silos, so they are
+  // Founders-only (migration 0058). A Director runs the department they were
+  // given: they manage its people day to day, but cannot widen their own
+  // scope, appoint a peer, or pull an outsider in.
+  const structuralLocked = !viewerIsFounder;
+
   const run = async (fn: () => Promise<void>, msg: string) => {
     setPending(true);
     try {
@@ -349,14 +357,24 @@ export function ManageMemberModal({
           </Field>
         </div>
 
-        {/* Department */}
-        <Field label="Department">
+        {/* Department — the security boundary, so moving someone across it is
+            a Founder-only structural change. Changing it also detaches the
+            member from their old manager (the server clears manager_id). */}
+        <Field
+          label="Department"
+          hint={
+            structuralLocked
+              ? 'Only a Founder can move a member between departments.'
+              : 'Moving a member to another department detaches them from their current manager.'
+          }
+        >
           <div className="flex items-center gap-2">
             <div style={{ flex: 1 }}>
               <DepartmentSelect
                 value={department}
                 departments={departments}
                 onChange={setDepartment}
+                disabled={structuralLocked || founderProtected}
               />
             </div>
             <Button
@@ -365,6 +383,7 @@ export function ManageMemberModal({
               onClick={saveDept}
               disabled={
                 pending ||
+                structuralLocked ||
                 founderProtected ||
                 department.trim() === '' ||
                 department === member.department
@@ -385,14 +404,16 @@ export function ManageMemberModal({
           hint={
             isSelf
               ? 'You cannot change your own role.'
-              : 'Sets permissions and the default daily hours. Directors manage the whole team; Managers head one department.'
+              : structuralLocked
+                ? 'Only a Founder can change who is a Director, Manager or Executive.'
+                : 'Sets permissions and the default daily hours. A Director runs one department; a Manager heads a team inside it.'
           }
         >
           <select
             className="select"
             value={uiRole}
             onChange={(e) => setUiRole(e.target.value as typeof uiRole)}
-            disabled={founderProtected || isSelf}
+            disabled={structuralLocked || founderProtected || isSelf}
           >
             <option value="director">Director</option>
             <option value="manager">Manager</option>
@@ -406,7 +427,7 @@ export function ManageMemberModal({
                   className="select"
                   value={type}
                   onChange={(e) => setType(e.target.value as typeof type)}
-                  disabled={founderProtected || isSelf}
+                  disabled={structuralLocked || founderProtected || isSelf}
                 >
                   <option value="fte">Full-Time</option>
                   <option value="pte">Part-Time</option>
@@ -418,11 +439,15 @@ export function ManageMemberModal({
 
           {uiRole === 'manager' ? (
             <div className="mt-2">
-              <Field label="Department to head">
+              <Field
+                label="Department to head"
+                hint="A Manager heads the department they belong to — saving this moves them into it."
+              >
                 <DepartmentSelect
                   value={headDept}
                   departments={departments}
                   onChange={setHeadDept}
+                  disabled={structuralLocked}
                 />
               </Field>
             </div>
@@ -435,6 +460,7 @@ export function ManageMemberModal({
               onClick={saveRole}
               disabled={
                 pending ||
+                structuralLocked ||
                 founderProtected ||
                 isSelf ||
                 !roleFieldChanged ||
@@ -629,7 +655,11 @@ export function ManageMemberModal({
 
             <Field
               label={`Team in ${member.managedDepartment}`}
-              hint="Pick the members this manager leads. Only members of the department they head are shown."
+              hint={
+                structuralLocked
+                  ? 'Only a Founder can change who reports to this manager.'
+                  : 'Pick the members this manager leads. Only members of the department they head are shown.'
+              }
             >
               {teamCandidates.length === 0 ? (
                 <div className="text-xs text-grey">
@@ -655,6 +685,7 @@ export function ManageMemberModal({
                       <input
                         type="checkbox"
                         checked={team.includes(m.id)}
+                        disabled={structuralLocked}
                         onChange={() => toggleTeam(m.id)}
                       />
                       <Avatar name={m.name} size="sm" src={m.avatarUrl} />
@@ -666,10 +697,15 @@ export function ManageMemberModal({
               )}
             </Field>
             <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
-              <Button size="sm" onClick={saveTeam} disabled={pending}>
+              <Button size="sm" onClick={saveTeam} disabled={pending || structuralLocked}>
                 Save team
               </Button>
-              <Button size="sm" variant="secondary" onClick={removeManager} disabled={pending}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={removeManager}
+                disabled={pending || structuralLocked}
+              >
                 Remove manager status
               </Button>
               <span className="text-xs text-grey">{team.length} selected</span>

@@ -109,3 +109,79 @@ export function isFounder(profile: { id: string } | null | undefined): boolean {
   return (FOUNDER_USER_IDS as readonly string[]).includes(profile.id);
 }
 
+// ── Department scope ────────────────────────────────────────────────────────
+// The department is the security boundary above the manager line (migration
+// 0058). A Director is board-level scoped to exactly ONE department: the value
+// in their own `department` field. Several Directors may share a department; a
+// Director never spans two. A department with no Director is covered by the
+// Founders alone.
+//
+// The Founders sit under NO department — their `department` is the empty
+// string and their reach comes from isFounder(), not from a department. Blank
+// therefore has to mean "matches nothing", or every unassigned account would
+// silently see every other unassigned one.
+
+// The sentinel stored in `profiles.department` for someone under no
+// department. The column is NOT NULL, so "none" is the empty string.
+export const NO_DEPARTMENT = '';
+
+// A person's department, or null when they belong to none.
+export function departmentOf(
+  profile: { department?: string | null } | null | undefined,
+): string | null {
+  const d = profile?.department?.trim();
+  return d ? d : null;
+}
+
+// A Director is board-level but NOT a Founder. Founders are board-level too,
+// yet they are deliberately excluded: their power is org-wide, so treating
+// them as a Director of their (empty) department would scope them to nothing.
+export function isDirector(
+  profile: { id: string; role: UserRole } | null | undefined,
+): boolean {
+  if (!profile) return false;
+  return profile.role === 'board' && !isFounder(profile);
+}
+
+// True when both people sit in the same, non-blank department.
+export function sameDepartment(
+  a: { department?: string | null } | null | undefined,
+  b: { department?: string | null } | null | undefined,
+): boolean {
+  const da = departmentOf(a);
+  return da != null && da === departmentOf(b);
+}
+
+// May `viewer` see `target` at all? Mirrors can_view_user() in migration 0058 —
+// RLS is the real enforcement, this is for UI gating.
+export function canViewMember(
+  viewer: { id: string; role: UserRole; department?: string | null; is_manager?: boolean | null },
+  target: { id: string; department?: string | null; manager_id?: string | null },
+): boolean {
+  if (isFounder(viewer)) return true;
+  if (viewer.id === target.id) return true;
+  if (isDirector(viewer) && sameDepartment(viewer, target)) return true;
+  return isManager(viewer) && target.manager_id === viewer.id;
+}
+
+// May `viewer` EDIT `target`'s profile? Narrower than canViewMember: Managers
+// get no write power (they raise change requests), and a Founder row is frozen
+// against everyone but its own owner. Mirrors can_manage_user() in 0058.
+export function canManageMember(
+  viewer: { id: string; role: UserRole; department?: string | null },
+  target: { id: string; department?: string | null },
+): boolean {
+  if (isFounder(target)) return viewer.id === target.id;
+  if (isFounder(viewer)) return true;
+  return isDirector(viewer) && sameDepartment(viewer, target);
+}
+
+// Structural changes — who is a Director, who heads which department, who
+// reports to whom — are the Founders' alone. A Director runs the department
+// they were given; they cannot widen it or appoint their own peers.
+export function canRestructure(
+  viewer: { id: string } | null | undefined,
+): boolean {
+  return isFounder(viewer);
+}
+

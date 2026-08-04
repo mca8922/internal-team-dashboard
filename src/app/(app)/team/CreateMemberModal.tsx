@@ -20,17 +20,24 @@ export function CreateMemberModal({
   open,
   onClose,
   departments,
+  viewerIsFounder,
+  viewerDepartment,
 }: {
   open: boolean;
   onClose: () => void;
   departments: string[];
+  // Creating a Director is a structural change (migration 0058), so only a
+  // Founder may do it. A Director hires only into their OWN department — the
+  // department field is fixed to it rather than offered as a choice.
+  viewerIsFounder: boolean;
+  viewerDepartment: string;
 }) {
   const toast = useToast();
   const [form, setForm] = React.useState({
     name: '',
     email: '',
     password: TEMP_PASSWORD,
-    department: '',
+    department: viewerIsFounder ? '' : viewerDepartment,
   });
   // Role (permission tier) and Type (employment classification) are separate
   // fields — see ManageMemberModal for the full Director/Manager/Executive
@@ -51,7 +58,7 @@ export function CreateMemberModal({
       name: '',
       email: '',
       password: TEMP_PASSWORD,
-      department: '',
+      department: viewerIsFounder ? '' : viewerDepartment,
     });
     setUiRole('executive');
     setType('fte');
@@ -118,21 +125,34 @@ export function CreateMemberModal({
           />
         </Field>
         <div className="grid grid-2col-even" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Role" hint="Manager is appointed later, from Manage member.">
+          <Field
+            label="Role"
+            hint={
+              viewerIsFounder
+                ? 'Manager is appointed later, from Manage member.'
+                : 'Only a Founder can create a Director.'
+            }
+          >
             <select
               className="select"
               value={uiRole}
               onChange={(e) => setUiRole(e.target.value as typeof uiRole)}
+              disabled={!viewerIsFounder}
             >
-              <option value="director">Director</option>
+              {viewerIsFounder ? <option value="director">Director</option> : null}
               <option value="executive">Executive</option>
             </select>
           </Field>
-          <Field label="Department" error={err.department}>
+          <Field
+            label="Department"
+            error={err.department}
+            hint={viewerIsFounder ? undefined : 'New accounts join your own department.'}
+          >
             <DepartmentSelect
               value={form.department}
               departments={departments}
               onChange={(v) => set('department', v)}
+              disabled={!viewerIsFounder}
             />
           </Field>
         </div>

@@ -97,6 +97,49 @@ function guardFounderTarget(
   throw new Error('The Founder account is protected and cannot be changed.');
 }
 
+// Board-level guard for an action that TARGETS one member. On top of the
+// Founder freeze this enforces the department silo (migration 0058): a
+// Director may only touch people inside their OWN department, while a Founder
+// — who belongs to no department — reaches everyone.
+//
+// RLS already blocks the write, but failing here gives the Director a real
+// error instead of a silent zero-row update.
+async function requireMemberScope(memberId: string, opts: { allowSelf?: boolean } = {}) {
+  const { supabase, userId } = await requireBoard();
+  guardFounderTarget(memberId, userId, opts);
+  if (isFounderId(userId) || memberId === userId) return { supabase, userId };
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, department')
+    .in('id', [userId, memberId]);
+  const dept = (id: string) =>
+    (data ?? []).find((r) => r.id === id)?.department?.trim() || '';
+  const mine = dept(userId);
+  const theirs = dept(memberId);
+  // A blank department matches nothing — two unassigned accounts are not
+  // department peers, they are simply both unscoped.
+  if (!mine || mine !== theirs) {
+    throw new Error('You can only manage members of your own department.');
+  }
+  return { supabase, userId };
+}
+
+// The department the calling Director runs. Founders get null — they are not
+// scoped to one. Throws if the caller isn't board-level.
+async function callerDepartment(): Promise<string | null> {
+  const { supabase, userId } = await requireBoard();
+  if (isFounderId(userId)) return null;
+  const { data } = await supabase
+    .from('profiles')
+    .select('department')
+    .eq('id', userId)
+    .single();
+  const d = data?.department?.trim();
+  if (!d) throw new Error('You have not been assigned to a department yet.');
+  return d;
+}
+
 // Self-heal the Founder account. If a stray edit ever demoted the Founder's
 // role or marked them inactive/banned, this quietly restores it so the owner
 // can never be locked out. No-op for everyone else, and a no-op for the
@@ -1670,7 +1713,24 @@ export async function createTeamMember(input: {
   department: string;
   internshipMonths?: number | null;
 }): Promise<{ error?: string }> {
-  await requireBoard();
+  // A Director may only hire INTO their own department, and may not mint
+  // another Director — that's a structural change, Founders only (0058).
+  let department = input.department.trim();
+  try {
+    const mine = await callerDepartment();
+    if (mine != null) {
+      if (input.role === 'board') {
+        return { error: 'Only a Founder can create a Director.' };
+      }
+      if (department && department !== mine) {
+        return { error: 'You can only create accounts in your own department.' };
+      }
+      department = mine;
+    }
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  if (!department) return { error: 'Pick a department.' };
 
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
@@ -1680,7 +1740,7 @@ export async function createTeamMember(input: {
     user_metadata: {
       name: input.name.trim(),
       role: input.role,
-      department: input.department.trim(),
+      department,
     },
   });
   if (error) return { error: error.message };
@@ -1723,8 +1783,7 @@ export async function createTeamMember(input: {
 
 // Board sets (or clears) an intern's tenure in months.
 export async function setInternshipMonths(memberId: string, months: number | null) {
-  const { supabase, userId } = await requireBoard();
-  guardFounderTarget(memberId, userId, { allowSelf: true });
+  const { supabase } = await requireMemberScope(memberId, { allowSelf: true });
   await supabase
     .from('profiles')
     .update({ internship_months: months && months > 0 ? months : null })
@@ -1736,8 +1795,7 @@ export async function setInternshipMonths(memberId: string, months: number | nul
 // Board corrects a member's onboard (joining) date. For interns this also
 // shifts their tenure window, so the dashboard end date follows.
 export async function setMemberOnboardDate(memberId: string, date: string) {
-  const { supabase, userId } = await requireBoard();
-  guardFounderTarget(memberId, userId, { allowSelf: true });
+  const { supabase } = await requireMemberScope(memberId, { allowSelf: true });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid date.');
   await supabase.from('profiles').update({ joined_date: date }).eq('id', memberId);
   revalidatePath('/team');
@@ -1747,8 +1805,7 @@ export async function setMemberOnboardDate(memberId: string, date: string) {
 // Board sets/corrects a member's date of birth (drives Age everywhere and the
 // birthday reminder/wishing card).
 export async function setMemberDateOfBirth(memberId: string, date: string) {
-  const { supabase, userId } = await requireBoard();
-  guardFounderTarget(memberId, userId, { allowSelf: true });
+  const { supabase } = await requireMemberScope(memberId, { allowSelf: true });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid date.');
   await supabase.from('profiles').update({ date_of_birth: date }).eq('id', memberId);
   revalidatePath('/team');
@@ -1757,10 +1814,20 @@ export async function setMemberDateOfBirth(memberId: string, date: string) {
 }
 
 // Board edits a member's department.
+// Moving someone between departments moves them between SILOS (migration
+// 0058), so it is a Founder-only structural change — a Director must not be
+// able to pull an outsider into their own scope, or push a member out of it.
 export async function updateMemberDepartment(memberId: string, department: string) {
-  const { supabase, userId } = await requireBoard();
+  const { supabase, userId } = await requireFounder();
   guardFounderTarget(memberId, userId, { allowSelf: true });
-  await supabase.from('profiles').update({ department: department.trim() }).eq('id', memberId);
+  const dept = department.trim();
+  if (!dept) throw new Error('Pick a department.');
+  // The member is leaving their old manager's department, so the reporting
+  // link has to go with them — the DB trigger rejects a cross-department one.
+  await supabase
+    .from('profiles')
+    .update({ department: dept, manager_id: null })
+    .eq('id', memberId);
   revalidatePath('/team');
   revalidatePath('/dashboard');
 }
@@ -1770,8 +1837,11 @@ export async function updateMemberDepartment(memberId: string, department: strin
 // would let them accidentally demote themselves out of board access. Moving a
 // member out of "intern" clears their internship tenure since it no longer
 // applies.
+// Who is a Director, who is a Manager, who is staff — the shape of the
+// hierarchy itself — is the Founders' alone (migration 0058). A Director runs
+// the department they were given; they cannot appoint their own peers.
 export async function updateMemberRole(memberId: string, role: UserRole) {
-  const { supabase, userId } = await requireBoard();
+  const { supabase, userId } = await requireFounder();
   guardFounderTarget(memberId, userId); // no allowSelf: never via this path
   if (memberId === userId) throw new Error('You cannot change your own role.');
   if (!['board', 'fte', 'pte', 'intern'].includes(role)) {
@@ -1794,8 +1864,10 @@ export async function updateMemberRole(memberId: string, role: UserRole) {
 
 // Board renames a department across every member and goal that uses it.
 // Renaming onto an existing name merges the two.
+// Departments ARE the security boundaries (migration 0058), so renaming,
+// merging or deleting one redraws the org chart — Founders only.
 export async function renameDepartment(oldName: string, newName: string) {
-  await requireBoard();
+  await requireFounder();
   const from = oldName.trim();
   const to = newName.trim();
   if (!from) throw new Error('Missing department to rename.');
@@ -1878,7 +1950,7 @@ export async function setDepartmentColor(name: string, color: string) {
 // former) and no goal still references it. We don't silently reassign anyone,
 // so the caller must move people and goals out first (e.g. via rename).
 export async function deleteDepartment(name: string) {
-  await requireBoard();
+  await requireFounder();
   const dept = name.trim();
   if (!dept) throw new Error('Missing department to delete.');
 
@@ -2090,6 +2162,14 @@ export async function updateMemberIdentity(
     return { error: 'The Founder account is protected and cannot be changed.' };
   }
 
+  // This action writes through the service-role client, which bypasses RLS —
+  // so the department silo has to be checked explicitly here.
+  try {
+    await requireMemberScope(memberId, { allowSelf: true });
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+
   const admin = createAdminClient();
 
   // Read the current auth email so we only touch Auth when the email changed.
@@ -2114,8 +2194,7 @@ export async function updateMemberIdentity(
 // Board sets a member's daily target hours. Pass null to fall back to the
 // role default.
 export async function setMemberTargetHours(memberId: string, hours: number | null) {
-  const { supabase, userId } = await requireBoard();
-  guardFounderTarget(memberId, userId, { allowSelf: true });
+  const { supabase } = await requireMemberScope(memberId, { allowSelf: true });
   await supabase
     .from('profiles')
     .update({ daily_target_hours: hours && hours > 0 ? hours : null })
@@ -2129,12 +2208,13 @@ export async function setMemberTargetHours(memberId: string, hours: number | nul
 // inactive, their auth account is disabled (login blocked), and they are
 // hidden from the team grid by default. Data is retained.
 export async function markMemberLeft(memberId: string) {
-  const { supabase, userId } = await requireBoard();
-  if (memberId === userId) throw new Error('You cannot offboard yourself.');
-  // The Founder can never be offboarded — by anyone.
+  // The Founder can never be offboarded — by anyone. Checked before the scope
+  // guard so the message names the real reason rather than the department.
   if (isFounderId(memberId)) {
     throw new Error('The Founder account cannot be offboarded.');
   }
+  const { supabase, userId } = await requireMemberScope(memberId);
+  if (memberId === userId) throw new Error('You cannot offboard yourself.');
   await supabase
     .from('profiles')
     .update({ is_active: false, left_at: new Date().toISOString() })
@@ -2148,8 +2228,7 @@ export async function markMemberLeft(memberId: string) {
 
 // Board reverses an offboarding — member becomes active and can sign in again.
 export async function reinstateMember(memberId: string) {
-  const { supabase, userId } = await requireBoard();
-  guardFounderTarget(memberId, userId, { allowSelf: true });
+  const { supabase } = await requireMemberScope(memberId, { allowSelf: true });
   await supabase
     .from('profiles')
     .update({ is_active: true, left_at: null })
@@ -2226,8 +2305,7 @@ export async function setMemberTransactionalEnabled(memberId: string, enabled: b
 }
 
 export async function updateMemberJobTitle(memberId: string, jobTitle: string) {
-  const { supabase, userId } = await requireBoard();
-  guardFounderTarget(memberId, userId, { allowSelf: true });
+  const { supabase } = await requireMemberScope(memberId, { allowSelf: true });
   await supabase
     .from('profiles')
     .update({ job_title: jobTitle.trim() })
@@ -2242,13 +2320,23 @@ export async function updateMemberJobTitle(memberId: string, jobTitle: string) {
 // keeps their employment role; they simply gain manager powers over the team
 // the Board picks for them (see setManagerTeam). One department per manager.
 export async function setMemberAsManager(memberId: string, department: string) {
-  const { supabase, userId } = await requireBoard();
+  const { supabase, userId } = await requireFounder();
   guardFounderTarget(memberId, userId);
   const dept = department.trim();
   if (!dept) throw new Error('Pick a department for this manager to head.');
+  // A Manager heads the department they BELONG to — the two can't diverge, or
+  // the manager would sit in one silo while leading another. Their own
+  // manager_id is cleared: a Head of Department reports to the Director, not
+  // to another manager, and a stale link would fail the consistency trigger
+  // once the department moves.
   const { error } = await supabase
     .from('profiles')
-    .update({ is_manager: true, managed_department: dept })
+    .update({
+      is_manager: true,
+      managed_department: dept,
+      department: dept,
+      manager_id: null,
+    })
     .eq('id', memberId);
   if (error) throw new Error(error.message);
   revalidatePath('/team');
@@ -2259,8 +2347,7 @@ export async function setMemberAsManager(memberId: string, department: string) {
 // description shown atop their team view. Stored as HTML; sanitized on render
 // via <RichText/>. Board-only; the Founder row is protected.
 export async function setManagerResponsibilities(memberId: string, body: string) {
-  const { supabase, userId } = await requireBoard();
-  guardFounderTarget(memberId, userId);
+  const { supabase } = await requireMemberScope(memberId);
   const value = body.trim() === '' ? null : body;
   const { error } = await supabase
     .from('profiles')
@@ -2273,7 +2360,7 @@ export async function setManagerResponsibilities(memberId: string, body: string)
 // Board removes a member's Manager status and detaches their whole team
 // (clears manager_id on every member that pointed at them).
 export async function unsetManager(memberId: string) {
-  const { supabase, userId } = await requireBoard();
+  const { supabase, userId } = await requireFounder();
   guardFounderTarget(memberId, userId);
   const [{ error: e1 }, { error: e2 }] = await Promise.all([
     supabase
@@ -2292,7 +2379,7 @@ export async function unsetManager(memberId: string) {
 // the manager via manager_id; anyone previously on the team but not in the new
 // set is detached. Team members must belong to the department the manager heads.
 export async function setManagerTeam(managerId: string, memberIds: string[]) {
-  const { supabase, userId } = await requireBoard();
+  const { supabase } = await requireFounder();
 
   const { data: manager } = await supabase
     .from('profiles')
