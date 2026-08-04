@@ -34,11 +34,12 @@ const GROUPINGS: { value: GoalGrouping; label: string }[] = [
   { value: 'none', label: 'None' },
 ];
 
-// Short tier tag for the title cell (e.g. "Monthly", "Weekly").
+// Short tier tag for the title cell (e.g. "Quarterly", "Monthly").
 const tierShort: Record<Goal['level'], string> = {
   yearly: 'Yearly',
+  half_yearly: 'Half-Yearly',
+  quarterly: 'Quarterly',
   monthly: 'Monthly',
-  weekly: 'Weekly',
   daily: 'Daily',
 };
 

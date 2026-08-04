@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
-// Goals page — mission/vision banner + the yearly→monthly→weekly→daily cascade.
+// Goals page — mission/vision banner + the
+// yearly→half-yearly→quarterly→monthly→daily cascade.
 // Non-board members see only goals assigned to them or tagged to their
 // department; the Board sees everything and can add/edit goals inline.
 import {

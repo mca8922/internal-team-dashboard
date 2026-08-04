@@ -29,6 +29,7 @@ import {
   addDays,
   addMonths,
   daysBetween,
+  startOfWeek,
 } from '@/lib/dates';
 import { targetHours, roleLabel, isFounder, isManager } from '@/lib/roles';
 import { Donut } from '@/components/ui';
@@ -183,9 +184,19 @@ export default async function DashboardPage() {
   // minutes worked after 00:00 IST count toward today.
   const total = punchTotalMsForDate(myPunches, today);
   const streak = logStreak(myAllLogs);
-  // Weekly goals the member can see (already scoped by visibleGoals above).
+  // Tasks landing in the current week (Mon–Sun), already scoped by visibleGoals
+  // above. There is no Weekly TIER any more — the cascade runs Yearly →
+  // Half-Yearly → Quarterly → Monthly → Daily — so "this week" is now a due-date
+  // window across every tier, which is what the "Week N" label beside it means.
+  const weekStart = fmtDate(startOfWeek(new Date()));
+  const weekEnd = fmtDate(addDays(startOfWeek(new Date()), 6));
   const weekGoals = goals.filter(
-    (g) => g.level === 'weekly' && g.status !== 'achieved' && g.status !== 'not_met',
+    (g) =>
+      !!g.due_date &&
+      g.due_date >= weekStart &&
+      g.due_date <= weekEnd &&
+      g.status !== 'achieved' &&
+      g.status !== 'not_met',
   );
   // Most recent logs that actually have content, newest first.
   const recentLogs = [...myLogs]
@@ -410,13 +421,13 @@ export default async function DashboardPage() {
                   {isBoard ? 'all tasks' : 'assigned to you'} · {weekGoals.length} active
                 </div>
               </div>
-              <span className="badge">Weekly</span>
+              <span className="badge">Due this week</span>
             </div>
             {weekGoals.length === 0 ? (
               <div className="text-grey text-sm mt-2">
                 {isBoard
-                  ? 'No weekly tasks set.'
-                  : 'No weekly tasks assigned to you yet.'}
+                  ? 'No tasks due this week.'
+                  : 'No tasks due this week for you.'}
               </div>
             ) : (
               <div className="grid gap-3">

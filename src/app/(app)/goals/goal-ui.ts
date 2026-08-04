@@ -17,16 +17,47 @@ export const STATUS: Record<GoalStatus, { label: string; cls: string }> = {
 // Per-level display + which level its children are.
 export const LEVEL_META: Record<
   GoalLevel,
-  { label: string; tone: 'hero' | 'monthly' | 'weekly' | 'daily'; child: GoalLevel | null }
+  {
+    label: string;
+    tone: 'hero' | 'half' | 'quarter' | 'monthly' | 'daily';
+    child: GoalLevel | null;
+  }
 > = {
-  yearly: { label: 'Yearly Task', tone: 'hero', child: 'monthly' },
-  monthly: { label: 'Monthly Milestone', tone: 'monthly', child: 'weekly' },
-  weekly: { label: 'Weekly Task', tone: 'weekly', child: 'daily' },
+  yearly: { label: 'Yearly Task', tone: 'hero', child: 'half_yearly' },
+  half_yearly: { label: 'Half-Yearly Milestone', tone: 'half', child: 'quarterly' },
+  quarterly: { label: 'Quarterly Milestone', tone: 'quarter', child: 'monthly' },
+  monthly: { label: 'Monthly Task', tone: 'monthly', child: 'daily' },
   daily: { label: 'Daily Task', tone: 'daily', child: null },
 };
 
 // Tier order used to sort filtered results top-down (Yearly → Daily).
-export const LEVEL_ORDER: GoalLevel[] = ['yearly', 'monthly', 'weekly', 'daily'];
+export const LEVEL_ORDER: GoalLevel[] = [
+  'yearly',
+  'half_yearly',
+  'quarterly',
+  'monthly',
+  'daily',
+];
+
+// Lowercase tier word for inline copy, e.g. the collapse toggle's "4 quarterly".
+export const LEVEL_WORD: Record<GoalLevel, string> = {
+  yearly: 'yearly',
+  half_yearly: 'half-yearly',
+  quarterly: 'quarterly',
+  monthly: 'monthly',
+  daily: 'daily',
+};
+
+// The tier a task of `level` hangs under, or null for the top tier — the exact
+// inverse of LEVEL_META[...].child. Drives the parent picker and the migration's
+// notion of a legal parent link.
+export const PARENT_LEVEL: Record<GoalLevel, GoalLevel | null> = {
+  yearly: null,
+  half_yearly: 'yearly',
+  quarterly: 'half_yearly',
+  monthly: 'quarterly',
+  daily: 'monthly',
+};
 
 // Days from today to the goal's due date (negative = past). null if no due date.
 export const daysToDue = (g: Goal): number | null =>

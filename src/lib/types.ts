@@ -2,7 +2,9 @@
 // These mirror the SQL schema in supabase/migrations.
 
 export type UserRole = 'board' | 'fte' | 'pte' | 'intern';
-export type GoalLevel = 'yearly' | 'monthly' | 'weekly' | 'daily';
+// Task tiers, top of the cascade first. Each tier's parent is the one before it:
+// Yearly → Half-Yearly → Quarterly → Monthly → Daily.
+export type GoalLevel = 'yearly' | 'half_yearly' | 'quarterly' | 'monthly' | 'daily';
 export type GoalStatus = 'inactive' | 'active' | 'achieved' | 'not_met';
 export type LeaveType = 'casual' | 'sick' | 'emergency' | 'wfh';
 export type LeaveStatus = 'pending' | 'approved' | 'rejected';

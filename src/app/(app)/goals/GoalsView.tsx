@@ -4,7 +4,7 @@
 //
 // Mission & Vision sit at the top (the "why"). Below, the org's goals are
 // shown as a navigable tree: pick a top-tier goal and see how it breaks down
-// into Monthly → Weekly → Daily, connected with tree lines so the parent →
+// into Half-Yearly → Quarterly → Monthly → Daily, with tree lines so the parent →
 // child workflow is obvious at a glance.
 //
 // The Board adds and edits everything from ONE "Add Goal" button (no separate
@@ -47,6 +47,8 @@ import {
   STATUS,
   LEVEL_META,
   LEVEL_ORDER,
+  LEVEL_WORD,
+  PARENT_LEVEL,
   plainText,
   daysToDue,
   isOverdue,
@@ -994,7 +996,7 @@ function GoalNode({
     ? goals.filter((g) => g.level === childLevel && g.parent_id === goal.id)
     : [];
   const isOpen = !collapsed.has(goal.id);
-  const childWord = childLevel === 'weekly' ? 'weekly' : childLevel === 'daily' ? 'daily' : '';
+  const childWord = childLevel ? LEVEL_WORD[childLevel] : '';
 
   return (
     <div className="gb-node">
@@ -1425,22 +1427,27 @@ export function GoalsView({
   const topLabel =
     viewerRole === 'intern' && tenureMonths ? `${tenureMonths}-Month Task` : 'Yearly Task';
 
-  const { yearly, monthly, weekly, daily, unlinked } = React.useMemo(() => {
-    const yearly = goals.filter((g) => g.level === 'yearly');
-    const monthly = goals.filter((g) => g.level === 'monthly');
-    const weekly = goals.filter((g) => g.level === 'weekly');
-    const daily = goals.filter((g) => g.level === 'daily');
-    const yearlyIds = new Set(yearly.map((g) => g.id));
-    const monthlyIds = new Set(monthly.map((g) => g.id));
-    const weeklyIds = new Set(weekly.map((g) => g.id));
-    // Goals not reachable from a visible top-tier goal — surfaced separately
-    // so nothing a member is allowed to see ever gets hidden.
-    const unlinked: Goal[] = [
-      ...monthly.filter((m) => !m.parent_id || !yearlyIds.has(m.parent_id)),
-      ...weekly.filter((w) => !w.parent_id || !monthlyIds.has(w.parent_id)),
-      ...daily.filter((d) => !d.parent_id || !weeklyIds.has(d.parent_id)),
-    ];
-    return { yearly, monthly, weekly, daily, unlinked };
+  const { yearly, halfYearly, subYearly, unlinked } = React.useMemo(() => {
+    const byLevel = (lvl: GoalLevel) => goals.filter((g) => g.level === lvl);
+    const yearly = byLevel('yearly');
+    // Everything below the top tier, in cascade order — used for the flat list
+    // shown when there's no yearly root to hang the tree off.
+    const subYearly: Goal[] = LEVEL_ORDER.filter((l) => l !== 'yearly').flatMap(byLevel);
+
+    // Goals not reachable from a visible top-tier goal — surfaced separately so
+    // nothing a member is allowed to see ever gets hidden. A goal is linked only
+    // when its parent exists AND sits on the tier directly above it, so a stale
+    // cross-tier link (e.g. Monthly still pointing at a Yearly) is caught too.
+    const idsByLevel = new Map<GoalLevel, Set<string>>(
+      LEVEL_ORDER.map((l) => [l, new Set(byLevel(l).map((g) => g.id))]),
+    );
+    const unlinked = subYearly.filter((g) => {
+      const parentLevel = PARENT_LEVEL[g.level];
+      if (!g.parent_id || !parentLevel) return true;
+      return !idsByLevel.get(parentLevel)!.has(g.parent_id);
+    });
+
+    return { yearly, halfYearly: byLevel('half_yearly'), subYearly, unlinked };
   }, [goals]);
 
   const [selId, setSelId] = React.useState(yearly[0]?.id ?? '');
@@ -1923,7 +1930,8 @@ export function GoalsView({
           </span>
         </div>
         <div className="page-subtitle">
-          Mission → Vision → {topLabel.replace(' Task', '')} → Month → Week → Day
+          Mission → Vision → {topLabel.replace(' Task', '')} → Half-Yearly → Quarterly →
+          Monthly → Daily
         </div>
       </div>
       {isBoard ? (
@@ -1946,7 +1954,9 @@ export function GoalsView({
               Clean up
             </Button>
           ) : null}
-          <Button icon="plus" onClick={() => setEditing({ level: 'weekly' })}>
+          {/* Monthly is the default new-task tier: it's the lowest tier that
+              still groups work, so it's what the Board reaches for most. */}
+          <Button icon="plus" onClick={() => setEditing({ level: 'monthly' })}>
             Add Task
           </Button>
         </div>
@@ -2062,7 +2072,7 @@ export function GoalsView({
             ? 'Prefilled from your template. Pick the assignees and due date, then save.'
             : editing?._duplicate
               ? 'A fresh copy. Change the assignees (and anything else), then save.'
-              : 'One form for every tier: Yearly, Monthly, Weekly or Daily.'
+              : 'One form for every tier: Yearly, Half-Yearly, Quarterly, Monthly or Daily.'
         }
         width={620}
       >
@@ -2260,7 +2270,7 @@ export function GoalsView({
             {(() => {
               const pct = peek.progress ?? 0;
               const C = 2 * Math.PI * 26; // ring circumference (r=26)
-              const milestones = monthly.filter((m) => m.parent_id === peek.id).length;
+              const milestones = halfYearly.filter((h) => h.parent_id === peek.id).length;
               return (
                 <div className="gb-peek-summary">
                   <div className="gb-peek-ring" role="img" aria-label={`${pct}% complete`}>
@@ -2375,7 +2385,7 @@ export function GoalsView({
   // list. Only for the cascade view: in Table / One-Shot the main return below
   // renders those (they don't need a yearly root), so let them fall through.
   if (yearly.length === 0 && viewMode === 'cascade') {
-    const flat = [...monthly, ...weekly, ...daily];
+    const flat = subYearly;
     const memberQ = !isBoard ? query.trim().toLowerCase() : '';
     const flatShown = memberQ
       ? flat.filter((g) => `${g.title} ${plainText(g.description)}`.toLowerCase().includes(memberQ))
@@ -2467,7 +2477,7 @@ export function GoalsView({
     return out;
   };
   const subtree = sel ? subtreeOf(sel) : [];
-  const branches = sel ? monthly.filter((m) => m.parent_id === sel.id) : [];
+  const branches = sel ? halfYearly.filter((h) => h.parent_id === sel.id) : [];
   const achievedUnder = subtree.filter((g) => g.status === 'achieved').length;
 
   return (
@@ -2587,8 +2597,8 @@ export function GoalsView({
       <div className="gb-section-head">
         <h2 className="gb-section-title">Task breakdown</h2>
         <p className="gb-section-sub">
-          Pick a {topLabel.toLowerCase()} to see how it breaks down into monthly, weekly and
-          daily tasks.
+          Pick a {topLabel.toLowerCase()} to see how it breaks down into half-yearly,
+          quarterly, monthly and daily tasks.
         </p>
       </div>
 
@@ -2597,7 +2607,7 @@ export function GoalsView({
         <div className="gb-pinboard-wrap">
           <div className="gb-pinboard">
             {yearly.map((y, i) => {
-              const yBranches = monthly.filter((m) => m.parent_id === y.id);
+              const yBranches = halfYearly.filter((h) => h.parent_id === y.id);
               const isSelected = sel?.id === y.id;
               const rot = i % 3 === 0 ? -1.5 : i % 3 === 1 ? 1.2 : -0.7;
               return (
@@ -2698,7 +2708,7 @@ export function GoalsView({
                 <div className="gb-stats">
                   <div>
                     <div className="gb-stat-num">{branches.length}</div>
-                    <div className="gb-stat-lbl">Monthly milestones</div>
+                    <div className="gb-stat-lbl">Half-yearly milestones</div>
                   </div>
                   <div>
                     <div className="gb-stat-num">{subtree.length}</div>
@@ -2721,7 +2731,7 @@ export function GoalsView({
 
           {branches.length === 0 ? (
             <div className="gb-empty-branch">
-              No monthly milestones under this task yet.
+              No half-yearly milestones under this task yet.
               {isBoard ? ' Add one with "Add Task".' : ''}
             </div>
           ) : (
@@ -2760,9 +2770,9 @@ export function GoalsView({
             </div>
           ) : null}
           <div className="grid gap-3">
-            {/* GoalNode (not GoalCard) so an orphan monthly/weekly still renders
+            {/* GoalNode (not GoalCard) so an orphan mid-tier task still renders
                 its child tier — otherwise a deep-link to a child of an unlinked
-                parent (e.g. a weekly under a yearless monthly) has nothing to
+                parent (e.g. a monthly under a yearless quarterly) has nothing to
                 scroll to. */}
             {unlinked.map((g) => (
               <GoalNode
