@@ -17,12 +17,17 @@ export function DepartmentSelect({
   onChange,
   autoFocus,
   allowCreate = true,
+  disabled = false,
 }: {
   value: string;
   departments: string[];
   onChange: (v: string) => void;
   autoFocus?: boolean;
   allowCreate?: boolean;
+  // Read-only mode — used where the department is fixed by the viewer's own
+  // scope (a Director hiring into their department) or is a Founder-only
+  // structural field.
+  disabled?: boolean;
 }) {
   // "creating" mode shows the text input; it's on when the current value
   // isn't one of the known departments (e.g. a freshly typed new name).
@@ -47,9 +52,10 @@ export function DepartmentSelect({
           value={value}
           autoFocus={autoFocus}
           placeholder="New department name"
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
         />
-        {departments.length > 0 ? (
+        {departments.length > 0 && !disabled ? (
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -69,6 +75,7 @@ export function DepartmentSelect({
     <select
       className="select"
       value={value}
+      disabled={disabled}
       onChange={(e) => {
         if (e.target.value === NEW) {
           setCreating(true);

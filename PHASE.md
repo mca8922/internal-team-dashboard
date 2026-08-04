@@ -99,6 +99,53 @@ gone, and two tiers were inserted between Yearly and Monthly.
   Monthly, now the lowest tier that groups work, inherits the fine-grained
   cadences (weekdays / daily / custom) that Weekly used to allow.
 
+## Department-scoped hierarchy (done)
+
+The org used to be flat above the department line: every `role = 'board'`
+account (a "Director") saw and managed the whole company, and `department` was
+only a grouping label. The chain is now four levels deep and the **department
+is the security boundary** — migration `0058_department_scope.sql`:
+
+```
+Founder (no department, sees everything, assigns everything)
+  └── Department
+        └── Director   — role='board', profiles.department = the one they run
+              └── Manager   — is_manager + managed_department
+                    └── Staff (fte / pte / intern)
+```
+
+- A Director sees only their own department's people; several Directors may
+  share a department, none spans two. A department with no Director is covered
+  by the Founders alone. The Founders sit under **no** department —
+  `profiles.department` is `''` for them and every scope check treats blank as
+  "matches nothing", so unassigned accounts are never exposed to each other.
+- SQL predicates `can_view_user()` / `can_manage_user()` replace the flat
+  `is_board()` in the read/write policies for `profiles`, `punches`, `logs`,
+  `leaves` and `change_requests`. Their TypeScript mirrors are
+  `canViewMember()` / `canManageMember()` in `src/lib/roles.ts`, covered by
+  `roles.test.ts` — the two must stay in agreement.
+- **Structural changes are Founder-only**: `updateMemberRole`,
+  `updateMemberDepartment`, `setMemberAsManager`, `unsetManager`,
+  `setManagerTeam`, `renameDepartment`, `deleteDepartment`, and creating a
+  Director. A Director runs the department they were given but cannot widen
+  their own scope, appoint a peer, or pull an outsider in. Day-to-day member
+  fields (target hours, job title, DOB, onboard date, offboard/reinstate) stay
+  with the Director, scoped by `requireMemberScope()` in `actions.ts`.
+- A DB trigger (`assert_hierarchy_consistent`) rejects any `manager_id` that
+  crosses a department, so a stray write cannot build a cross-silo link.
+- Team page: the standalone "Directors" section is gone. Every non-Founder now
+  sits in their own department block, ordered Director → Manager → staff, with
+  the department's Director named in the block header.
+
+**Not scoped by this change** (deliberately — the ask was people, not tasks):
+goals/tasks, holidays and the company record stay company-wide readable, and
+`getProfileBriefs()` still resolves goal-assignee names/avatars through the
+service role, so a shared cross-department task can still surface a name.
+
+**Operational step after deploying**: each Director's `profiles.department`
+must be set to the department they actually run — that field is now what
+grants their scope.
+
 ## Phase 2 — Backlog (re-enable when ready)
 
 Flip the flag in `src/lib/featureFlags.ts` for whichever of these should

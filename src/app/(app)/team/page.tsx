@@ -156,6 +156,7 @@ export default async function TeamPage() {
       members={members}
       currentUserId={profile.id}
       viewerIsFounder={isFounder(profile)}
+      viewerDepartment={profile.department ?? ''}
       goalDeptCounts={goalDeptCounts}
       deptColors={deptColors}
     />
