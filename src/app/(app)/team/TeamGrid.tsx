@@ -256,14 +256,17 @@ export function TeamGrid({
   const active = React.useMemo(() => members.filter((u) => u.isActive), [members]);
   const former = React.useMemo(() => members.filter((u) => !u.isActive), [members]);
 
-  // Distinct departments across the whole org (active + former), sorted —
-  // used to populate the department dropdown in the member modals.
+  // Distinct departments across the whole org (active + former), sorted — used
+  // to populate the department dropdown in the member modals. Registered
+  // departments are folded in from `departments` (via deptColors) as well as
+  // those derived from members, so a newly created empty department can have
+  // its first member assigned — otherwise it would be uncreatable in practice.
   const departmentList = React.useMemo(
     () =>
-      Array.from(new Set(members.map((u) => u.department).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [members],
+      Array.from(
+        new Set([...members.map((u) => u.department), ...Object.keys(deptColors)].filter(Boolean)),
+      ).sort((a, b) => a.localeCompare(b)),
+    [members, deptColors],
   );
 
   // Per-department usage for the manage-departments modal: member headcount
@@ -271,6 +274,10 @@ export function TeamGrid({
   const departmentStats = React.useMemo<DepartmentStat[]>(() => {
     const names = new Set<string>(departmentList);
     Object.keys(goalDeptCounts).forEach((d) => names.add(d));
+    // Registered-but-empty departments live only in the `departments` table
+    // (deptColors is keyed off it), so a freshly created one would vanish from
+    // this list until someone was assigned to it.
+    Object.keys(deptColors).forEach((d) => names.add(d));
     return Array.from(names)
       .sort((a, b) => a.localeCompare(b))
       .map((name) => ({

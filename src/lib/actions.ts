@@ -1930,6 +1930,48 @@ export async function renameDepartment(oldName: string, newName: string) {
   revalidatePath('/goals');
 }
 
+// Board creates an empty department. It exists as a row in `departments` with
+// no members and no tasks yet — the Team page folds that table into its
+// department list, so a brand-new one is immediately assignable and shows in
+// Manage departments as "Unused" (and stays deletable until something uses it).
+//
+// Founder-only, matching rename/delete: adding a department is a structural
+// change to the org, not a per-member edit.
+export async function createDepartment(name: string) {
+  await requireFounder();
+  const dept = name.trim();
+  if (!dept) throw new Error('Enter a department name.');
+
+  const { supabase } = await requireUser();
+  // Case-insensitive duplicate guard. The table's primary key is the exact
+  // string, so "audit" and "Audit" would otherwise both insert and then read as
+  // two departments that look identical everywhere they are listed.
+  // ilike takes a PATTERN, so a name containing % or _ ("R&D_Ops") would match
+  // far more than itself and wrongly report a clash — escape them first.
+  const pattern = dept.replace(/[\\%_]/g, (c) => `\\${c}`);
+  const { data: clash } = await supabase
+    .from('departments')
+    .select('name')
+    .ilike('name', pattern)
+    .maybeSingle();
+  if (clash) throw new Error(`"${clash.name}" already exists.`);
+  // A department can also be in use via profiles without a row here (any
+  // predating the departments table), so check the derived names too.
+  const { data: inUse } = await supabase
+    .from('profiles')
+    .select('department')
+    .ilike('department', pattern)
+    .limit(1);
+  if (inUse && inUse.length > 0) throw new Error(`"${dept}" already exists.`);
+
+  const { error } = await supabase.from('departments').insert({ name: dept });
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/team');
+  revalidatePath('/dashboard');
+  revalidatePath('/goals');
+}
+
 // Board dedicates (or recolours) a department's accent colour. Upserts the
 // departments row; the colour is read app-wide via getDepartmentColors.
 export async function setDepartmentColor(name: string, color: string) {

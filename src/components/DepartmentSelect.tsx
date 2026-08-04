@@ -5,8 +5,9 @@
 // the Create-account and Manage-member modals.
 //
 // `allowCreate={false}` drops the create option and offers only the departments
-// that already exist — used by the task form, where a department is picked, not
-// invented.
+// that already exist — used by the task form and the Manage-member modal, where
+// a department is picked, not invented. Creating one lives in
+// Team › Departments (ManageDepartmentsModal).
 import * as React from 'react';
 
 const NEW = '__new__';

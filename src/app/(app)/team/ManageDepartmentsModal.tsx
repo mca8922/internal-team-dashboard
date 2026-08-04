@@ -9,7 +9,12 @@ import { Button, Modal } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
 import { useConfirm } from '@/components/ConfirmDialog';
-import { renameDepartment, deleteDepartment, setDepartmentColor } from '@/lib/actions';
+import {
+  renameDepartment,
+  deleteDepartment,
+  setDepartmentColor,
+  createDepartment,
+} from '@/lib/actions';
 
 export interface DepartmentStat {
   name: string;
@@ -183,6 +188,64 @@ function DepartmentRow({
   );
 }
 
+// Create a new, empty department. It lands in the list below straight away as
+// "Unused" and becomes selectable wherever a department is picked.
+function AddDepartmentRow({
+  pending,
+  setPending,
+  onChanged,
+}: {
+  pending: boolean;
+  setPending: (v: boolean) => void;
+  onChanged: () => void;
+}) {
+  const toast = useToast();
+  const [name, setName] = React.useState('');
+
+  const add = async () => {
+    const dept = name.trim();
+    if (!dept) return;
+    setPending(true);
+    try {
+      await createDepartment(dept);
+      toast(`"${dept}" added`);
+      setName('');
+      onChanged();
+    } catch (e) {
+      toast((e as Error).message, 'error');
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div className="dept-add-row">
+      <input
+        className="input"
+        value={name}
+        placeholder="New department name"
+        aria-label="New department name"
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            add();
+          }
+        }}
+      />
+      <Button
+        size="sm"
+        variant="secondary"
+        icon="plus"
+        onClick={add}
+        disabled={pending || name.trim() === ''}
+      >
+        Add
+      </Button>
+    </div>
+  );
+}
+
 export function ManageDepartmentsModal({
   open,
   departments,
@@ -201,6 +264,12 @@ export function ManageDepartmentsModal({
         Renaming a department updates every member and goal that uses it. A department can
         only be deleted once nothing references it.
       </p>
+
+      <AddDepartmentRow
+        pending={pending}
+        setPending={setPending}
+        onChanged={() => router.refresh()}
+      />
 
       {departments.length === 0 ? (
         <div className="empty-state">
