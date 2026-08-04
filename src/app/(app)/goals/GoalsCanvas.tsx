@@ -2,13 +2,13 @@
 
 // One-Shot — the whole goal hierarchy as a single, zoomable node canvas
 // (n8n-style): every goal is a small card wired to its parent, laid out
-// left→right by tier (Yearly → Monthly → Weekly → Daily). It auto-fits to
-// the viewport on open so the structure reads at a glance with no page
-// scrolling; from there the user can pan/zoom to inspect a busy area.
+// left→right by tier (Yearly → Half-Yearly → Quarterly → Monthly → Daily). It
+// auto-fits to the viewport on open so the structure reads at a glance with no
+// page scrolling; from there the user can pan/zoom to inspect a busy area.
 //
 // Daily goals are the most numerous tier (often one branch per assignee), so
-// they collapse into a "+N" badge on their Weekly parent by default — that
-// keeps the default glance to Yearly/Monthly/Weekly readable even on a large
+// they collapse into a "+N" badge on their Monthly parent by default — that
+// keeps the default glance to the four grouping tiers readable even on a large
 // board, while the full detail stays one click away per branch.
 //
 // Pure client-side layout (divs + one SVG for the connector lines) — no
@@ -64,7 +64,7 @@ interface Layout {
 // vertical span of its own (visible) children. Independent trees (yearly
 // roots, plus any goal whose parent isn't in the visible set) stack below
 // one another. Daily children of a goal not in `expanded` are skipped and
-// counted instead, so the default view stays Yearly/Monthly/Weekly-sized.
+// counted instead, so the default view stays to the four grouping tiers.
 function layout(goals: Goal[], expanded: Set<string>): Layout {
   const byId = new Map(goals.map((g) => [g.id, g]));
   const childrenOf = new Map<string, Goal[]>();
@@ -152,7 +152,7 @@ export function GoalsCanvas({
   due: 'all' | 'overdue' | 'week';
   isMatch: (g: Goal) => boolean;
 }) {
-  // Daily goals collapsed by default (one badge per Weekly parent) — see
+  // Daily goals collapsed by default (one badge per Monthly parent) — see
   // module doc comment for why.
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const { nodes, edges, w, h, collapsedCounts, collapsibleIds } = React.useMemo(

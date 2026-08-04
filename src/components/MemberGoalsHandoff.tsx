@@ -9,17 +9,17 @@ import { Modal, Button, Avatar } from './ui';
 import { Icon } from './Icon';
 import { useToast } from './Toast';
 import { loadMemberGoalsForHandoff, setGoalAssignees } from '@/lib/actions';
+import { LEVEL_META } from '@/app/(app)/goals/goal-ui';
+import type { GoalLevel } from '@/lib/types';
 
 type Data = Awaited<ReturnType<typeof loadMemberGoalsForHandoff>>;
 type HandoffGoal = Data['goals'][number];
 
-const LEVEL_LABEL: Record<string, string> = {
-  yearly: 'Yearly',
-  half_yearly: 'Half-Yearly',
-  quarterly: 'Quarterly',
-  monthly: 'Monthly',
-  daily: 'Daily',
-};
+// Tier labels come from goal-ui so this list can't drift out of step with the
+// cascade — it used to be a hand-maintained copy that had to be edited in
+// lockstep every time a tier changed.
+const LEVEL_LABEL = (level: string): string =>
+  LEVEL_META[level as GoalLevel]?.label ?? level;
 
 export function MemberGoalsHandoff({
   open,
@@ -147,7 +147,7 @@ export function MemberGoalsHandoff({
             <div key={g.id} className="mgh-goal">
               <div className="mgh-goal-head">
                 <span className="mgh-goal-title">{g.title}</span>
-                <span className="badge badge-slate">{LEVEL_LABEL[g.level] ?? g.level}</span>
+                <span className="badge badge-slate">{LEVEL_LABEL(g.level)}</span>
                 {saved.has(g.id) ? (
                   <span className="badge gb-onleave-badge">
                     <Icon name="check" size={11} /> Saved

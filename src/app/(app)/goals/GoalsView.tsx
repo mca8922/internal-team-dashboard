@@ -1929,9 +1929,19 @@ export function GoalsView({
             </span>
           </span>
         </div>
-        <div className="page-subtitle">
-          Mission → Vision → {topLabel.replace(' Task', '')} → Half-Yearly → Quarterly →
-          Monthly → Daily
+        {/* The cascade, as a breadcrumb. Each step carries its own trailing
+            arrow inside a nowrap span, so on a narrow screen the line wraps
+            BETWEEN steps instead of stranding an arrow at the start of a line
+            or splitting "Half-Yearly" across two. */}
+        <div className="page-subtitle gb-cascade-path">
+          {['Mission', 'Vision', topLabel.replace(' Task', ''), 'Half-Yearly', 'Quarterly', 'Monthly', 'Daily'].map(
+            (step, i, all) => (
+              <span key={step} className="gb-cascade-step">
+                {step}
+                {i < all.length - 1 ? <span aria-hidden="true"> → </span> : null}
+              </span>
+            ),
+          )}
         </div>
       </div>
       {isBoard ? (

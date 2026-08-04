@@ -32,6 +32,7 @@ import {
   startOfWeek,
 } from '@/lib/dates';
 import { targetHours, roleLabel, isFounder, isManager } from '@/lib/roles';
+import { LEVEL_META } from '@/app/(app)/goals/goal-ui';
 import { Donut } from '@/components/ui';
 import { ManagerBadge } from '@/components/ManagerBadge';
 import { PunchWidget } from './PunchWidget';
@@ -443,7 +444,12 @@ export default async function DashboardPage() {
                     <div className="goal-progress">
                       <div className="goal-progress-fill" style={{ width: `${g.progress || 0}%` }} />
                     </div>
+                    {/* The tier matters here now: this card used to list one
+                        tier only (Weekly), so every row was alike. It spans all
+                        tiers today, and a Yearly task reads very differently
+                        from a Daily one. */}
                     <div className="text-xs text-grey mt-2">
+                      {LEVEL_META[g.level].label} ·{' '}
                       {g.due_date ? `Due ${fmtRelative(parseDate(g.due_date))} · ` : ''}
                       {g.department}
                     </div>

@@ -510,6 +510,9 @@ p { margin: 0; }
 .page-header { margin-bottom: 24px; display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .page-title { font-size: 28px; letter-spacing: -0.01em; }
 .page-subtitle { color: var(--color-grey-text); font-size: 14px; margin-top: 4px; }
+/* Tasks cascade breadcrumb — wraps between steps, never inside one. */
+.gb-cascade-path { display: flex; flex-wrap: wrap; }
+.gb-cascade-step { white-space: nowrap; }
 .page-header-actions { margin-left: auto; display: flex; gap: 8px; }
 
 /* ===== Cards ===== */
@@ -3341,18 +3344,10 @@ p { margin: 0; }
 .bar-axis { display: flex; gap: 8px; margin-top: 4px; }
 .bar-axis-label { flex: 1; text-align: center; font-size: 11px; color: var(--color-grey-text); }
 
-/* ===== Goal tree ===== */
-.goal-tree { display: flex; flex-direction: column; gap: 16px; }
-.goal-node {
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 16px;
-  position: relative;
-}
-.goal-node.level-yearly { border-left: 3px solid var(--color-black); }
-.goal-node.level-monthly { border-left: 3px solid var(--color-slate); margin-left: 24px; }
-.goal-node.level-weekly { border-left: 3px solid var(--color-green-primary); margin-left: 48px; background: var(--color-green-light); }
+/* ===== Goal progress bar =====
+   (The old .goal-tree / .goal-node block that used to live here was dead: no
+   component has rendered those classes since the cascade moved to the .gb-*
+   cards, and its per-tier rules still described the removed Weekly tier.) */
 .goal-progress {
   height: 6px; background: var(--color-border); border-radius: 3px;
   overflow: hidden; margin-top: 10px;
@@ -3829,24 +3824,6 @@ body { font-size: 15px; }
 .mission-card .mv-text { color: var(--on-dark); }
 .mv-empty { color: var(--on-dark-dim); }
 .vision-card .mv-empty { color: var(--color-grey-text); }
-
-/* ===== Goals — tree nodes responsive + theme-safe ===== */
-.goal-node { padding: 18px; }
-.goal-node .text-lg { font-size: 17px; }
-@media (max-width: 760px) {
-  /* drop the deep indentation so cards aren't squished on mobile */
-  .goal-node.level-monthly { margin-left: 14px; }
-  .goal-node.level-weekly  { margin-left: 28px; }
-  .goal-node .flex.items-center.justify-between {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  .goal-node .text-right { text-align: left; }
-}
-
-/* weekly hero card text scales nicely */
-.goal-tree .card .text-lg { font-size: 17px; }
 
 /* ===== misc readability ===== */
 .empty-state h3 { font-size: 17px; }
@@ -8826,6 +8803,10 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
   border: 1px solid var(--color-border);
   border-radius: 999px;
   padding: 1px 7px;
+  /* "HALF-YEARLY" is long enough to break inside the pill on a narrow column;
+     keep it on one line and let the task title take the squeeze instead (it
+     ellipsises, the pill cannot). */
+  white-space: nowrap;
 }
 .gb-td-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .gb-td-dept { flex-shrink: 0; font-size: 11px; color: var(--color-grey-text); }
