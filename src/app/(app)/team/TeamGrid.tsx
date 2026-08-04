@@ -65,6 +65,11 @@ const ROLE_ORDER: Record<UserRole, number> = { board: 0, fte: 1, pte: 2, intern:
 // so every board member always gets a distinct colour.
 const BOARD_COLORS = ['#4285F4', '#EA4335', '#FBBC04', '#34A853'];
 
+// Founders get a single shared golden identity instead of the per-person
+// Google palette — they're a fixed, un-removable pair, not just "first on
+// the board", so their cards should read as visually distinct from Directors.
+const FOUNDER_COLOR = '#D4A017';
+
 
 // Memoized — a card only re-renders when its own member data changes, not
 // when an unrelated filter/search keystroke re-renders the grid.
@@ -72,30 +77,38 @@ const TeamCard = React.memo(function TeamCard({
   u,
   onManage,
   boardColor,
+  founder,
 }: {
   u: TeamMember;
   onManage: (m: TeamMember) => void;
   boardColor?: string;
+  founder?: boolean;
 }) {
   const router = useRouter();
   // Live "in the app right now" — updates in real time as teammates open or
   // close the dashboard, independent of whether they have punched in.
   const online = usePresence().has(u.id);
-  const accent = boardColor || u.deptColor || 'var(--color-green-primary)';
+  const cardColor = founder ? FOUNDER_COLOR : boardColor;
+  const accent = cardColor || u.deptColor || 'var(--color-green-primary)';
   const open = () => router.push('/team/' + u.id);
   return (
     <div
-      className={`card team-card${boardColor ? ' team-card--board' : ''} ${u.isActive ? '' : 'member-left'}`}
-      style={{ '--dept': accent, ...(boardColor ? { '--board-color': boardColor } : {}) } as React.CSSProperties}
+      className={`card team-card${cardColor ? ' team-card--board' : ''}${founder ? ' team-card--founder' : ''} ${u.isActive ? '' : 'member-left'}`}
+      style={{ '--dept': accent, ...(cardColor ? { '--board-color': cardColor } : {}) } as React.CSSProperties}
     >
       {/* One clear clickable region: avatar, name, status and stats all open
           the member's profile. The Manage button below is the only part that
           does something else. */}
       <button type="button" className="team-card-open" onClick={open} title="View profile">
         <div className="flex items-center gap-3">
-          {boardColor ? (
-            <div className="team-board-avatar-ring" style={{ '--board-color': boardColor } as React.CSSProperties}>
+          {cardColor ? (
+            <div className="team-board-avatar-ring" style={{ '--board-color': cardColor } as React.CSSProperties}>
               <Avatar name={u.name} size="lg" src={u.avatarUrl} />
+              {founder ? (
+                <span className="team-founder-crown">
+                  <Icon name="crown" size={11} />
+                </span>
+              ) : null}
             </div>
           ) : (
             <Avatar name={u.name} size="lg" src={u.avatarUrl} />
@@ -105,7 +118,7 @@ const TeamCard = React.memo(function TeamCard({
               <div className="fw-bold">{u.name}</div>
               {online ? <span className="dot dot-live" title="Online now" /> : null}
               {u.isFounder ? (
-                <span className="badge badge-black" style={boardColor ? { background: boardColor, color: '#fff' } : undefined}>Founder</span>
+                <span className="badge badge-black" style={cardColor ? { background: cardColor, color: '#fff' } : undefined}>Founder</span>
               ) : null}
               {u.role === 'intern' ? <span className="badge badge-slate">Intern</span> : null}
               {u.role === 'board' && !u.isFounder ? (
@@ -275,17 +288,25 @@ export function TeamGrid({
     return active.filter(matches);
   }, [active, filter, dept, search]);
 
-  // Board Members get their own section pinned to the very top (Founder first),
-  // regardless of department — leadership is easiest to find up top.
-  const boardGroup = React.useMemo(() => {
-    const mem = filtered.filter((u) => u.role === 'board');
+  // Founders get their own section pinned above everything else — they're a
+  // fixed, un-removable pair distinct from the rest of the board.
+  const founderGroup = React.useMemo(() => {
+    const mem = filtered.filter((u) => u.role === 'board' && u.isFounder);
     if (mem.length === 0) return null;
     return {
       inCount: mem.filter((m) => m.status === 'in').length,
-      members: mem.slice().sort((a, b) => {
-        if (a.isFounder !== b.isFounder) return a.isFounder ? -1 : 1;
-        return a.name.localeCompare(b.name);
-      }),
+      members: mem.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  }, [filtered]);
+
+  // Directors get their own section below Founders, regardless of
+  // department — leadership is easiest to find up top.
+  const boardGroup = React.useMemo(() => {
+    const mem = filtered.filter((u) => u.role === 'board' && !u.isFounder);
+    if (mem.length === 0) return null;
+    return {
+      inCount: mem.filter((m) => m.status === 'in').length,
+      members: mem.slice().sort((a, b) => a.name.localeCompare(b.name)),
     };
   }, [filtered]);
 
@@ -421,6 +442,27 @@ export function TeamGrid({
           </select>
         </div>
       </div>
+
+      {founderGroup ? (
+        <section className="team-dept">
+          <div className="team-dept-head">
+            <span className="team-dept-accent" style={{ background: FOUNDER_COLOR }} />
+            <span className="team-dept-name">Founders</span>
+            <span className="team-dept-count">{founderGroup.members.length}</span>
+            {founderGroup.inCount > 0 ? (
+              <span className="team-dept-in">
+                <span className="dot dot-green" />
+                {founderGroup.inCount} on the clock
+              </span>
+            ) : null}
+          </div>
+          <div className="grid grid-3 gap-4">
+            {founderGroup.members.map((u) => (
+              <TeamCard key={u.id} u={u} onManage={setManaging} founder />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {boardGroup ? (
         <section className="team-dept">

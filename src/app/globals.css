@@ -6247,6 +6247,70 @@ body { font-size: 15px; }
   line-height: 0;
 }
 
+/* ---- Founders: golden identity ----
+   Founders can't be removed from the org, so their cards get a treatment
+   that reads as unmistakably different from Directors, not just a
+   recoloured version of the same card: a full gold hairline frame, a warm
+   gradient wash, a soft ambient glow, and a small crown badge on the
+   avatar. Kept to colour/shadow/pseudo-elements only, so it drops into the
+   existing responsive grid (.grid-3) without any layout changes. */
+.team-card--founder {
+  position: relative;
+  border: none;
+  background:
+    linear-gradient(155deg, rgba(246, 211, 101, 0.16) 0%, var(--color-card) 45%, rgba(212, 160, 23, 0.1) 100%);
+  box-shadow:
+    0 0 0 1.5px rgba(212, 160, 23, 0.55),
+    0 6px 24px -8px rgba(212, 160, 23, 0.35);
+}
+/* Thin gradient frame drawn as a pseudo-border so the gold reads as metallic
+   rather than a flat single-tone outline. */
+.team-card--founder::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, #f9e29c 0%, #d4a017 45%, #a6790f 75%, #f6d365 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.team-card--founder:hover {
+  box-shadow:
+    0 0 0 1.5px rgba(212, 160, 23, 0.8),
+    0 10px 30px -8px rgba(212, 160, 23, 0.5),
+    var(--shadow-lift);
+}
+.team-card--founder .team-board-avatar-ring {
+  position: relative;
+  background: linear-gradient(135deg, #f9e29c 0%, #d4a017 55%, #a6790f 100%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #d4a017 18%, transparent);
+}
+/* Small crown badge pinned to the avatar ring — a quick, unmistakable
+   "this person can't be removed" signal distinct from the Founder text
+   badge next to the name. */
+.team-founder-crown {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f9e29c 0%, #d4a017 60%, #a6790f 100%);
+  color: #3d2a00;
+  border: 2px solid var(--color-card);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+[data-theme="dark"] .team-card--founder {
+  background:
+    linear-gradient(155deg, rgba(246, 211, 101, 0.1) 0%, var(--color-card) 45%, rgba(212, 160, 23, 0.07) 100%);
+}
+
 /* ---- Department grouping on the Team grid ----
    A dense 3-column grid of department blocks. Each block spans as many columns
    as it has members (capped at 3), so a department with several members lays
