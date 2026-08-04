@@ -15,8 +15,9 @@ type HandoffGoal = Data['goals'][number];
 
 const LEVEL_LABEL: Record<string, string> = {
   yearly: 'Yearly',
+  half_yearly: 'Half-Yearly',
+  quarterly: 'Quarterly',
   monthly: 'Monthly',
-  weekly: 'Weekly',
   daily: 'Daily',
 };
 

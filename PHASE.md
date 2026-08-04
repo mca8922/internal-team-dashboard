@@ -72,6 +72,33 @@ Re-adding either is a from-scratch build, not a flag flip:
   `profiles.priya_enabled`, and redefined `prune_old_data()` (the pg_cron
   job from migration 0028) to stop touching `priya_email_logs`.
 
+## Task tiers — cascade restructure (done)
+
+The Tasks cascade was **Yearly → Monthly → Weekly → Daily**. It is now
+**Yearly → Half-Yearly → Quarterly → Monthly → Daily**: the Weekly tier is
+gone, and two tiers were inserted between Yearly and Monthly.
+
+- `goal_level` is a Postgres enum, which cannot drop a value, so migration
+  `0057_task_tiers.sql` rebuilds the type. It deletes every Weekly task (there
+  was no production task data), cuts any parent link that is no longer
+  tier-legal so the task lands in "Unlinked Tasks" instead of a broken branch,
+  and remaps `goal_templates.level = 'weekly'` to `'monthly'`.
+- The tier ladder is defined once in `src/app/(app)/goals/goal-ui.ts`
+  (`LEVEL_META`, `LEVEL_ORDER`, `PARENT_LEVEL`, `LEVEL_WORD`). Changing the
+  cascade again means editing those plus the `GoalLevel` union in
+  `src/lib/types.ts` — everything else derives from them.
+- `src/lib/fiscal.ts` holds the FY Apr–Mar period math (H1 Apr–Sep, H2 Oct–Mar;
+  Q1 Apr–Jun … Q4 Jan–Mar). A new task's due date defaults to its period end and
+  the form shows the period beside the date field. Covered by `fiscal.test.ts`.
+- Dashboard: "This week's tasks" used to filter on the Weekly *tier*. With that
+  tier gone it now selects open tasks whose **due date** falls in the current
+  Mon–Sun week, across every tier — which is what the "Week N" label beside it
+  already implied. The rest of the dashboard has not been revisited for the new
+  tiers yet.
+- The checklist-item `weekly` *recurrence* is unrelated to the tier and stays.
+  Monthly, now the lowest tier that groups work, inherits the fine-grained
+  cadences (weekdays / daily / custom) that Weekly used to allow.
+
 ## Phase 2 — Backlog (re-enable when ready)
 
 Flip the flag in `src/lib/featureFlags.ts` for whichever of these should

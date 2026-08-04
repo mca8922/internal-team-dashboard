@@ -47,14 +47,14 @@ describe('dueBucket', () => {
 describe('goalAncestors / goalPath', () => {
   const yearly = goal({ id: 'y', level: 'yearly', parent_id: null });
   const monthly = goal({ id: 'm', level: 'monthly', parent_id: 'y' });
-  const weekly = goal({ id: 'w', level: 'weekly', parent_id: 'm' });
-  const all = [weekly, yearly, monthly];
+  const daily = goal({ id: 'd', level: 'daily', parent_id: 'm' });
+  const all = [daily, yearly, monthly];
 
   it('lists ancestors top-down, excluding self', () => {
-    expect(goalAncestors(weekly, all).map((g) => g.id)).toEqual(['y', 'm']);
+    expect(goalAncestors(daily, all).map((g) => g.id)).toEqual(['y', 'm']);
   });
   it('path includes self at the end, root first', () => {
-    expect(goalPath(weekly, all).map((g) => g.id)).toEqual(['y', 'm', 'w']);
+    expect(goalPath(daily, all).map((g) => g.id)).toEqual(['y', 'm', 'd']);
   });
   it('root goal has no ancestors', () => {
     expect(goalAncestors(yearly, all)).toEqual([]);

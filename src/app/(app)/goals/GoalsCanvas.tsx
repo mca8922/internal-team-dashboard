@@ -28,8 +28,20 @@ const MIN_SCALE = 0.15;
 const MAX_SCALE = 2.5;
 const FIT_MAX_SCALE = 1.3;
 
-const COL_OF: Record<GoalLevel, number> = { yearly: 0, monthly: 1, weekly: 2, daily: 3 };
-const TIER_TAG: Record<GoalLevel, string> = { yearly: 'Y', monthly: 'M', weekly: 'W', daily: 'D' };
+const COL_OF: Record<GoalLevel, number> = {
+  yearly: 0,
+  half_yearly: 1,
+  quarterly: 2,
+  monthly: 3,
+  daily: 4,
+};
+const TIER_TAG: Record<GoalLevel, string> = {
+  yearly: 'Y',
+  half_yearly: 'H',
+  quarterly: 'Q',
+  monthly: 'M',
+  daily: 'D',
+};
 
 interface Positioned {
   goal: Goal;

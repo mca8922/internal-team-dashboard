@@ -209,7 +209,7 @@ export const getGoalAssignees = cache(async (): Promise<GoalAssignee[]> => {
 
 // Goals visible to a member: a goal counts if it (or any ancestor) is
 // assigned directly to them. Including descendants of a visible goal means an
-// assigned yearly goal also surfaces its monthly/weekly children in the focus
+// assigned yearly goal also surfaces its half-yearly/quarterly children in the focus
 // view. A goal with no assignees is hidden from everyone except the Board —
 // department-tagging alone no longer grants visibility.
 export function visibleGoals(

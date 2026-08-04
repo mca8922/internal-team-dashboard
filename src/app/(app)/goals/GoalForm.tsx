@@ -12,7 +12,9 @@ import { RichTextEditor } from '@/components/RichTextEditor';
 import { DepartmentSelect } from '@/components/DepartmentSelect';
 import { DatePicker } from '@/components/DatePicker';
 import { WEEKDAYS, recurrenceOptionsForLevel } from '@/lib/recurrence';
+import { periodEndDate, periodLabel } from '@/lib/fiscal';
 import { fmtDate, addDays } from '@/lib/dates';
+import { PARENT_LEVEL } from './goal-ui';
 import type { Goal, GoalLevel, ChecklistRecurrence } from '@/lib/types';
 
 export interface AssignableMember {
@@ -56,19 +58,15 @@ export interface GoalSubmit {
 
 const LEVELS: { value: GoalLevel; label: string }[] = [
   { value: 'yearly', label: 'Yearly' },
+  { value: 'half_yearly', label: 'Half-Yearly' },
+  { value: 'quarterly', label: 'Quarterly' },
   { value: 'monthly', label: 'Monthly' },
-  { value: 'weekly', label: 'Weekly' },
   { value: 'daily', label: 'Daily' },
 ];
 
 // Which level a goal of `level` hangs under (its parent tier), or null for the
-// top tier. Drives the parent picker: daily→weekly→monthly→yearly.
-const PARENT_OF: Record<GoalLevel, GoalLevel | null> = {
-  yearly: null,
-  monthly: 'yearly',
-  weekly: 'monthly',
-  daily: 'weekly',
-};
+// top tier. Drives the parent picker: daily→monthly→quarterly→half-yearly→yearly.
+const PARENT_OF = PARENT_LEVEL;
 
 export function GoalForm({
   initial,
@@ -100,7 +98,14 @@ export function GoalForm({
     level: initial.level,
     title: initial.title || '',
     description: initial.description || '',
-    dueDate: initial.due_date || fmtDate(addDays(new Date(), 7)),
+    // A tiered task defaults to the end of the financial period it belongs to
+    // (FY Apr–Mar), so a Quarterly task lands on its quarter-end rather than an
+    // arbitrary date. Daily has no period, so it keeps the week-out default.
+    dueDate:
+      initial.due_date ||
+      (initial.level === 'daily'
+        ? fmtDate(addDays(new Date(), 7))
+        : periodEndDate(initial.level)),
     status: (initial.status || 'active') as 'inactive' | 'active' | 'achieved' | 'not_met',
     progress: initial.progress || 0,
     parentId: initial.parent_id || null,
@@ -114,7 +119,6 @@ export function GoalForm({
         ? [initial.department]
         : [],
   );
-  const [newDept, setNewDept] = React.useState('');
   const [assignees, setAssignees] = React.useState<string[]>(initialAssignees);
   const [checklist, setChecklist] = React.useState<ChecklistRow[]>(() =>
     // Auto-reveal the description on rows that already have one (so editing an
@@ -160,6 +164,10 @@ export function GoalForm({
         title: '',
         description: '',
         parentId: null,
+        // Re-anchor the due date on the new tier's financial period. Only on a
+        // new task — an existing task's date is the user's, never overwritten.
+        dueDate:
+          next === 'daily' ? fmtDate(addDays(new Date(), 7)) : periodEndDate(next),
       }));
       setChecklist([]);
       return;
@@ -234,13 +242,10 @@ export function GoalForm({
   // Multi-department picker (Board): toggle one department in/out.
   const toggleDept = (dept: string) =>
     setDeptsPruned(depts.includes(dept) ? depts.filter((d) => d !== dept) : [...depts, dept]);
-  const addNewDept = () => {
-    const d = newDept.trim();
-    if (d && !depts.includes(d)) setDeptsPruned([...depts, d]);
-    setNewDept('');
-  };
-
-  // The chip pool for the multi-select: known departments plus any just-typed.
+  // The chip pool for the multi-select: the departments the org already has.
+  // A task cannot mint a new one — departments are created in Team/Settings, not
+  // here. Any department already ON this task is still included so editing a
+  // task never silently drops a department that has since been retired.
   const deptPool = React.useMemo(
     () => Array.from(new Set([...departments, ...depts])),
     [departments, depts],
@@ -317,23 +322,6 @@ export function GoalForm({
               );
             })}
           </div>
-          <div className="dept-multi-add">
-            <input
-              className="input"
-              value={newDept}
-              placeholder="New department…"
-              onChange={(e) => setNewDept(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addNewDept();
-                }
-              }}
-            />
-            <Button type="button" size="sm" variant="secondary" icon="plus" onClick={addNewDept}>
-              Add
-            </Button>
-          </div>
         </Field>
       ) : (
         <Field label="Department">
@@ -341,6 +329,7 @@ export function GoalForm({
             value={depts[0] || ''}
             departments={departments}
             onChange={changeDepartment}
+            allowCreate={false}
           />
         </Field>
       )}
@@ -352,6 +341,12 @@ export function GoalForm({
             onChange={(v) => set('dueDate', v)}
             ariaLabel="Due date"
           />
+          {/* Which financial period the chosen date falls in (FY Apr–Mar), so
+              the Board can see at a glance that a "Q2" task really is due in
+              Jul–Sep. Purely informative — the date itself stays editable. */}
+          {form.dueDate && periodLabel(form.level, form.dueDate) ? (
+            <div className="field-hint">{periodLabel(form.level, form.dueDate)}</div>
+          ) : null}
         </Field>
         <div />
       </div>

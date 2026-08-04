@@ -22,6 +22,7 @@ import type {
   Block,
   ChangeRequestField,
   ChecklistRecurrence,
+  GoalLevel,
   GoalViewConfig,
   LeaveType,
   NotificationType,
@@ -785,7 +786,7 @@ export async function setGoalAssignees(goalId: string, userIds: string[]) {
 }
 
 export async function createGoal(input: {
-  level: 'yearly' | 'monthly' | 'weekly' | 'daily';
+  level: GoalLevel;
   title: string;
   description: string;
   dueDate: string;
@@ -847,7 +848,7 @@ export async function createGoal(input: {
 export async function updateGoal(
   id: string,
   patch: Partial<{
-    level: 'yearly' | 'monthly' | 'weekly' | 'daily';
+    level: GoalLevel;
     title: string;
     description: string;
     due_date: string;
@@ -1164,7 +1165,7 @@ export async function saveReportTemplate(department: string, body: string) {
 // as JSONB (an array of TemplateChecklistRow shapes).
 export async function createGoalTemplate(input: {
   name: string;
-  level: 'yearly' | 'monthly' | 'weekly' | 'daily';
+  level: GoalLevel;
   department: string;
   title: string;
   description: string;

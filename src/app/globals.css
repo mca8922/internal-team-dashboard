@@ -597,11 +597,35 @@ p { margin: 0; }
   transition: border-color 120ms, box-shadow 120ms;
   width: 100%;
 }
+/* Dropdown chevron. The native arrow sits hard against the right border and its
+   spacing differs per browser/OS, so it's replaced with our own — same 12px
+   gutter as the field's text padding, matching the DatePicker's chevron. The
+   glyph is a variable so the dark theme can swap it for a lighter stroke
+   (a data: URI can't read var(--color-*) itself). */
+:root {
+  --select-chevron: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23676F7E' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
+}
+[data-theme="dark"] {
+  --select-chevron: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23B8BFCC' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
+}
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px 14px;
+  /* Reserve the chevron's lane so a long option never runs underneath it. */
+  padding-right: 34px;
+}
 .input:focus, .select:focus, .textarea:focus {
   border-color: var(--color-green-primary);
   box-shadow: 0 0 0 3px rgba(31,92,62,0.15);
 }
 .field-error { font-size: 11.5px; color: var(--color-red); }
+/* Neutral note under a field — context, not a problem (e.g. which financial
+   quarter a chosen due date falls in). Muted so it never reads as an error. */
+.field-hint { font-size: 11.5px; color: var(--color-grey-text); }
 
 /* Password field with a show/hide toggle overlaid on the input's right edge.
    The toggle is a real button (not a decorative span) so it stays reachable
@@ -853,8 +877,6 @@ p { margin: 0; }
   padding: 1px 6px;
   border-radius: 6px;
 }
-.dept-multi-add { display: flex; gap: 8px; margin-top: 10px; }
-.dept-multi-add .input { flex: 1; }
 
 /* ===== DateTimePicker — calendar + time columns ===== */
 .dtpicker-body { display: flex; gap: 12px; }
@@ -3921,9 +3943,13 @@ body { font-size: 15px; }
   padding: 18px 20px;
   border-left: 3px solid var(--color-border);
 }
+/* Per-tier left accent, one hue per rung of the cascade so depth is readable at
+   a glance: Yearly → Half-Yearly → Quarterly → Monthly → Daily.
+   (.gb-daily is defined further down, with the rest of the daily-tier styles.) */
 .gb-hero { border-left: 3px solid var(--color-green-primary); padding: 24px; }
+.gb-half { border-left: 3px solid var(--color-gold-darker); }
+.gb-quarter { border-left: 3px solid var(--color-violet); }
 .gb-monthly { border-left: 3px solid var(--color-slate); }
-.gb-weekly { border-left: 3px solid var(--color-green-primary); }
 
 /* Deep-link landing: a notification jumped here. The card lifts, glows, and
    holds a soft green ring so the user instantly sees THIS is the one — then it
@@ -5525,9 +5551,13 @@ body { font-size: 15px; }
 }
 
 /* segmented control — the goal-level picker at the top of the form */
+/* Tier picker. Flex (not a fixed column count) so the control adapts to however
+   many tiers exist — it was hard-coded to 4 columns, which stranded the 5th tier
+   alone on a second row. The buttons share the row evenly and only wrap when the
+   longest label genuinely cannot fit. */
 .seg {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 4px;
   background: var(--color-bg);
@@ -5535,7 +5565,11 @@ body { font-size: 15px; }
   border-radius: var(--radius-sm);
 }
 .seg-btn {
-  padding: 8px 6px;
+  /* Equal share of the row, but never squeezed below the label itself. */
+  flex: 1 1 auto;
+  min-width: max-content;
+  white-space: nowrap;
+  padding: 8px 10px;
   border-radius: 7px;
   border: 1px solid transparent;
   background: transparent;
@@ -5661,7 +5695,9 @@ body { font-size: 15px; }
 }
 
 @media (max-width: 640px) {
-  .seg { grid-template-columns: repeat(2, 1fr); }
+  /* Phones: tighten the tier buttons so more of them share each row before the
+     control wraps. They stay evenly sized whichever row they land on. */
+  .seg-btn { padding: 8px 7px; font-size: 12px; }
   .day-picker { padding-left: 0; }
 }
 
@@ -8725,7 +8761,14 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
 }
 .gb-table-count { font-size: 12.5px; color: var(--color-grey-text); font-weight: 600; }
 .gb-table-group { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--color-grey-text); white-space: nowrap; flex-shrink: 0; }
-.gb-table-group .select { padding: 5px 8px; font-size: 12.5px; }
+/* Compact select: still needs the chevron's lane reserved on the right, and the
+   glyph pulled in to match the tighter horizontal padding. */
+.gb-table-group .select {
+  padding: 5px 26px 5px 8px;
+  font-size: 12.5px;
+  background-position: right 8px center;
+  background-size: 12px 12px;
+}
 .gb-table-foldbtns { display: inline-flex; gap: 6px; margin-left: auto; }
 
 .gb-table {
@@ -10405,9 +10448,12 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
   .gb-table-group .select,
   .gb-toolbar-dept,
   .gb-toolbar-due {
-    padding: 8px 10px;
+    /* Keep the right gutter wide enough for the chevron at this larger text. */
+    padding: 8px 30px 8px 10px;
     height: auto;
     min-height: 42px;
+    background-position: right 10px center;
+    background-size: 14px 14px;
   }
   /* Comfortable touch targets. */
   .btn { min-height: 40px; }

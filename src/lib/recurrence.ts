@@ -22,10 +22,15 @@ export const RECURRENCE_OPTIONS: { value: ChecklistRecurrence; label: string }[]
 // daily checklist (that's what a Daily goal is for), so the picker hides
 // finer-than-tier options. Editing an existing item with an out-of-range
 // cadence snaps it down to a valid one in the form.
+// NOTE: these VALUES are checklist cadences (how often an item repeats), which
+// still include 'weekly' — that's independent of the task tiers, which no longer
+// have a Weekly rung. Monthly is now the tier directly above Daily, so it
+// inherits the fine-grained cadences Weekly used to carry.
 const RECURRENCE_BY_LEVEL: Record<GoalLevel, ChecklistRecurrence[]> = {
   yearly: ['once', 'yearly', 'monthly'],
-  monthly: ['once', 'monthly', 'weekly'],
-  weekly: ['once', 'weekly', 'weekdays', 'daily', 'custom'],
+  half_yearly: ['once', 'yearly', 'monthly'],
+  quarterly: ['once', 'monthly', 'weekly'],
+  monthly: ['once', 'monthly', 'weekly', 'weekdays', 'daily', 'custom'],
   daily: ['once', 'daily'],
 };
 

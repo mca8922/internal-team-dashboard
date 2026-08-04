@@ -97,7 +97,7 @@ const STEPS: TourStep[] = [
     icon: 'target',
     title: 'The Tasks page',
     intro:
-      'Open Tasks from the sidebar to see the big picture: the company’s yearly tasks broken down into monthly, weekly and daily work.',
+      'Open Tasks from the sidebar to see the big picture: the company’s yearly tasks broken down into half-yearly, quarterly, monthly and daily work.',
     points: [
       'Most tasks carry a checklist you tick off as you go, and your progress updates on its own.',
       'Finish your last item due for the day and you get a little celebration. 🎉',
