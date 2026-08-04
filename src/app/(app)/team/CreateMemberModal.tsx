@@ -146,12 +146,20 @@ export function CreateMemberModal({
           <Field
             label="Department"
             error={err.department}
-            hint={viewerIsFounder ? undefined : 'New accounts join your own department.'}
+            hint={
+              viewerIsFounder
+                ? 'Pick an existing department. To add a new one, use Departments on the Team page.'
+                : 'New accounts join your own department.'
+            }
           >
+            {/* Existing departments only — creating one lives in
+                Team › Departments so the org's department list has a single
+                deliberate home rather than growing as a side effect of hiring. */}
             <DepartmentSelect
               value={form.department}
               departments={departments}
               onChange={(v) => set('department', v)}
+              allowCreate={false}
               disabled={!viewerIsFounder}
             />
           </Field>

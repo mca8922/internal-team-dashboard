@@ -6423,6 +6423,22 @@ body { font-size: 15px; }
   font-style: italic;
 }
 
+/* ---- Add-a-department row (Manage › Departments) ----
+   Sits above the list, separated from it so it reads as a create action rather
+   than another editable row. The input takes the slack; the button never
+   shrinks, and the pair stacks on a narrow screen. */
+.dept-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+.dept-add-row .input { flex: 1 1 180px; min-width: 0; }
+.dept-add-row .btn { flex: 0 0 auto; }
+
 /* ---- Department colour picker swatches (Manage › Departments) ---- */
 .dept-swatch {
   width: 20px;

@@ -370,10 +370,14 @@ export function ManageMemberModal({
         >
           <div className="flex items-center gap-2">
             <div style={{ flex: 1 }}>
+              {/* Pick from the existing departments only. New ones are created
+                  in Team › Departments, so the org's department list has one
+                  deliberate home instead of being extended mid-edit. */}
               <DepartmentSelect
                 value={department}
                 departments={departments}
                 onChange={setDepartment}
+                allowCreate={false}
                 disabled={structuralLocked || founderProtected}
               />
             </div>
