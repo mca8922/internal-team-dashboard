@@ -146,6 +146,35 @@ service role, so a shared cross-department task can still surface a name.
 must be set to the department they actually run — that field is now what
 grants their scope.
 
+### Direct reports to a Director (done)
+
+0058 answered "who can this Director *see*?" but not "who *answers* to them".
+Migration `0059_director_reports.sql` adds `profiles.director_id` — on a
+member's row it points at the Director they report to.
+
+- It is a **reporting record, not a permission**. Visibility is still
+  department-based, so 0059 changes no RLS policy: a Director could already
+  see everyone in their department, this only says which of them report to
+  them directly.
+- `director_id` and `manager_id` are **independent** — a person may report to
+  a Manager *and* straight to their Director at the same time. This is a
+  dotted-line org, not a strict tree, so nothing forces the two to agree
+  beyond both staying inside the one department.
+- Rules enforced by the (extended) `assert_hierarchy_consistent` trigger: the
+  target must be a real Director; both rows share the same non-blank
+  department; a Director never reports to another Director, a Founder to no
+  one, nobody to themselves. `canReportToDirector()` in `roles.ts` mirrors
+  these for the UI and is covered by `roles.test.ts`.
+- A second trigger, `release_director_reports`, detaches everyone pointing at
+  a Director the moment they are demoted or moved department, so no dangling
+  line survives. `updateMemberDepartment` clears both lines when a member
+  moves; promoting someone to Director clears their own upward links.
+- UI: **Founder-only** "Direct reports" panel on a Director in Manage member,
+  listing the department split into Managers and Staff. Team cards show a
+  "Reports to …" line naming both lines when present.
+- Server action: `setDirectorReports(directorId, memberIds)`, Founder-gated,
+  mirroring `setManagerTeam`.
+
 ## Phase 2 — Backlog (re-enable when ready)
 
 Flip the flag in `src/lib/featureFlags.ts` for whichever of these should

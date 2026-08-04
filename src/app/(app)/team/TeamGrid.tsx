@@ -36,6 +36,9 @@ export interface TeamMember {
   managedDepartment: string | null;
   managerId: string | null;
   managerResponsibilities: string | null;
+  // The Director this person reports to (migration 0059). Independent of
+  // managerId — a member may hold both lines at once.
+  directorId: string | null;
   status: 'in' | 'complete' | 'short' | 'not-started' | 'leave';
   todayMs: number;
   weeklyHours: number;
@@ -88,11 +91,16 @@ const TeamCard = React.memo(function TeamCard({
   onManage,
   boardColor,
   founder,
+  reportsTo,
 }: {
   u: TeamMember;
   onManage: (m: TeamMember) => void;
   boardColor?: string;
   founder?: boolean;
+  // Who this person answers to, already resolved to names. Both lines can be
+  // present at once (a Manager's team member who also reports straight to the
+  // Director), so this is a list, not a single value.
+  reportsTo?: string[];
 }) {
   const router = useRouter();
   // Live "in the app right now" — updates in real time as teammates open or
@@ -161,6 +169,12 @@ const TeamCard = React.memo(function TeamCard({
                 {u.isFounder ? 'Founder' : roleLabel(u.role)}
                 {' · '}
                 {u.jobTitle}
+              </div>
+            ) : null}
+            {reportsTo && reportsTo.length > 0 ? (
+              <div className="team-card-reports">
+                <Icon name="corner-down-right" size={11} />
+                <span>Reports to {reportsTo.join(' & ')}</span>
               </div>
             ) : null}
           </div>
@@ -255,6 +269,21 @@ export function TeamGrid({
 
   const active = React.useMemo(() => members.filter((u) => u.isActive), [members]);
   const former = React.useMemo(() => members.filter((u) => !u.isActive), [members]);
+
+  // Resolve each person's upward lines to names once, rather than scanning the
+  // roster inside every card. A member can hold both at the same time, so the
+  // Manager is listed first (the nearer line) and the Director second.
+  const reportsToNames = React.useMemo(() => {
+    const byId = new Map(members.map((m) => [m.id, m.name]));
+    const out = new Map<string, string[]>();
+    for (const u of members) {
+      const names = [u.managerId, u.directorId]
+        .map((id) => (id ? byId.get(id) : undefined))
+        .filter((n): n is string => !!n);
+      if (names.length) out.set(u.id, names);
+    }
+    return out;
+  }, [members]);
 
   // Distinct departments across the whole org (active + former), sorted — used
   // to populate the department dropdown in the member modals. Registered
@@ -533,6 +562,7 @@ export function TeamGrid({
                       key={u.id}
                       u={u}
                       onManage={setManaging}
+                      reportsTo={reportsToNames.get(u.id)}
                       boardColor={
                         u.role === 'board'
                           ? BOARD_COLORS[
@@ -572,7 +602,12 @@ export function TeamGrid({
           {showFormer && (
             <div className="grid grid-3 gap-4">
               {former.map((u) => (
-                <TeamCard key={u.id} u={u} onManage={setManaging} />
+                <TeamCard
+                  key={u.id}
+                  u={u}
+                  onManage={setManaging}
+                  reportsTo={reportsToNames.get(u.id)}
+                />
               ))}
             </div>
           )}

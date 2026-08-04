@@ -25,9 +25,10 @@ import {
   unsetManager,
   setManagerTeam,
   setManagerResponsibilities,
+  setDirectorReports,
 } from '@/lib/actions';
 import { RichTextEditor } from '@/components/RichTextEditor';
-import { roleLabel, weeklyTargetFromDaily } from '@/lib/roles';
+import { roleLabel, weeklyTargetFromDaily, canReportToDirector } from '@/lib/roles';
 import { MemberGoalsHandoff } from '@/components/MemberGoalsHandoff';
 import { addMonths, calcAge, fmtFriendly, parseDate } from '@/lib/dates';
 import { DepartmentSelect } from '@/components/DepartmentSelect';
@@ -73,6 +74,8 @@ export function ManageMemberModal({
   const [headDept, setHeadDept] = React.useState('');
   const [team, setTeam] = React.useState<string[]>([]);
   const [responsibilities, setResponsibilities] = React.useState('');
+  // Director controls — the people who report directly to this Director.
+  const [reports, setReports] = React.useState<string[]>([]);
 
   // Re-seed the form whenever a different member is opened.
   React.useEffect(() => {
@@ -91,6 +94,7 @@ export function ManageMemberModal({
       setHeadDept(member.managedDepartment || member.department);
       setTeam(allMembers.filter((m) => m.managerId === member.id).map((m) => m.id));
       setResponsibilities(member.managerResponsibilities || '');
+      setReports(allMembers.filter((m) => m.directorId === member.id).map((m) => m.id));
     }
   }, [member, allMembers]);
 
@@ -230,6 +234,23 @@ export function ManageMemberModal({
 
   const removeManager = () =>
     run(() => unsetManager(member!.id), 'Manager status removed');
+
+  // ---- Director controls ----
+  // Who may report to this Director: active, non-Founder members of the SAME
+  // department, excluding other Directors (a Director never reports to one) and
+  // the Director themselves. Split into Managers and Staff so the Founder can
+  // see the two tiers of the department at a glance rather than one long list.
+  const reportCandidates = member
+    ? allMembers.filter((m) => canReportToDirector(member, m))
+    : [];
+  const reportManagers = reportCandidates.filter((m) => m.isManager);
+  const reportStaff = reportCandidates.filter((m) => !m.isManager);
+
+  const toggleReport = (id: string) =>
+    setReports((r) => (r.includes(id) ? r.filter((x) => x !== id) : [...r, id]));
+
+  const saveReports = () =>
+    run(() => setDirectorReports(member!.id, reports), 'Direct reports updated');
 
   // For interns, the tenure end date follows from onboard date + months.
   const tenureEnd =
@@ -609,6 +630,105 @@ export function ManageMemberModal({
             ) : null}
           </Field>
         )}
+
+        {/* Director — the people who report directly to them. This records a
+            reporting line, not a permission: a Director can already see their
+            whole department (migration 0058), so nothing here widens their
+            reach. Founders only, since it shapes the hierarchy.
+            Someone may appear on a Manager's team AND here — the two lines are
+            independent by design. */}
+        {member.role === 'board' && !member.isFounder && member.isActive ? (
+          <div
+            style={{
+              borderTop: '1px solid var(--color-border)',
+              paddingTop: 16,
+              display: 'grid',
+              gap: 10,
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <Icon name="shield" size={15} />
+              <span
+                className="text-xs fw-medium text-grey"
+                style={{ textTransform: 'uppercase', letterSpacing: '0.06em' }}
+              >
+                Director
+              </span>
+              <span className="badge badge-green">{member.department}</span>
+            </div>
+
+            <Field
+              label="Direct reports"
+              hint={
+                structuralLocked
+                  ? 'Only a Founder can change who reports to a Director.'
+                  : `Who answers to ${member.name.split(' ')[0]} directly. Only ${member.department} members are shown — a report always shares their Director's department. Someone can be here and on a Manager's team at the same time.`
+              }
+            >
+              {reportCandidates.length === 0 ? (
+                <div className="text-xs text-grey">
+                  No other active members in {member.department} to assign yet.
+                </div>
+              ) : (
+                <div
+                  className="grid gap-2"
+                  style={{
+                    maxHeight: 240,
+                    overflow: 'auto',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 6,
+                    padding: 8,
+                  }}
+                >
+                  {[
+                    { label: 'Managers', people: reportManagers },
+                    { label: 'Staff', people: reportStaff },
+                  ]
+                    .filter((g) => g.people.length > 0)
+                    .map((g) => (
+                      <div key={g.label} className="grid gap-1">
+                        <div
+                          className="text-xs fw-medium text-grey"
+                          style={{ textTransform: 'uppercase', letterSpacing: '0.06em' }}
+                        >
+                          {g.label}
+                        </div>
+                        {g.people.map((m) => (
+                          <label
+                            key={m.id}
+                            className="flex items-center gap-2"
+                            style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: 4 }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={reports.includes(m.id)}
+                              disabled={structuralLocked}
+                              onChange={() => toggleReport(m.id)}
+                            />
+                            <Avatar name={m.name} size="sm" src={m.avatarUrl} />
+                            <span className="text-sm fw-medium">{m.name}</span>
+                            <span className="text-xs text-grey">
+                              · {m.isManager ? 'Manager' : roleLabel(m.role)}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </Field>
+            <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+              <Button
+                size="sm"
+                onClick={saveReports}
+                disabled={pending || structuralLocked || reportCandidates.length === 0}
+              >
+                Save direct reports
+              </Button>
+              <span className="text-xs text-grey">{reports.length} selected</span>
+            </div>
+          </div>
+        ) : null}
 
         {/* Department Manager (Head of Department) — appointing a Manager now
             happens via the Role field above (which sets is_manager + the

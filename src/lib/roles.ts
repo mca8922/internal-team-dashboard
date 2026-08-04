@@ -185,3 +185,31 @@ export function canRestructure(
   return isFounder(viewer);
 }
 
+// May `candidate` be made a direct report of `director`? Mirrors the rules the
+// assert_hierarchy_consistent() trigger enforces in migration 0059:
+//
+//   * the director must actually be a Director (board, not a Founder)
+//   * both sit in the SAME, non-blank department — a cross-department line
+//     would point out of the silo 0058 established
+//   * a Director never reports to another Director, a Founder to no one, and
+//     nobody to themselves
+//
+// Deliberately says nothing about manager_id: a member may report to a Manager
+// AND to their Director at once, so the two lines never exclude each other.
+export function canReportToDirector(
+  director: { id: string; role: UserRole; department?: string | null },
+  candidate: {
+    id: string;
+    role: UserRole;
+    department?: string | null;
+    isActive?: boolean;
+  },
+): boolean {
+  if (!isDirector(director)) return false;
+  if (candidate.id === director.id) return false;
+  if (isFounder(candidate)) return false;
+  if (candidate.role === 'board') return false;
+  if (candidate.isActive === false) return false;
+  return sameDepartment(director, candidate);
+}
+

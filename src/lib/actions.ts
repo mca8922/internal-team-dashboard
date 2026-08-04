@@ -1822,11 +1822,12 @@ export async function updateMemberDepartment(memberId: string, department: strin
   guardFounderTarget(memberId, userId, { allowSelf: true });
   const dept = department.trim();
   if (!dept) throw new Error('Pick a department.');
-  // The member is leaving their old manager's department, so the reporting
-  // link has to go with them — the DB trigger rejects a cross-department one.
+  // The member is leaving the department both of their reporting lines live
+  // in, so both have to go with them — the DB trigger rejects a
+  // cross-department manager_id or director_id.
   await supabase
     .from('profiles')
-    .update({ department: dept, manager_id: null })
+    .update({ department: dept, manager_id: null, director_id: null })
     .eq('id', memberId);
   revalidatePath('/team');
   revalidatePath('/dashboard');
@@ -1847,9 +1848,23 @@ export async function updateMemberRole(memberId: string, role: UserRole) {
   if (!['board', 'fte', 'pte', 'intern'].includes(role)) {
     throw new Error('Invalid role.');
   }
-  const patch: { role: UserRole; internship_months?: null } = { role };
+  const patch: {
+    role: UserRole;
+    internship_months?: null;
+    director_id?: null;
+    manager_id?: null;
+  } = { role };
   if (role !== 'intern') patch.internship_months = null;
-  await supabase.from('profiles').update(patch).eq('id', memberId);
+  // A Director reports to neither a Director nor a Manager, so promoting
+  // someone clears both of their upward lines. (Demoting a Director releases
+  // the people who reported to THEM — that side is handled by the
+  // release_director_reports trigger in 0059.)
+  if (role === 'board') {
+    patch.director_id = null;
+    patch.manager_id = null;
+  }
+  const { error } = await supabase.from('profiles').update(patch).eq('id', memberId);
+  if (error) throw new Error(error.message);
   revalidatePath('/team');
   revalidatePath('/dashboard');
   revalidatePath('/analytics');
@@ -2459,6 +2474,69 @@ export async function setManagerTeam(managerId: string, memberIds: string[]) {
     const { error: aErr } = await supabase
       .from('profiles')
       .update({ manager_id: managerId })
+      .in('id', wanted);
+    if (aErr) throw new Error(aErr.message);
+  }
+
+  revalidatePath('/team');
+  revalidatePath('/dashboard');
+}
+
+// Founder sets a Director's direct reports to exactly `memberIds` — the picked
+// members get director_id = the Director; anyone previously reporting to them
+// but not in the new set is detached.
+//
+// This records a REPORTING line, not a permission: the Director could already
+// see their whole department (migration 0058), so nothing here widens what
+// they can reach. Reports must live in the Director's own department, and a
+// member may hold this alongside a manager_id — the two lines are independent
+// by design (see 0059).
+export async function setDirectorReports(directorId: string, memberIds: string[]) {
+  const { supabase } = await requireFounder();
+
+  const { data: director } = await supabase
+    .from('profiles')
+    .select('id, role, department')
+    .eq('id', directorId)
+    .single();
+  const dept = director?.department?.trim() || '';
+  if (!director || director.role !== 'board' || isFounderId(director.id)) {
+    throw new Error('Direct reports can only be assigned to a Director.');
+  }
+  if (!dept) {
+    throw new Error('This Director has no department yet — set one before assigning reports.');
+  }
+
+  const wanted = Array.from(new Set(memberIds)).filter((id) => id !== directorId);
+
+  // Validate the whole picked set in one round-trip: same department, and
+  // never another Director or a Founder.
+  if (wanted.length) {
+    const { data: picks } = await supabase
+      .from('profiles')
+      .select('id, role, department')
+      .in('id', wanted);
+    for (const p of picks ?? []) {
+      if (isFounderId(p.id)) throw new Error('A Founder does not report to a Director.');
+      if (p.role === 'board') {
+        throw new Error('A Director does not report to another Director.');
+      }
+      if ((p.department?.trim() || '') !== dept) {
+        throw new Error('Direct reports must belong to the same department as their Director.');
+      }
+    }
+  }
+
+  // Detach the ones no longer picked, then attach the wanted set.
+  let detach = supabase.from('profiles').update({ director_id: null }).eq('director_id', directorId);
+  if (wanted.length) detach = detach.not('id', 'in', `(${wanted.join(',')})`);
+  const { error: dErr } = await detach;
+  if (dErr) throw new Error(dErr.message);
+
+  if (wanted.length) {
+    const { error: aErr } = await supabase
+      .from('profiles')
+      .update({ director_id: directorId })
       .in('id', wanted);
     if (aErr) throw new Error(aErr.message);
   }

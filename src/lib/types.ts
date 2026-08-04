@@ -40,6 +40,10 @@ export interface Profile {
   managed_department: string | null; // the department this person heads (managers only)
   manager_id: string | null; // on a team member's row: their Head's id
   manager_responsibilities: string | null; // Board-authored Role & Responsibilities (HTML), managers only
+  // The Director this person reports to (migration 0059). A reporting record,
+  // not a permission — visibility stays department-based. Independent of
+  // manager_id: a member may hold both links at once.
+  director_id: string | null;
 }
 
 // A Manager's request for the Board to change one field on a team member's
@@ -470,6 +474,7 @@ export interface Database {
           managed_department?: string | null;
           manager_id?: string | null;
           manager_responsibilities?: string | null;
+          director_id?: string | null;
         };
         Update: {
           name?: string;
@@ -492,6 +497,7 @@ export interface Database {
           managed_department?: string | null;
           manager_id?: string | null;
           manager_responsibilities?: string | null;
+          director_id?: string | null;
         };
       };
       punches: {

@@ -8,7 +8,7 @@ export type IconName =
   | 'calendar' | 'flag' | 'trash' | 'eye' | 'eye-off' | 'search' | 'fire' | 'sparkles' | 'lock'
   | 'mail' | 'user' | 'grip' | 'building' | 'bolt' | 'arrow-right' | 'arrow-left' | 'archive'
   | 'monitor' | 'help-circle' | 'bot' | 'refresh' | 'copy' | 'more-vertical'
-  | 'crown' | 'shield' | 'inbox'
+  | 'crown' | 'shield' | 'inbox' | 'corner-down-right'
   | 'star' | 'star-filled' | 'list' | 'layers' | 'network'
   | 'lightbulb' | 'thumbs-up' | 'thumbs-down' | 'maximize' | 'minimize';
 
@@ -80,6 +80,7 @@ export function Icon({ name, size = 16, stroke = 1.6, style }: IconProps) {
     case 'more-vertical': return <svg {...props}><circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" /></svg>;
     case 'crown': return <svg {...props}><path d="M2 18h20" /><path d="M3 7l5 5 4-7 4 7 5-5-2 11H5L3 7z" /></svg>;
     case 'shield': return <svg {...props}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>;
+    case 'corner-down-right': return <svg {...props}><path d="M15 10l5 5-5 5" /><path d="M4 4v7a4 4 0 0 0 4 4h12" /></svg>;
     case 'inbox': return <svg {...props}><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>;
     case 'star': return <svg {...props}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>;
     case 'star-filled': return <svg {...props}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="currentColor" /></svg>;

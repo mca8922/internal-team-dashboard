@@ -11,6 +11,7 @@ import {
   canViewMember,
   canManageMember,
   canRestructure,
+  canReportToDirector,
 } from './roles';
 import type { UserRole } from './types';
 
@@ -122,6 +123,50 @@ describe('canManageMember', () => {
   it('gives an unassigned account no reach over another unassigned one', () => {
     const otherUnassigned = person('u-2', 'board', '');
     expect(canManageMember(otherUnassigned, unassigned)).toBe(false);
+  });
+});
+
+describe('canReportToDirector', () => {
+  it('accepts a same-department manager or staff member', () => {
+    expect(canReportToDirector(auditDirector, auditManager)).toBe(true);
+    expect(canReportToDirector(auditDirector, auditStaff)).toBe(true);
+  });
+
+  it('rejects anyone outside the Director’s department', () => {
+    expect(canReportToDirector(auditDirector, taxStaff)).toBe(false);
+    expect(canReportToDirector(auditDirector, unassigned)).toBe(false);
+  });
+
+  it('never lets a Director report to another Director', () => {
+    // Both sit in Audit, so only the role rule can reject this.
+    expect(canReportToDirector(auditDirector, taxDirector)).toBe(false);
+    const auditDirector2 = person('d-audit-2', 'board', 'Audit');
+    expect(canReportToDirector(auditDirector, auditDirector2)).toBe(false);
+  });
+
+  it('rejects self-assignment and Founders', () => {
+    expect(canReportToDirector(auditDirector, auditDirector)).toBe(false);
+    expect(canReportToDirector(auditDirector, { ...founder, department: 'Audit' })).toBe(false);
+  });
+
+  it('requires the assigner to actually be a Director', () => {
+    expect(canReportToDirector(auditManager, auditStaff)).toBe(false);
+    // A Founder is board-level but belongs to no department, so they hold no
+    // reports of their own — they assign other people's.
+    expect(canReportToDirector(founder, auditStaff)).toBe(false);
+  });
+
+  it('skips inactive members', () => {
+    expect(
+      canReportToDirector(auditDirector, { ...auditStaff, isActive: false }),
+    ).toBe(false);
+  });
+
+  it('is independent of manager_id — both lines may be held at once', () => {
+    // auditStaff already reports to auditManager; that must not block the
+    // direct line to the Director.
+    expect(auditStaff.manager_id).toBe('m-audit');
+    expect(canReportToDirector(auditDirector, auditStaff)).toBe(true);
   });
 });
 

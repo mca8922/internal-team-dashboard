@@ -143,6 +143,7 @@ export default async function TeamPage() {
       managedDepartment: u.managed_department,
       managerId: u.manager_id,
       managerResponsibilities: u.manager_responsibilities,
+      directorId: u.director_id,
       status,
       todayMs,
       weeklyHours: durationHours(weeklyMs),

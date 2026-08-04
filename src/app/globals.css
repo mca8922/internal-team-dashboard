@@ -6423,6 +6423,26 @@ body { font-size: 15px; }
   font-style: italic;
 }
 
+/* Who a member answers to, on their team card. Both a Manager and a Director
+   can appear here at once — the two reporting lines are independent. */
+.team-card-reports {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--color-grey-text);
+  min-width: 0;
+}
+.team-card-reports span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-card-reports svg {
+  flex-shrink: 0;
+}
+
 /* ---- Add-a-department row (Manage › Departments) ----
    Sits above the list, separated from it so it reads as a create action rather
    than another editable row. The input takes the slack; the button never
