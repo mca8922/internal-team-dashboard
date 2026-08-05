@@ -1014,6 +1014,116 @@ p { margin: 0; }
 .badge-violet { background: var(--color-violet-bg); color: var(--color-violet); }
 .badge-black { background: var(--color-black); color: #fff; }
 
+/* ===== Department chips (multi-department members, migration 0060) =====
+   One pattern for every surface that lists the departments a person belongs
+   to — the team card, Manage member, Create account and the member profile —
+   so a department reads the same wherever it appears.
+
+   Chips never truncate to a fixed width: the row wraps instead, because
+   "+Aud…" is worse than a second line. They cap at the container width so a
+   very long department name still can't push a card wider. */
+.dept-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 1px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-grey-text);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The "+" that marks an ADDITIONAL department. It's a connector, not part of
+   the name, so it gets its own breathing room and a lighter weight — "+ Audit"
+   reads as a department, "+Audit" reads as one odd word. The gap lives here
+   rather than in the text so JSX whitespace can never collapse it away. */
+.dept-chip-plus {
+  margin-right: -3px;
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+/* The primary/home department — the one scope is drawn on, so it carries the
+   accent while the additional ones stay quiet outlines. */
+.dept-chip--primary {
+  border-color: transparent;
+  background: var(--color-green-light);
+  color: var(--color-green-primary);
+}
+
+/* A wrapping row of chips. Used wherever more than one can appear, so a member
+   in five departments spills onto a second line instead of overflowing. */
+.dept-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* Scrolling checkbox list of departments / people (Multi department, Create
+   account, Direct reports). Fixed max height so a long roster never pushes the
+   modal's own actions off screen; the rows themselves stay comfortable. */
+.dept-pick-list {
+  display: grid;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 6px;
+  background: var(--color-bg);
+}
+.dept-pick-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  min-width: 0;
+}
+.dept-pick-row:hover { background: var(--color-card); }
+.dept-pick-row input[type='checkbox'] { flex-shrink: 0; }
+/* The name takes the slack and truncates; the trailing role/department chips
+   keep their size so they never get squeezed to nothing. */
+.dept-pick-row .dept-pick-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dept-pick-row .dept-pick-meta { flex-shrink: 0; }
+/* A chip sitting INSIDE a pick list would otherwise be the same colour as the
+   list's own background and read as a flat outline — lift it onto the card
+   surface so it still looks like a chip. */
+.dept-pick-list .dept-chip { background: var(--color-card); }
+
+/* Chip summary + its Save button. The button trails the chips on a wide modal
+   and drops to a full-width row of its own once there isn't room, rather than
+   being squeezed against them. */
+.dept-chip-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.dept-chip-summary .dept-chip-row { flex: 1 1 200px; }
+.dept-chip-summary .btn { flex-shrink: 0; margin-left: auto; }
+@media (max-width: 520px) {
+  .dept-chip-summary .btn { margin-left: 0; width: 100%; }
+}
+
 /* Age pill next to a Date of birth field — big number, small caps caption. */
 .age-badge {
   display: inline-flex;
@@ -6161,14 +6271,24 @@ body { font-size: 15px; }
 }
 /* Department shown as clean coloured text (no heavy pill), truncated so long
    names never wrap or break the card. */
+/* The department line under a member's name. It carries the primary department
+   plus, since 0060, a chip per ADDITIONAL one — so it wraps rather than
+   squeezing them: every department a person belongs to has to stay readable,
+   however many there are and however narrow the card gets.
+
+   `align-items: center` (not baseline) because a bordered chip and plain text
+   sit on different baselines and the chip would ride low against the name. */
 .team-card-dept {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
   min-width: 0;
 }
 .team-card-dept .dept-name-text {
   color: var(--dept);
   font-weight: 600;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -21,7 +21,13 @@ export interface Profile {
   email: string;
   commute_email: string | null;
   role: UserRole;
+  // Primary / home department. This is the one the SECURITY boundary is drawn
+  // on (migration 0058) and the one every grouping, analytics and reporting
+  // read still uses. Always equals departments[0].
   department: string;
+  // Every department this person belongs to (migration 0060), primary first.
+  // A LABEL, not a permission — an extra department widens nobody's reach.
+  departments: string[];
   joined_date: string;
   date_of_birth: string | null;
   confirmed_by_board: boolean;
@@ -460,6 +466,7 @@ export interface Database {
           email: string;
           role?: UserRole;
           department?: string;
+          departments?: string[];
           joined_date?: string;
           date_of_birth?: string | null;
           confirmed_by_board?: boolean;
@@ -483,6 +490,7 @@ export interface Database {
           transactional_emails_enabled?: boolean;
           role?: UserRole;
           department?: string;
+          departments?: string[];
           joined_date?: string;
           date_of_birth?: string | null;
           confirmed_by_board?: boolean;
