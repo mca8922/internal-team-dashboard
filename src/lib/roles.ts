@@ -109,17 +109,21 @@ export function isFounder(profile: { id: string } | null | undefined): boolean {
   return (FOUNDER_USER_IDS as readonly string[]).includes(profile.id);
 }
 
-// ── Department scope ────────────────────────────────────────────────────────
-// The department is the security boundary above the manager line (migration
-// 0058). A Director is board-level scoped to exactly ONE department: the value
-// in their own `department` field. Several Directors may share a department; a
-// Director never spans two. A department with no Director is covered by the
-// Founders alone.
+// ── Director scope ──────────────────────────────────────────────────────────
+// A Director's scope is the people the Founder ASSIGNED to them — the members
+// carrying their id in `director_id` (migration 0061). It is not their
+// department: two Directors may share one and hold entirely different teams,
+// and a Director with no assignments sees only themselves.
+//
+// The department did not stop mattering, it changed job. It now decides who is
+// ELIGIBLE to be assigned (canReportToDirector below), reading the member's
+// whole `departments` list, so someone can be handed to a Director outside
+// their primary department without being moved out of it.
 //
 // The Founders sit under NO department — their `department` is the empty
 // string and their reach comes from isFounder(), not from a department. Blank
 // therefore has to mean "matches nothing", or every unassigned account would
-// silently see every other unassigned one.
+// silently be eligible to every other unassigned one.
 
 // The sentinel stored in `profiles.department` for someone under no
 // department. The column is NOT NULL, so "none" is the empty string.
@@ -143,6 +147,48 @@ export function isDirector(
   return profile.role === 'board' && !isFounder(profile);
 }
 
+// ── Multi-department membership (migration 0060) ────────────────────────────
+// A member may be LISTED under several departments. `department` stays the
+// primary/home one and `departments` holds the full list with the primary
+// first.
+//
+// The list is still not an access grant on its own: canViewMember /
+// canManageMember below never read it. What it decides (since 0061) is
+// ELIGIBILITY — putting "Audit" on someone whose primary is "GST" makes them
+// assignable to an Audit Director in canReportToDirector(). Nobody sees them
+// until the Founder actually makes that assignment.
+
+// Every department a person is listed under, primary first, normalised
+// (trimmed, de-duplicated, blanks dropped). Falls back to the primary alone
+// for rows written before 0060.
+export function departmentsOf(
+  profile: { department?: string | null; departments?: string[] | null } | null | undefined,
+): string[] {
+  const primary = departmentOf(profile);
+  const rest = (profile?.departments ?? []).map((d) => d?.trim()).filter((d): d is string => !!d);
+  return Array.from(new Set([...(primary ? [primary] : []), ...rest]));
+}
+
+// The departments BESIDE the primary — what the "Multi department" section in
+// Manage member edits, and what the Team card shows as extra chips.
+export function extraDepartmentsOf(
+  profile: { department?: string | null; departments?: string[] | null } | null | undefined,
+): string[] {
+  const primary = departmentOf(profile);
+  return departmentsOf(profile).filter((d) => d !== primary);
+}
+
+// Is this person listed under `dept` at all — primary or additional? For
+// grouping and filtering only; never for an access decision (use
+// canViewMember/canManageMember, which are primary-only by design).
+export function belongsToDepartment(
+  profile: { department?: string | null; departments?: string[] | null } | null | undefined,
+  dept: string,
+): boolean {
+  const d = dept.trim();
+  return d !== '' && departmentsOf(profile).includes(d);
+}
+
 // True when both people sit in the same, non-blank department.
 export function sameDepartment(
   a: { department?: string | null } | null | undefined,
@@ -152,28 +198,33 @@ export function sameDepartment(
   return da != null && da === departmentOf(b);
 }
 
-// May `viewer` see `target` at all? Mirrors can_view_user() in migration 0058 —
+// May `viewer` see `target` at all? Mirrors can_view_user() in migration 0061 —
 // RLS is the real enforcement, this is for UI gating.
+//
+// A Director's scope is the people ASSIGNED to them (director_id), NOT their
+// department — 0061 replaced 0058's department arm. Deliberately not transitive:
+// directing a Manager does not hand over that Manager's team, which is assigned
+// separately if it should be visible.
 export function canViewMember(
   viewer: { id: string; role: UserRole; department?: string | null; is_manager?: boolean | null },
-  target: { id: string; department?: string | null; manager_id?: string | null },
+  target: { id: string; manager_id?: string | null; director_id?: string | null },
 ): boolean {
   if (isFounder(viewer)) return true;
   if (viewer.id === target.id) return true;
-  if (isDirector(viewer) && sameDepartment(viewer, target)) return true;
+  if (isDirector(viewer) && target.director_id === viewer.id) return true;
   return isManager(viewer) && target.manager_id === viewer.id;
 }
 
 // May `viewer` EDIT `target`'s profile? Narrower than canViewMember: Managers
 // get no write power (they raise change requests), and a Founder row is frozen
-// against everyone but its own owner. Mirrors can_manage_user() in 0058.
+// against everyone but its own owner. Mirrors can_manage_user() in 0061.
 export function canManageMember(
   viewer: { id: string; role: UserRole; department?: string | null },
-  target: { id: string; department?: string | null },
+  target: { id: string; director_id?: string | null },
 ): boolean {
   if (isFounder(target)) return viewer.id === target.id;
   if (isFounder(viewer)) return true;
-  return isDirector(viewer) && sameDepartment(viewer, target);
+  return isDirector(viewer) && target.director_id === viewer.id;
 }
 
 // Structural changes — who is a Director, who heads which department, who
@@ -186,13 +237,18 @@ export function canRestructure(
 }
 
 // May `candidate` be made a direct report of `director`? Mirrors the rules the
-// assert_hierarchy_consistent() trigger enforces in migration 0059:
+// assert_hierarchy_consistent() trigger enforces, as amended by migration 0061:
 //
 //   * the director must actually be a Director (board, not a Founder)
-//   * both sit in the SAME, non-blank department — a cross-department line
-//     would point out of the silo 0058 established
+//   * the candidate must BELONG TO the Director's department — primary or
+//     additional (0060). This is the one place the multi-department list
+//     changes an outcome: it is what lets a GST person be assigned to an Audit
+//     Director without leaving GST.
 //   * a Director never reports to another Director, a Founder to no one, and
 //     nobody to themselves
+//
+// Since 0061 this is also the ACCESS decision, not just a reporting record —
+// assigning someone is what makes them visible to that Director.
 //
 // Deliberately says nothing about manager_id: a member may report to a Manager
 // AND to their Director at once, so the two lines never exclude each other.
@@ -202,6 +258,7 @@ export function canReportToDirector(
     id: string;
     role: UserRole;
     department?: string | null;
+    departments?: string[] | null;
     isActive?: boolean;
   },
 ): boolean {
@@ -210,6 +267,7 @@ export function canReportToDirector(
   if (isFounder(candidate)) return false;
   if (candidate.role === 'board') return false;
   if (candidate.isActive === false) return false;
-  return sameDepartment(director, candidate);
+  const dept = departmentOf(director);
+  return dept != null && belongsToDepartment(candidate, dept);
 }
 

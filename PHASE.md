@@ -175,6 +175,104 @@ member's row it points at the Director they report to.
 - Server action: `setDirectorReports(directorId, memberIds)`, Founder-gated,
   mirroring `setManagerTeam`.
 
+### Multi-department members (done)
+
+A person belonged to exactly one department. Migration `0060_member_departments.sql`
+adds `profiles.departments text[]`, mirroring what 0038 did for goals:
+`profiles.department` stays the **primary / home** department and the array
+holds every department they are listed under, primary always element 0.
+
+- It is a **label, not a permission**. 0058's boundary is untouched: no RLS
+  policy, no `can_view_user()` / `can_manage_user()`, no
+  `assert_hierarchy_consistent()` rule reads the array. A Tax Director does not
+  gain sight of someone whose primary is Audit because "Tax" appears in their
+  list, and the member gains nothing either. `canViewMember()` /
+  `canManageMember()` in `roles.ts` deliberately stay primary-only, pinned by
+  tests in `roles.test.ts`.
+- **Directors and Managers can be listed under several departments too**, but
+  the one they direct/head is still their primary — that is where their scope
+  comes from, so 0058's "a Director never spans two" holds for *access*.
+- A DB trigger `sync_member_departments` keeps the invariant: `departments[0]`
+  is always `department`, no blanks, no duplicates. Every pre-0060 writer of
+  `profiles.department` (`updateMemberDepartment`, `renameDepartment`,
+  `setMemberAsManager`, account creation) therefore stays correct untouched.
+  When `department` alone moves, the old primary is **dropped**, not demoted to
+  an extra. The trigger also refuses a non-Founder write to the array, mirroring
+  the action.
+- Server action: `setMemberDepartments(memberId, extraDepartments)`,
+  Founder-gated. It edits the extras only — the primary comes from
+  `updateMemberDepartment`. Extras must already exist as departments (created in
+  Team › Departments); the Founders themselves are rejected outright, since they
+  sit under no department.
+- `createTeamMember()` takes an optional `extraDepartments`, validated (and
+  rejected for a non-Founder caller) *before* the auth user is created, so a bad
+  list can't leave a half-configured account behind. The auth trigger only knows
+  the primary, so the array is written in the same post-create patch.
+- `renameDepartment` now rewrites the name inside members' arrays as well as
+  goals'; `deleteDepartment` counts anyone listed under it, primary *or*
+  additional, so a stale label can't survive a delete.
+- UI: a Founder-only **"Multi department"** section in Manage member, below
+  Department, and the same picker in Create account (hidden for a Director,
+  who hires into their own department and nowhere else). Team cards keep their
+  card in the **primary** department's block (duplicating a person per
+  department would double-count every headcount) with the others as `+Name`
+  chips; the member's profile page shows an "Also in …" line. The Team
+  department filter matches primary *or* extras.
+
+### A Director's scope is the staff assigned to them (done)
+
+0058 gave a Director their whole department automatically; 0059 added
+`director_id` as a *reporting record only*, because department membership had
+already granted everything. Migration `0061_director_assigned_scope.sql`
+inverts that — the Founder assigns staff to a Director, and **those
+assignments are the Director's scope**:
+
+```
+Founder (no department, sees everything, assigns everything)
+  └── Director        — role='board'
+        └── exactly the people with director_id = that Director
+```
+
+- A Director no longer sees their department by default. They see themselves
+  plus the people the Founder handed them. Two Directors may share a department
+  and hold completely different teams; a Director with no assignments sees only
+  themselves.
+- **Deliberately not transitive**: a Director does not inherit sight of the
+  staff under a Manager assigned to them. Those people are assigned
+  individually or not at all — so a Manager can legitimately see someone their
+  own Director cannot. Pinned by `roles.test.ts`.
+- The department did not stop mattering, it changed job: it now decides
+  **eligibility**, reading the member's whole `departments` list (0060). Putting
+  "Audit" on someone whose primary is "GST" makes them assignable to an Audit
+  Director without moving them out of GST — and grants nothing until the
+  assignment is actually made. This is the one place multi-department changes an
+  outcome.
+- SQL: new `directs_user()`; `can_view_user()` / `can_manage_user()` swap their
+  department arm for it, as do the `logs` / `leaves` read and `leaves` review
+  policies. `punches`, `profiles` and `change_requests` follow automatically via
+  the two predicates. TS mirrors are `canViewMember()` / `canManageMember()` —
+  both now read `director_id`, not `department`.
+- `assert_hierarchy_consistent` checks the candidate's whole `departments` list,
+  and `departments` joined its column list so *removing* the department a
+  reporting line rests on raises rather than silently severing it.
+  `release_director_reports` now keeps the reports who also belong to a moving
+  Director's new department instead of dropping all of them.
+- `requireMemberScope()` in `actions.ts` moved from a department comparison to
+  `director_id`. `setDirectorReports()` validates eligibility with
+  `belongsToDepartment()`. `createTeamMember()` auto-assigns a hire to the
+  **Director who created them** — otherwise a Director would fill in the form
+  and immediately lose sight of the account.
+- UI: the "Direct reports" panel is now a permission screen, not an org chart —
+  its hint says so, candidates from another primary department carry a
+  department badge, and an empty selection warns that the Director will see only
+  themselves. The Team page subtitle reads "Assigned to you" rather than naming
+  a department the counts no longer describe.
+
+**Operational**: the migration backfills only members with **no** director yet,
+handing them to their primary department's sole Director. It never overwrites an
+existing assignment. Departments with no Director (currently *General*) keep
+nobody assigned — those members are visible to the Founders alone.
+
 ## Phase 2 — Backlog (re-enable when ready)
 
 Flip the flag in `src/lib/featureFlags.ts` for whichever of these should

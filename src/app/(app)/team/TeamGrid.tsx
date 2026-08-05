@@ -6,7 +6,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { Avatar, Button } from '@/components/ui';
 import { Icon } from '@/components/Icon';
-import { roleLabel, weeklyTargetFromDaily } from '@/lib/roles';
+import { roleLabel, weeklyTargetFromDaily, extraDepartmentsOf, belongsToDepartment } from '@/lib/roles';
 import { usePresence } from '@/components/Presence';
 import { durationMs, fmtRelative, parseDate } from '@/lib/dates';
 import { CreateMemberModal } from './CreateMemberModal';
@@ -20,7 +20,12 @@ export interface TeamMember {
   email: string;
   commuteEmail: string | null;
   role: UserRole;
+  // The primary/home department — what the grid groups on and what scope is
+  // drawn from (migration 0058).
   department: string;
+  // Every department they are listed under, primary first (migration 0060).
+  // A label: the extras group and filter them, they grant nothing.
+  departments: string[];
   deptColor: string | null;
   avatarUrl: string | null;
   isActive: boolean;
@@ -106,6 +111,7 @@ const TeamCard = React.memo(function TeamCard({
   // Live "in the app right now" — updates in real time as teammates open or
   // close the dashboard, independent of whether they have punched in.
   const online = usePresence().has(u.id);
+  const extraDepts = extraDepartmentsOf(u);
   const cardColor = founder ? FOUNDER_COLOR : boardColor;
   const accent = cardColor || u.deptColor || 'var(--color-green-primary)';
   const open = () => router.push('/team/' + u.id);
@@ -155,10 +161,26 @@ const TeamCard = React.memo(function TeamCard({
             </div>
             <div className="text-xs mt-1 team-card-dept">
               <span className="dept-name-text">{u.department}</span>
+              {/* Extra departments (migration 0060). The card stays in its
+                  PRIMARY department's block — showing the same person once per
+                  department would double-count every headcount on the page —
+                  so the other ones ride along here as chips. */}
+              {extraDepts.map((d) => (
+                <span
+                  key={d}
+                  className="dept-chip"
+                  title={`Also in ${d} — grouping only, access follows ${u.department}`}
+                >
+                  <span className="dept-chip-plus">+</span>
+                  {d}
+                </span>
+              ))}
               {/* The role is repeated in the job-title line below, so only show
-                  it here as a fallback when the member has no job title. */}
+                  it here as a fallback when the member has no job title. The
+                  separator is part of this span because the row is a wrapping
+                  flex — a bare " · " text node would strand itself. */}
               {!u.jobTitle ? (
-                <span className="text-grey"> · {roleLabel(u.role)}</span>
+                <span className="text-grey">· {roleLabel(u.role)}</span>
               ) : null}
             </div>
             {u.jobTitle ? (
@@ -293,7 +315,12 @@ export function TeamGrid({
   const departmentList = React.useMemo(
     () =>
       Array.from(
-        new Set([...members.map((u) => u.department), ...Object.keys(deptColors)].filter(Boolean)),
+        new Set(
+          [
+            ...members.flatMap((u) => u.departments ?? [u.department]),
+            ...Object.keys(deptColors),
+          ].filter(Boolean),
+        ),
       ).sort((a, b) => a.localeCompare(b)),
     [members, deptColors],
   );
@@ -311,14 +338,24 @@ export function TeamGrid({
       .sort((a, b) => a.localeCompare(b))
       .map((name) => ({
         name,
-        memberCount: members.filter((u) => u.department === name).length,
+        // Counts everyone LISTED under it, primary or additional — the same
+        // rule deleteDepartment() enforces, so the number shown here is the
+        // number that will block a delete.
+        memberCount: members.filter((u) => belongsToDepartment(u, name)).length,
         goalCount: goalDeptCounts[name] ?? 0,
         color: deptColors[name] ?? null,
       }));
   }, [departmentList, members, goalDeptCounts, deptColors]);
 
+  // Every department someone active is listed under — extras included, so
+  // filtering by a department a person only works ACROSS still finds them.
   const deps = React.useMemo(
-    () => ['all', ...Array.from(new Set(active.map((u) => u.department)))],
+    () => [
+      'all',
+      ...Array.from(new Set(active.flatMap((u) => u.departments ?? [u.department]))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    ],
     [active],
   );
   const punchedIn = React.useMemo(
@@ -331,7 +368,10 @@ export function TeamGrid({
   const filtered = React.useMemo(() => {
     const matches = (u: TeamMember) => {
       if (filter !== 'all' && u.role !== filter) return false;
-      if (dept !== 'all' && u.department !== dept) return false;
+      // Matches a primary OR an additional department (0060) — a member who
+      // works across two shows up under either filter. They still render in
+      // their primary department's block below.
+      if (dept !== 'all' && !belongsToDepartment(u, dept)) return false;
       if (search && !u.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     };
@@ -390,9 +430,11 @@ export function TeamGrid({
         <div>
           <h1 className="page-title">Team</h1>
           <div className="page-subtitle">
-            {/* A Director's scope is one department, so say which — the counts
-                below are their department's, not the whole company's. */}
-            {viewerIsFounder ? null : `${viewerDepartment} · `}
+            {/* A Director's scope is the people assigned to them (migration
+                0061), not their whole department — so the counts below are
+                their assigned team's, and the label says so rather than naming
+                a department the numbers no longer describe. */}
+            {viewerIsFounder ? null : 'Assigned to you · '}
             {active.length} active · {punchedIn} punched in today
             {former.length > 0 ? ` · ${former.length} former` : ''}
           </div>

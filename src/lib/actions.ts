@@ -13,7 +13,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { fmtDate, fmtFriendly, fmtDateDMY, parseDate, istDayStartMs } from '@/lib/dates';
 import { milestoneForToday, milestonePings, type Milestone, type MilestoneKind } from '@/lib/milestones';
 import { STALE_PUNCH_HOURS } from '@/lib/queries';
-import { FOUNDER_USER_IDS } from '@/lib/roles';
+import { FOUNDER_USER_IDS, belongsToDepartment } from '@/lib/roles';
 import { sendPush } from '@/lib/push';
 import { notifyByEmail } from '@/lib/notify-email';
 import { sendMail } from '@/lib/mailer';
@@ -98,9 +98,9 @@ function guardFounderTarget(
 }
 
 // Board-level guard for an action that TARGETS one member. On top of the
-// Founder freeze this enforces the department silo (migration 0058): a
-// Director may only touch people inside their OWN department, while a Founder
-// — who belongs to no department — reaches everyone.
+// Founder freeze this enforces a Director's scope (migration 0061): a Director
+// may only touch the people ASSIGNED to them, while a Founder — who belongs to
+// no department and directs no one — reaches everyone.
 //
 // RLS already blocks the write, but failing here gives the Director a real
 // error instead of a silent zero-row update.
@@ -111,16 +111,11 @@ async function requireMemberScope(memberId: string, opts: { allowSelf?: boolean 
 
   const { data } = await supabase
     .from('profiles')
-    .select('id, department')
-    .in('id', [userId, memberId]);
-  const dept = (id: string) =>
-    (data ?? []).find((r) => r.id === id)?.department?.trim() || '';
-  const mine = dept(userId);
-  const theirs = dept(memberId);
-  // A blank department matches nothing — two unassigned accounts are not
-  // department peers, they are simply both unscoped.
-  if (!mine || mine !== theirs) {
-    throw new Error('You can only manage members of your own department.');
+    .select('id, director_id')
+    .eq('id', memberId)
+    .maybeSingle();
+  if (!data || data.director_id !== userId) {
+    throw new Error('You can only manage the members assigned to you.');
   }
   return { supabase, userId };
 }
@@ -1711,14 +1706,27 @@ export async function createTeamMember(input: {
   password: string;
   role: 'board' | 'fte' | 'pte' | 'intern';
   department: string;
+  // Departments BESIDE the primary one (migration 0060) — a grouping label,
+  // never a grant. Founder-only, matching setMemberDepartments().
+  extraDepartments?: string[];
   internshipMonths?: number | null;
 }): Promise<{ error?: string }> {
   // A Director may only hire INTO their own department, and may not mint
   // another Director — that's a structural change, Founders only (0058).
   let department = input.department.trim();
+  // callerDepartment() returns null precisely for a Founder — they belong to
+  // no department, which is also what makes them the unscoped one.
+  let callerIsFounder = false;
+  // A Director's scope is the people assigned to them (0061), so a Director who
+  // creates an account must be assigned the new hire in the same breath —
+  // otherwise they'd finish the form and immediately lose sight of it.
+  let assignToDirector: string | null = null;
+  const { userId: creatorId } = await requireBoard();
   try {
     const mine = await callerDepartment();
+    callerIsFounder = mine == null;
     if (mine != null) {
+      assignToDirector = creatorId;
       if (input.role === 'board') {
         return { error: 'Only a Founder can create a Director.' };
       }
@@ -1731,6 +1739,24 @@ export async function createTeamMember(input: {
     return { error: (e as Error).message };
   }
   if (!department) return { error: 'Pick a department.' };
+
+  // Resolve the extras up front: a bad list should fail BEFORE the auth user
+  // exists, not leave a half-configured account behind.
+  const extras = Array.from(
+    new Set((input.extraDepartments ?? []).map((d) => d.trim()).filter(Boolean)),
+  ).filter((d) => d !== department);
+  if (extras.length) {
+    if (!callerIsFounder) {
+      return { error: 'Only a Founder can put a member in more than one department.' };
+    }
+    const known = await knownDepartments();
+    const unknown = extras.filter((d) => !known.has(d));
+    if (unknown.length) {
+      return {
+        error: `Unknown department${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')}. Create it in Team › Departments first.`,
+      };
+    }
+  }
 
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
@@ -1763,6 +1789,8 @@ export async function createTeamMember(input: {
     confirmed_by_board: boolean;
     joined_date: string;
     internship_months?: number | null;
+    departments?: string[];
+    director_id?: string;
   } = {
     confirmed_by_board: true,
     joined_date: fmtDate(new Date()),
@@ -1770,6 +1798,14 @@ export async function createTeamMember(input: {
   if (input.role === 'intern' && input.internshipMonths) {
     patch.internship_months = input.internshipMonths;
   }
+  // Founders assign reports deliberately, from Manage member, so only a
+  // Director's own hires are auto-assigned.
+  if (assignToDirector) patch.director_id = assignToDirector;
+  // The auth trigger only knows the primary department, so the extras are
+  // applied here. This runs on the admin client, which the sync trigger's
+  // Founder check lets through as trusted server-side code — the check that
+  // matters already happened above.
+  if (extras.length) patch.departments = [department, ...extras];
   await admin.from('profiles').update(patch).eq('id', newUserId);
 
   // No emails are sent at creation: the address entered above is only a login
@@ -1829,6 +1865,80 @@ export async function updateMemberDepartment(memberId: string, department: strin
     .from('profiles')
     .update({ department: dept, manager_id: null, director_id: null })
     .eq('id', memberId);
+  revalidatePath('/team');
+  revalidatePath('/dashboard');
+}
+
+// The set of department names the org actually knows about — the registered
+// rows in `departments` plus any name still carried by a profile (some predate
+// that table). Used to stop a department being invented outside its one
+// deliberate home, Team › Departments.
+async function knownDepartments(): Promise<Set<string>> {
+  const { supabase } = await requireUser();
+  const [{ data: registered }, { data: inUse }] = await Promise.all([
+    supabase.from('departments').select('name'),
+    supabase.from('profiles').select('department'),
+  ]);
+  return new Set(
+    [
+      ...(registered ?? []).map((d) => d.name),
+      ...(inUse ?? []).map((p) => p.department),
+    ]
+      .map((n) => (n ?? '').trim())
+      .filter(Boolean),
+  );
+}
+
+// Founder sets the ADDITIONAL departments a member belongs to (migration 0060).
+// The member's primary/home department is untouched — it comes from
+// updateMemberDepartment above and stays element 0 of the stored array.
+//
+// These extras are a LABEL: they group the member for reporting and show as
+// chips on their card. They grant nothing. Access is still drawn on the primary
+// department alone (0058), so listing someone under a second department does
+// not expose them to that department's Director, nor widen what they can see.
+// Founder-only, like every other structural edit.
+export async function setMemberDepartments(memberId: string, extraDepartments: string[]) {
+  const { supabase } = await requireFounder();
+  // The Founders sit under NO department by design (0058) — giving them one
+  // here, even as a label, would contradict the whole scope model.
+  if (isFounderId(memberId)) {
+    throw new Error('The Founder account belongs to no department.');
+  }
+
+  const { data: member } = await supabase
+    .from('profiles')
+    .select('id, department')
+    .eq('id', memberId)
+    .single();
+  const primary = member?.department?.trim() || '';
+  if (!member) throw new Error('Member not found.');
+  if (!primary) {
+    throw new Error('Set this member’s department first — extras sit alongside a primary one.');
+  }
+
+  // Normalise: trimmed, de-duplicated, never the primary (it is already the
+  // head of the list, not an extra).
+  const extras = Array.from(
+    new Set(extraDepartments.map((d) => d.trim()).filter(Boolean)),
+  ).filter((d) => d !== primary);
+
+  const known = await knownDepartments();
+  const unknown = extras.filter((d) => !known.has(d));
+  if (unknown.length) {
+    throw new Error(
+      `Unknown department${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')}. Create it in Team › Departments first.`,
+    );
+  }
+
+  // The DB trigger re-derives element 0 from `department`, so sending the
+  // primary here is belt-and-braces rather than load-bearing.
+  const { error } = await supabase
+    .from('profiles')
+    .update({ departments: [primary, ...extras] })
+    .eq('id', memberId);
+  if (error) throw new Error(error.message);
+
   revalidatePath('/team');
   revalidatePath('/dashboard');
 }
@@ -1913,6 +2023,23 @@ export async function renameDepartment(oldName: string, newName: string) {
         ...new Set(((g.departments ?? []) as string[]).map((d) => (d === from ? to : d))),
       ];
       return supabase.from('goals').update({ departments }).eq('id', g.id);
+    }),
+  );
+
+  // …and so do multi-department members (0060). The primary column was already
+  // renamed above; this catches the rows where `from` is an ADDITIONAL
+  // department, which that update never touched. Rows where it was the primary
+  // are handled by the sync trigger, so re-writing them here is harmless.
+  const { data: multiMembers } = await supabase
+    .from('profiles')
+    .select('id, departments')
+    .contains('departments', [from]);
+  await Promise.all(
+    (multiMembers ?? []).map((m) => {
+      const departments = [
+        ...new Set(((m.departments ?? []) as string[]).map((d) => (d === from ? to : d))),
+      ];
+      return supabase.from('profiles').update({ departments }).eq('id', m.id);
     }),
   );
 
@@ -2013,10 +2140,13 @@ export async function deleteDepartment(name: string) {
 
   const { supabase } = await requireUser();
   const [{ count: memberCount }, { count: goalCount }] = await Promise.all([
+    // Counts anyone LISTED under it, primary or additional (0060) — deleting a
+    // department that is still someone's second one would leave a stale label
+    // pointing at nothing.
     supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
-      .eq('department', dept),
+      .contains('departments', [dept]),
     supabase
       .from('goals')
       .select('id', { count: 'exact', head: true })
@@ -2486,11 +2616,15 @@ export async function setManagerTeam(managerId: string, memberIds: string[]) {
 // members get director_id = the Director; anyone previously reporting to them
 // but not in the new set is detached.
 //
-// This records a REPORTING line, not a permission: the Director could already
-// see their whole department (migration 0058), so nothing here widens what
-// they can reach. Reports must live in the Director's own department, and a
-// member may hold this alongside a manager_id — the two lines are independent
-// by design (see 0059).
+// Since migration 0061 this IS the Director's scope, not merely a note about
+// who answers to whom: assigning someone is what makes them visible and
+// editable to that Director, and unticking them takes that away. A Director
+// with an empty list sees only themselves.
+//
+// Eligibility reads the member's whole `departments` list (0060), so a member
+// whose primary is GST can be handed to an Audit Director once Audit is on
+// their list — without leaving GST. A member may hold this alongside a
+// manager_id; the two lines are independent by design (see 0059).
 export async function setDirectorReports(directorId: string, memberIds: string[]) {
   const { supabase } = await requireFounder();
 
@@ -2509,20 +2643,22 @@ export async function setDirectorReports(directorId: string, memberIds: string[]
 
   const wanted = Array.from(new Set(memberIds)).filter((id) => id !== directorId);
 
-  // Validate the whole picked set in one round-trip: same department, and
-  // never another Director or a Founder.
+  // Validate the whole picked set in one round-trip: belongs to the Director's
+  // department (primary or additional), and never another Director or a Founder.
   if (wanted.length) {
     const { data: picks } = await supabase
       .from('profiles')
-      .select('id, role, department')
+      .select('id, name, role, department, departments')
       .in('id', wanted);
     for (const p of picks ?? []) {
       if (isFounderId(p.id)) throw new Error('A Founder does not report to a Director.');
       if (p.role === 'board') {
         throw new Error('A Director does not report to another Director.');
       }
-      if ((p.department?.trim() || '') !== dept) {
-        throw new Error('Direct reports must belong to the same department as their Director.');
+      if (!belongsToDepartment(p, dept)) {
+        throw new Error(
+          `${p.name} doesn't belong to ${dept}. Add ${dept} to their departments in Manage member first.`,
+        );
       }
     }
   }

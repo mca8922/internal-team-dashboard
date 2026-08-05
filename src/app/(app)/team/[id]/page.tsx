@@ -29,7 +29,13 @@ import {
   parseDate,
   isWeekend,
 } from '@/lib/dates';
-import { roleLabel, isFounder, isManager, weeklyTargetHours } from '@/lib/roles';
+import {
+  roleLabel,
+  isFounder,
+  isManager,
+  weeklyTargetHours,
+  extraDepartmentsOf,
+} from '@/lib/roles';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { Progress } from '@/components/ui';
 import { Icon } from '@/components/Icon';
@@ -308,6 +314,20 @@ export default async function EmployeePage({
                 {u.job_title ? ` · ${u.job_title}` : ''} · {u.department} · joined{' '}
                 {fmtFriendly(parseDate(u.joined_date))}
               </div>
+              {/* Departments beyond the primary (migration 0060), in the same
+                  chip pattern the team card uses. Labelled "Also in" so the
+                  primary named above stays the one that reads as theirs — it
+                  is the only one scope follows. */}
+              {extraDepartmentsOf(u).length > 0 ? (
+                <div className="dept-chip-row mt-1">
+                  <span className="text-xs text-grey">Also in</span>
+                  {extraDepartmentsOf(u).map((d) => (
+                    <span key={d} className="dept-chip">
+                      {d}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               <PresenceLine
                 userId={u.id}
                 onTheClock={onTheClock}
