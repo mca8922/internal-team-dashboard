@@ -47,6 +47,9 @@ export function CreateMemberModal({
   const [uiRole, setUiRole] = React.useState<'director' | 'executive'>('executive');
   const [type, setType] = React.useState<'fte' | 'pte' | 'intern'>('fte');
   const [internMonths, setInternMonths] = React.useState(3);
+  // Departments beside the primary one (migration 0060). Founder-only, and a
+  // grouping label rather than a grant — see the section below.
+  const [extraDepts, setExtraDepts] = React.useState<string[]>([]);
   const [err, setErr] = React.useState<Record<string, string>>({});
   const [pending, setPending] = React.useState(false);
 
@@ -63,6 +66,7 @@ export function CreateMemberModal({
     setUiRole('executive');
     setType('fte');
     setInternMonths(3);
+    setExtraDepts([]);
     setErr({});
   };
 
@@ -87,6 +91,11 @@ export function CreateMemberModal({
     const res = await createTeamMember({
       ...form,
       role,
+      // Never send what the picker below couldn't have set — if the primary
+      // changed after a box was ticked, that tick is stale.
+      extraDepartments: viewerIsFounder
+        ? extraDepts.filter((d) => d !== form.department.trim())
+        : [],
       internshipMonths: role === 'intern' ? internMonths : null,
     });
     setPending(false);
@@ -164,6 +173,70 @@ export function CreateMemberModal({
             />
           </Field>
         </div>
+        {/* Multi department (migration 0060) — the other departments this hire
+            works across, beside the primary above.
+
+            A LABEL, not a permission: access is drawn on the primary
+            department alone (migration 0058), so ticking "Audit" here does not
+            expose the new account to an Audit Director, nor widen what they can
+            see. Founder-only, matching the Manage member section — a Director
+            hires into their own department and nowhere else, so they are not
+            offered the choice at all. */}
+        {viewerIsFounder ? (
+          <Field
+            label="Multi department"
+            hint="Optional. Other departments this person works across — used for grouping and reporting only; access follows the primary department above. Can be changed later in Manage member."
+          >
+            {!form.department.trim() ? (
+              <div className="text-xs text-grey">Pick a department above first.</div>
+            ) : (
+              (() => {
+                const options = departments.filter((d) => d !== form.department.trim());
+                if (options.length === 0) {
+                  return (
+                    <div className="text-xs text-grey">
+                      There is no other department to add yet.
+                    </div>
+                  );
+                }
+                const picked = extraDepts.filter((d) => options.includes(d));
+                return (
+                  <>
+                    <div className="dept-pick-list" style={{ maxHeight: 160 }}>
+                      {options.map((d) => (
+                        <label key={d} className="dept-pick-row">
+                          <input
+                            type="checkbox"
+                            checked={extraDepts.includes(d)}
+                            onChange={() =>
+                              setExtraDepts((cur) =>
+                                cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d],
+                              )
+                            }
+                          />
+                          <span className="text-sm fw-medium dept-pick-name">{d}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {/* Same chip preview as Manage member, so what you pick here
+                        looks like what you'll see on the card afterwards. */}
+                    <div className="dept-chip-row" style={{ marginTop: 10 }}>
+                      <span className="dept-chip dept-chip--primary" title="Primary department">
+                        {form.department.trim()}
+                      </span>
+                      {picked.map((d) => (
+                        <span key={d} className="dept-chip">
+                          <span className="dept-chip-plus">+</span>
+                          {d}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()
+            )}
+          </Field>
+        ) : null}
         {uiRole === 'executive' ? (
           <Field label="Type">
             <select

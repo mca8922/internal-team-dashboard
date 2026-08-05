@@ -24,7 +24,13 @@ import {
   fmtDateDMY,
   fmtTime,
 } from '@/lib/dates';
-import { roleDefaultHours, targetHours, isFounder, isManager } from '@/lib/roles';
+import {
+  roleDefaultHours,
+  targetHours,
+  isFounder,
+  isManager,
+  departmentsOf,
+} from '@/lib/roles';
 import { TeamGrid, type TeamMember } from './TeamGrid';
 import { ManagerTeamView, type ManagerTeamMember } from './ManagerTeamView';
 import type { Profile } from '@/lib/types';
@@ -128,6 +134,7 @@ export default async function TeamPage() {
       commuteEmail: u.commute_email,
       role: u.role,
       department: u.department,
+      departments: departmentsOf(u),
       deptColor: deptColors[u.department] ?? null,
       avatarUrl: u.avatar_url,
       isActive: u.is_active,

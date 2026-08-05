@@ -26,9 +26,15 @@ import {
   setManagerTeam,
   setManagerResponsibilities,
   setDirectorReports,
+  setMemberDepartments,
 } from '@/lib/actions';
 import { RichTextEditor } from '@/components/RichTextEditor';
-import { roleLabel, weeklyTargetFromDaily, canReportToDirector } from '@/lib/roles';
+import {
+  roleLabel,
+  weeklyTargetFromDaily,
+  canReportToDirector,
+  extraDepartmentsOf,
+} from '@/lib/roles';
 import { MemberGoalsHandoff } from '@/components/MemberGoalsHandoff';
 import { addMonths, calcAge, fmtFriendly, parseDate } from '@/lib/dates';
 import { DepartmentSelect } from '@/components/DepartmentSelect';
@@ -56,6 +62,9 @@ export function ManageMemberModal({
   const [email, setEmail] = React.useState('');
   const [commuteEmail, setCommuteEmail] = React.useState('');
   const [department, setDepartment] = React.useState('');
+  // The departments BESIDE the primary one (migration 0060). A label for
+  // grouping and reporting — it grants nothing, see the section below.
+  const [extraDepts, setExtraDepts] = React.useState<string[]>([]);
   // "Role" is now a 3-way tier (Director/Manager/Executive) rather than the
   // raw 4-value UserRole enum — Director maps to role='board' (same
   // permissions as the old "Board Member"), Manager maps to the existing
@@ -84,6 +93,7 @@ export function ManageMemberModal({
       setEmail(member.email);
       setCommuteEmail(member.commuteEmail ?? '');
       setDepartment(member.department);
+      setExtraDepts(extraDepartmentsOf(member));
       setUiRole(member.role === 'board' ? 'director' : member.isManager ? 'manager' : 'executive');
       setType(member.role === 'board' ? 'fte' : member.role);
       setJobTitle(member.jobTitle || '');
@@ -138,6 +148,22 @@ export function ManageMemberModal({
 
   const saveDept = () =>
     run(() => updateMemberDepartment(member.id, department), 'Department updated');
+
+  // ---- Multi department ----
+  // Everything the member can be listed under besides their primary. The
+  // primary itself is edited by the Department field above, so it is excluded
+  // here rather than shown as a locked, always-ticked row.
+  const savedExtras = extraDepartmentsOf(member);
+  const extraOptions = departments.filter((d) => d !== member.department);
+  const extrasChanged =
+    extraDepts.length !== savedExtras.length ||
+    extraDepts.some((d) => !savedExtras.includes(d));
+
+  const toggleExtraDept = (d: string) =>
+    setExtraDepts((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));
+
+  const saveExtraDepts = () =>
+    run(() => setMemberDepartments(member.id, extraDepts), 'Departments updated');
 
   // What Role/Type/managed-department the member ACTUALLY has right now
   // (server state), so Save only enables on a real change and so we only
@@ -236,10 +262,14 @@ export function ManageMemberModal({
     run(() => unsetManager(member!.id), 'Manager status removed');
 
   // ---- Director controls ----
-  // Who may report to this Director: active, non-Founder members of the SAME
-  // department, excluding other Directors (a Director never reports to one) and
-  // the Director themselves. Split into Managers and Staff so the Founder can
-  // see the two tiers of the department at a glance rather than one long list.
+  // Who may report to this Director: active, non-Founder members who BELONG TO
+  // the Director's department — primary or additional (0060) — excluding other
+  // Directors (a Director never reports to one) and the Director themselves.
+  // Split into Managers and Staff so the Founder can see the two tiers at a
+  // glance rather than one long list.
+  //
+  // Since 0061 ticking someone here is what GRANTS the Director sight of them,
+  // so this list is a permission screen, not just an org chart.
   const reportCandidates = member
     ? allMembers.filter((m) => canReportToDirector(member, m))
     : [];
@@ -418,6 +448,82 @@ export function ManageMemberModal({
             </Button>
           </div>
         </Field>
+
+        {/* Multi department (migration 0060) — the other departments this
+            person is listed under, beside their primary above.
+
+            This is a LABEL, not a permission. Access is still drawn on the
+            primary department alone (migration 0058): adding "Audit" here does
+            not let an Audit Director see this member, and does not widen what
+            the member themselves can see. The same holds for a Director or a
+            Manager — the department they run is their primary one. The hint
+            says so out loud, because a list of departments on a member's
+            profile reads like a grant unless it is spelled out.
+
+            The Founders sit under no department at all, so the section is
+            hidden for them entirely. */}
+        {!member.isFounder ? (
+          <Field
+            label="Multi department"
+            hint={
+              structuralLocked
+                ? 'Only a Founder can change which other departments a member belongs to.'
+                : `Other departments ${member.name.split(' ')[0]} works across, beside ${member.department || 'their primary one'}. Used for grouping and reporting only — access still follows the primary department above.`
+            }
+          >
+            {!member.department ? (
+              <div className="text-xs text-grey">
+                Set a primary department above first — extras sit alongside one.
+              </div>
+            ) : extraOptions.length === 0 ? (
+              <div className="text-xs text-grey">
+                There is no other department to add yet. Create one in Team › Departments.
+              </div>
+            ) : (
+              <>
+                <div className="dept-pick-list">
+                  {extraOptions.map((d) => (
+                    <label key={d} className="dept-pick-row">
+                      <input
+                        type="checkbox"
+                        checked={extraDepts.includes(d)}
+                        disabled={structuralLocked || founderProtected}
+                        onChange={() => toggleExtraDept(d)}
+                      />
+                      <span className="text-sm fw-medium dept-pick-name">{d}</span>
+                    </label>
+                  ))}
+                </div>
+                {/* Live preview of what will be saved, in the same chip pattern
+                    the team card uses — the primary accented, the extras as
+                    quiet outlines, wrapping rather than overflowing. */}
+                <div className="dept-chip-summary">
+                  <div className="dept-chip-row">
+                    <span className="dept-chip dept-chip--primary" title="Primary department">
+                      {member.department}
+                    </span>
+                    {extraDepts.map((d) => (
+                      <span key={d} className="dept-chip">
+                        <span className="dept-chip-plus">+</span>
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={saveExtraDepts}
+                    disabled={
+                      pending || structuralLocked || founderProtected || !extrasChanged
+                    }
+                  >
+                    Save departments
+                  </Button>
+                </div>
+              </>
+            )}
+          </Field>
+        ) : null}
 
         {/* Role — the permission tier (Director/Manager/Executive). Executive
             is the only tier with a Type (employment classification); Director
@@ -662,24 +768,16 @@ export function ManageMemberModal({
               hint={
                 structuralLocked
                   ? 'Only a Founder can change who reports to a Director.'
-                  : `Who answers to ${member.name.split(' ')[0]} directly. Only ${member.department} members are shown — a report always shares their Director's department. Someone can be here and on a Manager's team at the same time.`
+                  : `Who answers to ${member.name.split(' ')[0]} — and, since this is now their scope, exactly who they can see and manage. Anyone with ${member.department} in their departments can be picked, even if it isn't their primary one. Someone can be here and on a Manager's team at the same time.`
               }
             >
               {reportCandidates.length === 0 ? (
                 <div className="text-xs text-grey">
-                  No other active members in {member.department} to assign yet.
+                  Nobody belongs to {member.department} yet. Add {member.department} to a
+                  member’s departments in Manage member to make them assignable here.
                 </div>
               ) : (
-                <div
-                  className="grid gap-2"
-                  style={{
-                    maxHeight: 240,
-                    overflow: 'auto',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 6,
-                    padding: 8,
-                  }}
-                >
+                <div className="dept-pick-list" style={{ maxHeight: 260 }}>
                   {[
                     { label: 'Managers', people: reportManagers },
                     { label: 'Staff', people: reportStaff },
@@ -689,16 +787,16 @@ export function ManageMemberModal({
                       <div key={g.label} className="grid gap-1">
                         <div
                           className="text-xs fw-medium text-grey"
-                          style={{ textTransform: 'uppercase', letterSpacing: '0.06em' }}
+                          style={{
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.06em',
+                            padding: '4px 8px 0',
+                          }}
                         >
                           {g.label}
                         </div>
                         {g.people.map((m) => (
-                          <label
-                            key={m.id}
-                            className="flex items-center gap-2"
-                            style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: 4 }}
-                          >
+                          <label key={m.id} className="dept-pick-row">
                             <input
                               type="checkbox"
                               checked={reports.includes(m.id)}
@@ -706,10 +804,21 @@ export function ManageMemberModal({
                               onChange={() => toggleReport(m.id)}
                             />
                             <Avatar name={m.name} size="sm" src={m.avatarUrl} />
-                            <span className="text-sm fw-medium">{m.name}</span>
-                            <span className="text-xs text-grey">
-                              · {m.isManager ? 'Manager' : roleLabel(m.role)}
+                            <span className="text-sm fw-medium dept-pick-name">{m.name}</span>
+                            <span className="text-xs text-grey dept-pick-meta">
+                              {m.isManager ? 'Manager' : roleLabel(m.role)}
                             </span>
+                            {/* Eligible via an ADDITIONAL department, not their
+                                primary one — say so, so assigning someone out
+                                of another department is never a surprise. */}
+                            {m.department !== member.department ? (
+                              <span
+                                className="dept-chip dept-pick-meta"
+                                title={`${m.name.split(' ')[0]}'s primary department is ${m.department}`}
+                              >
+                                {m.department}
+                              </span>
+                            ) : null}
                           </label>
                         ))}
                       </div>
@@ -725,7 +834,16 @@ export function ManageMemberModal({
               >
                 Save direct reports
               </Button>
-              <span className="text-xs text-grey">{reports.length} selected</span>
+              {/* An empty list is legal but rarely intended — with nobody
+                  assigned a Director's Team page shows only themselves. */}
+              <span
+                className={reports.length === 0 ? 'text-xs fw-medium' : 'text-xs text-grey'}
+                style={reports.length === 0 ? { color: 'var(--color-amber, #B45309)' } : undefined}
+              >
+                {reports.length === 0
+                  ? `Nobody assigned — ${member.name.split(' ')[0]} can currently see only themselves.`
+                  : `${reports.length} selected`}
+              </span>
             </div>
           </div>
         ) : null}
@@ -790,22 +908,9 @@ export function ManageMemberModal({
                   No other active members in {headDept} to assign yet.
                 </div>
               ) : (
-                <div
-                  className="grid gap-1"
-                  style={{
-                    maxHeight: 200,
-                    overflow: 'auto',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 6,
-                    padding: 8,
-                  }}
-                >
+                <div className="dept-pick-list">
                   {teamCandidates.map((m) => (
-                    <label
-                      key={m.id}
-                      className="flex items-center gap-2"
-                      style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: 4 }}
-                    >
+                    <label key={m.id} className="dept-pick-row">
                       <input
                         type="checkbox"
                         checked={team.includes(m.id)}
@@ -813,8 +918,10 @@ export function ManageMemberModal({
                         onChange={() => toggleTeam(m.id)}
                       />
                       <Avatar name={m.name} size="sm" src={m.avatarUrl} />
-                      <span className="text-sm fw-medium">{m.name}</span>
-                      <span className="text-xs text-grey">· {roleLabel(m.role)}</span>
+                      <span className="text-sm fw-medium dept-pick-name">{m.name}</span>
+                      <span className="text-xs text-grey dept-pick-meta">
+                        {roleLabel(m.role)}
+                      </span>
                     </label>
                   ))}
                 </div>
