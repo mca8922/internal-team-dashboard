@@ -60,7 +60,10 @@ function ResLogo({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-type NavItem = { label: string; icon: 'home' | 'clock' | 'edit' | 'target' | 'users' | 'chart' | 'monitor' | 'inbox' | 'plane' | 'mail' | 'settings'; path: string; tier?: string; isNew?: boolean };
+// `locked` keeps an entry visible but marks it as not yet switched on — the
+// item still navigates, to a page that explains when it opens. Hiding it would
+// be the other valid choice; showing it is how the team learns it is coming.
+type NavItem = { label: string; icon: 'home' | 'clock' | 'edit' | 'target' | 'users' | 'chart' | 'monitor' | 'inbox' | 'plane' | 'mail' | 'settings' | 'help-circle'; path: string; tier?: string; isNew?: boolean; locked?: boolean };
 
 function isNavItemActive(pathname: string, item: NavItem) {
   return item.path === '/team'
@@ -94,6 +97,14 @@ function buildNavGroups(user: Profile) {
 
   const toolsItems: NavItem[] = [
     ...(FEATURE_FLAGS.apps ? [{ label: 'Apps', icon: 'monitor' as const, path: '/apps', isNew: showNewBadge }] : []),
+    // Never role-gated, unlike everything around it: someone locked out of
+    // their own record — offboarded, or read-only after a hand-off — is exactly
+    // who needs to reach support, so this entry survives even when it is the
+    // only thing left in the group.
+    //
+    // Phase 1 shows it LOCKED rather than removing it. That is the one thing
+    // the flag does not take away: the entry, and the promise it is coming.
+    { label: 'Support', icon: 'help-circle', path: '/support', locked: !FEATURE_FLAGS.support },
     { label: 'Settings', icon: 'settings', path: '/settings' },
   ];
 
@@ -121,12 +132,17 @@ const Sidebar = React.memo(function Sidebar({
         key={item.path}
         href={item.path}
         data-tour={'nav-' + item.path.slice(1)}
-        className={`nav-item ${active ? 'active' : ''}`}
-        title={collapsed ? item.label : ''}
+        className={`nav-item ${active ? 'active' : ''}${item.locked ? ' nav-item--locked' : ''}`}
+        title={collapsed ? `${item.label}${item.locked ? ' — unlocks in Phase 2' : ''}` : ''}
       >
         <Icon name={item.icon} size={17} />
         <span className="label">{item.label}</span>
         <span className="nav-item-right">
+          {item.locked && (
+            <span className="nav-lock" title="Unlocks in Phase 2" aria-label="Unlocks in Phase 2">
+              <Icon name="lock" size={13} />
+            </span>
+          )}
           {item.isNew && <span className="nav-new-pill">NEW</span>}
           {item.tier && <span className={`nav-tier nav-tier--${item.tier}`}>★</span>}
           {item.path === '/leaves' && isBoard && pendingLeaves > 0 && (
@@ -270,11 +286,16 @@ function MoreSheet({
         href={item.path}
         onClick={onClose}
         data-tour={tourTag[item.path]}
-        className={`more-sheet-item${active ? ' active' : ''}`}
+        className={`more-sheet-item${active ? ' active' : ''}${item.locked ? ' nav-item--locked' : ''}`}
       >
         <Icon name={item.icon} size={18} />
         <span className="label">{item.label}</span>
         <span className="nav-item-right">
+          {item.locked && (
+            <span className="nav-lock" title="Unlocks in Phase 2" aria-label="Unlocks in Phase 2">
+              <Icon name="lock" size={13} />
+            </span>
+          )}
           {item.isNew && <span className="nav-new-pill">NEW</span>}
           {item.tier && <span className={`nav-tier nav-tier--${item.tier}`}>★</span>}
           {item.path === '/leaves' && isBoard && pendingLeaves > 0 && (

@@ -273,6 +273,60 @@ handing them to their primary department's sole Director. It never overwrites an
 existing assignment. Departments with no Director (currently *General*) keep
 nobody assigned — those members are visible to the Founders alone.
 
+## reStrucAI Support desk (built, gated to Phase 2)
+
+A **Support** entry in the sidebar's Tools group (`/support`) is how this
+team raises requests with reStrucAI, follows their status, and closes them
+out. **Fully built and verified, then gated** behind `FEATURE_FLAGS.support`
+— flip that one flag to open it.
+
+While locked it behaves differently from every other gated feature: the nav
+entry stays **visible with a padlock** rather than disappearing, and
+`/support` renders an "Unlocks in Phase 2" state. The gate returns *before*
+`listMyTickets()`, so a locked desk makes no API call, sends no reporter
+email to reStrucAI, and writes no mirror rows.
+
+**Known consequence of gating:** an offboarded or read-only account cannot
+reach support either. That was the one thing the entry was designed to
+guarantee, and the flag overrides it — until Phase 2, those people need an
+email address instead.
+
+**reStrucAI's database is the source of truth.** Tickets are posted to
+reStrucAI's support API and read back from it; nothing the Support page
+renders comes from our tables.
+
+**A local mirror was added afterwards, at the operator's request** (migration
+`0062_support_mirror.sql` — `support_mirror_tickets`, `support_mirror_messages`).
+It is an **archive, not an authority**: written best-effort by the module's
+per-fork seam `src/support/support-mirror.ts`, and read by nothing in the app.
+Two known drifts, accepted deliberately:
+
+- A ticket that moves on reStrucAI's side updates here only the next time the
+  reporter loads Support or opens that ticket. These rows are never live.
+- The email back-and-forth is **not** captured, because reStrucAI does not
+  store it either — nothing writes an `agent` message there today. What lands
+  locally is the opening request plus status entries.
+
+If the two ever disagree, reStrucAI is right.
+
+- `src/support/` is a **shared module**, copied byte-identical into every
+  client fork. Do not patch it here; a fix belongs upstream so it reaches
+  every fork. `current-user.ts` is the one file that is per-fork, and this
+  fork's schema matched the stub as-is (`profiles` → name, `commute_email`
+  || `email`, `job_title` || `role`).
+- `support.css` is appended verbatim to `globals.css` under a marked
+  banner. Re-append on module updates rather than editing in place.
+- Two env vars, server-side only: `SUPPORT_API_URL` and `SUPPORT_API_KEY`.
+  **`SUPPORT_API_KEY` must never carry a `NEXT_PUBLIC_` prefix** — the three
+  server files guard this with `server-only`, so a client import fails the
+  build rather than shipping the key.
+- Not feature-flagged, and deliberately not role-gated: an offboarded or
+  read-only account keeps Support even when it is the only Tools entry left.
+  Someone locked out of their own record is exactly who needs to reach us.
+- Reached from the sidebar only — **no "?" button in the top bar**, which is
+  the deliberate difference from reStrucAI's own dashboard. There is also no
+  reply box: a ticket records state, and the conversation happens over email.
+
 ## Phase 2 — Backlog (re-enable when ready)
 
 Flip the flag in `src/lib/featureFlags.ts` for whichever of these should
@@ -282,6 +336,8 @@ come back:
 - Team Requests / change-request inbox (`teamRequests`)
 - Emails (`emails`)
 - Apps / Launchpad (`apps`)
+- reStrucAI Support desk (`support`) — built and verified, shown locked
+  rather than hidden; see its section above
 - Analytics filters, personal and team (`analyticsFilters`)
 - Goals cleanup/export (`goalsCleanup`)
 - Settings → Notifications section (`settingsNotifications`) — explicitly
