@@ -1,0 +1,648 @@
+/* reStrucAI support module - styles.
+   Append to the fork's globals.css, or import from the root layout.
+   Identical to the support block in reStrucAI's own globals.css (a few console
+   rules ride along unused - keeping the two files byte-identical is worth more
+   than trimming them), plus the modal/field rules this module needs because it
+   does not use the host app's component library. Uses only theme tokens, so it
+   follows whatever light/dark palette the fork already defines. */
+
+/* The "?" reads as a standing offer rather than another toolbar icon: a faint
+   ring marks it out at rest, and it warms to the brand green on hover like the
+   other icon buttons. */
+.help-btn {
+  position: relative;
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+.help-btn:hover { box-shadow: inset 0 0 0 1px transparent; }
+
+/* ---- report form ---- */
+
+.help-form { display: flex; flex-direction: column; gap: 18px; }
+.help-field { display: flex; flex-direction: column; gap: 8px; }
+.help-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.help-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-slate);
+}
+.help-count { font-size: 11px; font-weight: 600; color: var(--color-grey-text); }
+.help-count.warn { color: var(--color-red); }
+.help-textarea { line-height: 1.6; resize: vertical; min-height: 108px; }
+
+/* Six categories as cards. All visible at once, one tap to choose, and no
+   native select sheet swallowing the screen on a phone. */
+.help-cats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.help-cat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "icon label" "icon hint";
+  align-items: center;
+  gap: 2px 10px;
+  padding: 11px 12px;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+  color: var(--color-black);
+  transition: border-color 140ms ease, background 140ms ease, transform 90ms ease;
+}
+.help-cat svg { grid-area: icon; color: var(--color-grey-text); transition: color 140ms ease; }
+.help-cat-label { grid-area: label; font-size: 13px; font-weight: 600; line-height: 1.3; }
+.help-cat-hint { grid-area: hint; font-size: 11px; line-height: 1.35; color: var(--color-grey-text); }
+.help-cat:hover { border-color: var(--color-slate); }
+.help-cat:active { transform: scale(0.985); }
+.help-cat.active {
+  border-color: var(--color-green-primary);
+  background: var(--color-green-light);
+}
+.help-cat.active svg,
+.help-cat.active .help-cat-label { color: var(--color-green-primary); }
+
+.help-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+
+/* Quiet, but never hidden: what we collect, in the words we would use out loud. */
+.support-disclosure {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-grey-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 11px 13px;
+}
+.support-disclosure svg { flex: 0 0 auto; margin-top: 2px; }
+.support-disclosure code {
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+}
+
+/* ---- sent confirmation ---- */
+
+.support-sent { text-align: center; padding: 10px 4px 4px; }
+.support-sent-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-green-light);
+  color: var(--color-green-primary);
+  margin-bottom: 14px;
+  animation: support-pop 320ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+@keyframes support-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .support-sent-tick { animation: none; }
+}
+.support-sent h3 { font-size: 17px; margin: 0 0 12px; }
+/* The reference is a button because the first thing anyone does with a ticket
+   number is quote it somewhere. */
+.support-sent-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 7px 14px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--color-black);
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+.support-sent-ref:hover { border-color: var(--color-green-primary); color: var(--color-green-primary); }
+.support-sent-ref svg { color: var(--color-grey-text); }
+.support-sent-copy { font-size: 11px; font-weight: 600; color: var(--color-grey-text); }
+.support-sent-hint {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-grey-text);
+  margin: 0 auto 20px;
+  max-width: 330px;
+}
+.support-sent-actions { display: flex; gap: 8px; justify-content: center; }
+
+/* ---- ticket list ---- */
+
+.support-list { display: flex; flex-direction: column; }
+.support-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.support-row:last-child { border-bottom: 0; }
+.support-row:hover { background: var(--color-bg); }
+
+/* The console's entire SLA display: one dot per row. Red means we are past the
+   response promise without having picked the ticket up. */
+.support-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.support-dot--overdue { background: var(--color-red); }
+.support-dot--waiting { background: var(--color-amber-text); }
+.support-dot--ok      { background: var(--color-border); }
+
+.support-row-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.support-row-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.support-ref {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--color-grey-text);
+  flex: 0 0 auto;
+}
+.support-row-subject {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-black);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.support-row-sub { font-size: 12px; color: var(--color-grey-text); }
+.support-row-meta { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.support-age { font-size: 12px; color: var(--color-grey-text); min-width: 52px; text-align: right; }
+.support-stat-meta { font-size: 11px; font-weight: 600; color: var(--color-red); margin-top: 6px; }
+
+/* ---- ticket detail ---- */
+
+.support-detail { display: grid; grid-template-columns: 1fr 224px; gap: 20px; align-items: start; }
+.support-thread { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* What was asked. One card, because a ticket has exactly one request on it. */
+.support-request {
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-green-primary);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  background: var(--color-bg);
+}
+.support-msg-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.support-msg-author { font-size: 12px; font-weight: 700; color: var(--color-black); }
+.support-msg-time { font-size: 11px; color: var(--color-grey-text); }
+.support-msg-body {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--color-black);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Where it got to. A dotted spine so a run of status changes reads as one
+   history rather than five loose lines. */
+.support-history { display: flex; flex-direction: column; padding-left: 4px; }
+.support-history-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 12.5px;
+  color: var(--color-grey-text);
+}
+.support-history-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-border);
+  flex: 0 0 auto;
+  position: relative;
+}
+.support-history-row:not(:last-child) .support-history-dot::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  width: 1px;
+  height: 18px;
+  transform: translateX(-50%);
+  background: var(--color-border);
+}
+.support-history-when { margin-left: auto; font-size: 11.5px; }
+
+/* Status is the only action on a ticket, so it gets the whole footer. Rendered
+   as a track rather than a dropdown: the lifecycle, and where this ticket sits
+   in it, are both readable without opening anything. */
+.support-statusbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+.support-track {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+.support-track-btn {
+  flex: 1 1 0;
+  white-space: nowrap;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-grey-text);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.support-track-btn:hover:not(:disabled) { color: var(--color-black); background: var(--color-card); }
+.support-track-btn.active {
+  background: var(--color-card);
+  border-color: var(--color-green-primary);
+  color: var(--color-green-primary);
+  box-shadow: var(--shadow-card);
+}
+.support-track-btn:disabled { cursor: default; }
+.support-track-btn.busy { opacity: 0.6; }
+
+.support-detail-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* A staged status is a choice, not a fact: dashed, so at a glance it reads
+   differently from the solid ring on where the ticket actually is. */
+.support-track-btn.staged {
+  border-style: dashed;
+  border-color: var(--color-green-primary);
+  background: var(--color-green-light);
+}
+
+/* Nothing is written and nobody is emailed until this bar is confirmed. It
+   only exists while a change is pending, so its presence is the signal that
+   something is unsaved. */
+.support-confirm {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--color-green-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-green-light);
+  animation: support-confirm-in 160ms ease both;
+}
+@keyframes support-confirm-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .support-confirm { animation: none; }
+}
+.support-confirm-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-black);
+}
+.support-confirm-text svg { color: var(--color-green-primary); flex: 0 0 auto; }
+.support-confirm-text strong { font-weight: 700; }
+.support-confirm-notify {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-slate);
+  cursor: pointer;
+  user-select: none;
+}
+.support-confirm-notify input { width: 15px; height: 15px; accent-color: var(--color-green-primary); cursor: pointer; }
+.support-confirm-actions { display: flex; gap: 8px; margin-left: auto; }
+
+/* Everything the reporter never had to be asked for. */
+.support-context {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  background: var(--color-bg);
+}
+.support-context-name { font-size: 14px; font-weight: 700; color: var(--color-black); }
+.support-context-sub { font-size: 12px; color: var(--color-grey-text); }
+.support-context-mail { font-size: 12px; color: var(--color-green-primary); word-break: break-all; display: inline-block; margin-top: 4px; }
+.support-context-list { margin: 14px 0 0 0; display: flex; flex-direction: column; gap: 10px; }
+.support-context-row { display: flex; flex-direction: column; gap: 2px; }
+.support-context-row dt { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-grey-text); }
+.support-context-row dd { margin: 0; font-size: 12.5px; color: var(--color-black); word-break: break-word; }
+
+@media (max-width: 720px) {
+  /* One column: context moves below the request rather than squeezing it. */
+  .support-detail { grid-template-columns: 1fr; }
+  .help-cats { grid-template-columns: 1fr; }
+  .support-row-meta { flex-direction: column; align-items: flex-end; gap: 4px; }
+  .support-track { display: grid; grid-template-columns: 1fr 1fr; overflow-x: visible; }
+  .help-actions, .support-detail-actions { justify-content: stretch; }
+  .help-actions .btn, .support-detail-actions .btn { flex: 1 1 140px; justify-content: center; }
+}
+
+/* ---- module-only: modal + empty state, since this module does not import the
+   host app's ui.tsx (a fork's copy may have drifted) ---- */
+
+.sup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow-y: auto;
+  animation: sup-fade 140ms ease both;
+}
+@keyframes sup-fade { from { opacity: 0; } to { opacity: 1; } }
+.sup-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-card, #fff);
+  color: var(--color-black, #15181d);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  animation: sup-rise 180ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@keyframes sup-rise {
+  from { transform: translateY(10px) scale(0.99); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sup-backdrop, .sup-modal { animation: none; }
+}
+.sup-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.sup-modal-head h3 { margin: 0; font-size: 17px; }
+.sup-modal-head p { margin: 4px 0 0; font-size: 13px; color: var(--color-grey-text, #676f7e); }
+
+.sup-empty {
+  text-align: center;
+  padding: 48px 16px;
+  border: 1px dashed var(--color-border, #ececea);
+  border-radius: var(--radius-lg, 12px);
+}
+.sup-empty h3 { font-size: 16px; margin: 0 0 8px; }
+.sup-empty p { font-size: 13px; line-height: 1.6; color: var(--color-grey-text, #676f7e); margin: 0 auto; max-width: 380px; }
+/* An empty support page with no way to act on it is a dead end, so the empty
+   state carries the same call to action as the header. */
+.sup-empty .btn { margin-top: 18px; }
+
+/* ===========================================================================
+   About reStrucAI — trigger, wordmark and modal.
+   ===========================================================================
+   The wordmark is CSS rather than an image so it stays sharp anywhere and
+   recolours itself per theme with no second asset.
+
+   --sup-brand is declared LOCALLY and never reads var(--color-green-*). A
+   client fork re-themes those tokens to its own brand (MCA, for one, maps the
+   green to its forest #1F5C3E) — inheriting them would render reStrucAI's
+   wordmark in the client's colours, which is the one thing a logo may not do. */
+
+.sup-about {
+  --sup-brand: #00BF63;
+  --sup-brand-soft: rgba(0, 191, 99, 0.12);
+  max-width: 460px;
+  position: relative;
+  /* The shared .sup-modal sets overflow-y: auto, which would clip the close
+     button back inside the panel. Safe to drop here and only here: this panel's
+     content is short and fixed, so it never needs to scroll. */
+  overflow: visible;
+}
+
+/* Rides the panel's outer corner instead of sitting in its padding. Straddling
+   the edge is what makes it read as attached to the card rather than floating
+   over the content, so the border ring matters as much as the offset. */
+.sup-about-close {
+  position: absolute;
+  top: -13px;
+  right: -13px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--color-border, #E4E7EC);
+  background: var(--color-card, #fff);
+  color: var(--color-grey-text, #667085);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease,
+    transform 0.16s ease;
+}
+.sup-about-close:hover {
+  background: var(--sup-brand, #00BF63);
+  border-color: var(--sup-brand, #00BF63);
+  color: #fff;
+  transform: scale(1.06);
+}
+.sup-about-close:focus-visible {
+  outline: 2px solid var(--sup-brand, #00BF63);
+  outline-offset: 2px;
+}
+[data-theme="dark"] .sup-about-close {
+  background: #1A1D1C;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #C7CDCA;
+}
+[data-theme="dark"] .sup-about-close:hover {
+  background: var(--sup-brand, #00BF63);
+  border-color: var(--sup-brand, #00BF63);
+  color: #06231A;
+}
+
+/* ----- wordmark ----- */
+
+.sup-mark {
+  --sup-brand: #00BF63;
+  display: inline-flex;
+  align-items: baseline;
+  font-family: ui-rounded, 'Segoe UI Rounded', 'SF Pro Rounded', Nunito, system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  user-select: none;
+}
+.sup-mark-accent { color: var(--sup-brand); }
+.sup-mark-ink { color: var(--color-text, #101828); }
+[data-theme="dark"] .sup-mark-ink { color: #F4F6F5; }
+
+/* ----- trigger ----- */
+
+.sup-about-trigger {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border, #E4E7EC);
+  background: transparent;
+  color: var(--color-grey-text, #667085);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+}
+.sup-about-trigger:hover {
+  border-color: rgba(0, 191, 99, 0.5);
+  background: rgba(0, 191, 99, 0.06);
+  color: var(--color-text, #101828);
+}
+[data-theme="dark"] .sup-about-trigger:hover { color: #F4F6F5; }
+
+/* ----- hero ----- */
+
+.sup-about-hero {
+  position: relative;
+  padding: 34px 24px 26px;
+  text-align: center;
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--sup-brand-soft), transparent 78%);
+  overflow: hidden;
+}
+
+/* A soft radial bloom behind the wordmark. Decorative only, and it fades in
+   once on open rather than looping — a panel that animates forever reads as an
+   advertisement rather than as part of the product. */
+.sup-about-glow {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  width: 260px;
+  height: 160px;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(0, 191, 99, 0.32), transparent);
+  filter: blur(16px);
+  pointer-events: none;
+  animation: sup-about-bloom 0.6s ease-out both;
+}
+@keyframes sup-about-bloom {
+  from { opacity: 0; transform: translateX(-50%) scale(0.9); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+.sup-about-tagline {
+  margin: 14px auto 0;
+  max-width: 300px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-grey-text, #667085);
+}
+
+/* ----- links ----- */
+
+.sup-about-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.sup-about-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, #E4E7EC);
+  background: var(--color-card, #FFF);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+}
+.sup-about-link:hover {
+  border-color: rgba(0, 191, 99, 0.55);
+  background: rgba(0, 191, 99, 0.05);
+  transform: translateY(-1px);
+}
+.sup-about-link:focus-visible {
+  outline: 2px solid var(--sup-brand, #00BF63);
+  outline-offset: 2px;
+}
+
+.sup-about-link-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: rgba(0, 191, 99, 0.1);
+  color: #00BF63;
+}
+
+.sup-about-link-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sup-about-link-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-grey-text, #667085);
+}
+.sup-about-link-value {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--color-text, #101828);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-theme="dark"] .sup-about-link-value { color: #F4F6F5; }
+
+.sup-about-link-go {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--color-grey-text, #667085);
+  opacity: 0.5;
+  transition: opacity 0.16s ease, color 0.16s ease;
+}
+.sup-about-link:hover .sup-about-link-go { opacity: 1; color: #00BF63; }
+
+.sup-about-foot {
+  margin: 16px 2px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--color-grey-text, #667085);
+}
+
+@media (max-width: 480px) {
+  .sup-mark { font-size: 32px; }
+  .sup-about-hero { padding: 28px 16px 22px; }
+}
+
+/* Respect a reduced-motion preference: the bloom and the lift are decoration,
+   and decoration is exactly what this setting is asking us to drop. */
+@media (prefers-reduced-motion: reduce) {
+  .sup-about-glow { animation: none; }
+  .sup-about-link:hover { transform: none; }
+}
