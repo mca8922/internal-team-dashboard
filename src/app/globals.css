@@ -864,9 +864,13 @@ p { margin: 0; }
 }
 .datepicker-foot-btn:hover { background: var(--color-green-light); }
 
-/* ===== Multi-department picker (Board goal form) ===== */
+/* ===== Multi-department picker (Board goal/task form) =====
+   Named dept-pick-chip (not dept-chip) so it doesn't collide with the
+   read-only department-listing chip below, which redefines .dept-chip with
+   much tighter sizing for team cards/profiles. That collision used to make
+   this picker render at the read-only chip's cramped size on some pages. */
 .dept-multi { display: flex; flex-wrap: wrap; gap: 8px; }
-.dept-chip {
+.dept-pick-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -880,14 +884,14 @@ p { margin: 0; }
   cursor: pointer;
   transition: background 120ms, border-color 120ms, color 120ms;
 }
-.dept-chip:hover { border-color: var(--color-green-primary); color: var(--color-black); }
-.dept-chip.on {
+.dept-pick-chip:hover { border-color: var(--color-green-primary); color: var(--color-black); }
+.dept-pick-chip.on {
   background: var(--color-green-light);
   border-color: var(--color-green-primary);
   color: var(--color-green-darker);
   font-weight: 600;
 }
-.dept-chip-tag {
+.dept-pick-chip-tag {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
