@@ -313,12 +313,12 @@ export function GoalForm({
                 <button
                   key={d}
                   type="button"
-                  className={`dept-chip${on ? ' on' : ''}${primary ? ' primary' : ''}`}
+                  className={`dept-pick-chip${on ? ' on' : ''}${primary ? ' primary' : ''}`}
                   onClick={() => toggleDept(d)}
                 >
                   {on ? <Icon name="check" size={12} /> : null}
                   {d}
-                  {primary ? <span className="dept-chip-tag">Primary</span> : null}
+                  {primary ? <span className="dept-pick-chip-tag">Primary</span> : null}
                 </button>
               );
             })}
