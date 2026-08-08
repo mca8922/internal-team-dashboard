@@ -13,7 +13,7 @@ import {
   isHoliday,
   leaveLabel,
 } from '@/lib/queries';
-import { fmtDate, addDays, startOfWeek, isWeekend, isWorkingDay, fmtWeekday, fmtShort, daysBetween, GO_LIVE_DATE, parseDate } from '@/lib/dates';
+import { fmtDate, addDays, startOfWeek, isWeekend, isWorkingDay, fmtWeekday, fmtShort, daysBetween, GO_LIVE_DATE, parseDate, istHour } from '@/lib/dates';
 import Link from 'next/link';
 import { weeklyTargetHours, isManager } from '@/lib/roles';
 import { BarChart, LineChart, EnergyChart } from '@/components/charts';
@@ -200,7 +200,7 @@ export default async function AnalyticsPage({
     const sessions = punches
       .filter((p) => p.work_date === ds)
       .sort((a, b) => a.punch_in.localeCompare(b.punch_in));
-    if (sessions.length && new Date(sessions[0].punch_in).getHours() < 10) onTime += 1;
+    if (sessions.length && istHour(sessions[0].punch_in) < 10) onTime += 1;
   }
   const consistency = totalDays ? Math.round((onTime / totalDays) * 100) : 0;
 

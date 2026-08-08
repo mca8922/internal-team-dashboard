@@ -28,6 +28,7 @@ import {
   fmtTime,
   parseDate,
   isWeekend,
+  istHour,
 } from '@/lib/dates';
 import {
   roleLabel,
@@ -246,7 +247,7 @@ export default async function EmployeePage({
     const sessions = punches
       .filter((p) => p.work_date === ds)
       .sort((a, b) => a.punch_in.localeCompare(b.punch_in));
-    if (sessions.length && new Date(sessions[0].punch_in).getHours() < 10) onTime += 1;
+    if (sessions.length && istHour(sessions[0].punch_in) < 10) onTime += 1;
   }
   const consistency = totalDays ? Math.round((onTime / totalDays) * 100) : 0;
 
