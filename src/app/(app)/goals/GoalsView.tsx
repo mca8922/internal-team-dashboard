@@ -1756,7 +1756,7 @@ export function GoalsView({
     setSubmitting(true);
     try {
       if (data.id) {
-        await updateGoal(
+        const res = await updateGoal(
           data.id,
           {
             level: data.level,
@@ -1772,9 +1772,15 @@ export function GoalsView({
           data.assigneeIds,
           data.checklist,
         );
+        // A rejected save keeps the form open with the task's edits intact so
+        // the missing department/assignee can be filled in and re-submitted.
+        if (!res.ok) {
+          toast(res.error || 'Could not save the task.', 'error');
+          return;
+        }
         toast('Task updated');
       } else {
-        await createGoal({
+        const res = await createGoal({
           level: data.level,
           title: data.title,
           description: data.description,
@@ -1787,6 +1793,10 @@ export function GoalsView({
           assigneeIds: data.assigneeIds,
           checklist: data.checklist,
         });
+        if (!res.ok) {
+          toast(res.error || 'Could not create the task.', 'error');
+          return;
+        }
         toast('Task created');
       }
       setEditing(null);
@@ -1853,7 +1863,11 @@ export function GoalsView({
     reportReq,
     onSetStatus: async (g, status) => {
       try {
-        await updateGoal(g.id, { status });
+        const res = await updateGoal(g.id, { status });
+        if (!res.ok) {
+          toast(res.error || 'Could not update the status.', 'error');
+          return;
+        }
         toast(`Marked “${g.title}” ${STATUS[status].label}`);
       } catch (e) {
         toast((e as Error).message || 'Could not update the status.', 'error');
@@ -1861,7 +1875,11 @@ export function GoalsView({
     },
     onReassign: async (g, userIds) => {
       try {
-        await setGoalAssignees(g.id, userIds);
+        const res = await setGoalAssignees(g.id, userIds);
+        if (!res.ok) {
+          toast(res.error || 'Could not update assignees.', 'error');
+          return;
+        }
         toast('Assignees updated');
       } catch (e) {
         toast((e as Error).message || 'Could not update assignees.', 'error');

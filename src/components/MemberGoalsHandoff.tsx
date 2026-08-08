@@ -100,7 +100,11 @@ export function MemberGoalsHandoff({
   const saveGoal = async (goalId: string) => {
     setSavingId(goalId);
     try {
-      await setGoalAssignees(goalId, sel[goalId] ?? []);
+      const res = await setGoalAssignees(goalId, sel[goalId] ?? []);
+      if (!res.ok) {
+        toast(res.error || 'Could not reassign.', 'error');
+        return;
+      }
       setOrig((o) => ({ ...o, [goalId]: [...(sel[goalId] ?? [])] }));
       setSaved((s) => new Set(s).add(goalId));
       toast('Assignees updated');

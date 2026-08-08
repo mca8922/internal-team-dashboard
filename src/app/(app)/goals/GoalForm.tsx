@@ -261,7 +261,19 @@ export function GoalForm({
     ? parents.filter((p) => p.level === parentLevel)
     : [];
 
-  const canSubmit = !!form.title.trim() && depts.length > 0 && !submitting;
+  // A task MUST land on a department AND on at least one member. An unassigned
+  // task is one nobody can complete: toggle_checklist_item only lets a named
+  // assignee (or, on a legacy unassigned task, a member of its department) tick
+  // the checklist, so an assignee-less task shows up in people's "Your day" and
+  // then refuses every tick. createGoal/updateGoal enforce the same rule server
+  // side — this is only the courtesy half.
+  const missingDepts = depts.length === 0;
+  const missingAssignees = assignees.length === 0;
+  const canSubmit =
+    !!form.title.trim() && !missingDepts && !missingAssignees && !submitting;
+  // Errors stay hidden until the first submit attempt: a form that scolds you
+  // for fields you haven't reached yet is worse than one that waits.
+  const [showErrors, setShowErrors] = React.useState(false);
 
   return (
     <div className="grid gap-3">
@@ -282,7 +294,10 @@ export function GoalForm({
         </div>
       </Field>
 
-      <Field label="Title">
+      <Field
+        label="Title"
+        error={showErrors && !form.title.trim() ? 'Give the task a title.' : undefined}
+      >
         <input
           className="input"
           value={form.title}
@@ -304,6 +319,7 @@ export function GoalForm({
         <Field
           label="Departments"
           hint="Members from every selected department can be assigned. The first one is the primary, used for reporting and analytics."
+          error={showErrors && missingDepts ? 'Pick at least one department.' : undefined}
         >
           <div className="dept-multi">
             {deptPool.map((d) => {
@@ -325,7 +341,10 @@ export function GoalForm({
           </div>
         </Field>
       ) : (
-        <Field label="Department">
+        <Field
+          label="Department"
+          error={showErrors && missingDepts ? 'Pick a department.' : undefined}
+        >
           <DepartmentSelect
             value={depts[0] || ''}
             departments={departments}
@@ -523,6 +542,11 @@ export function GoalForm({
             ? `Showing ${deptsLabel}. Each assignee completes the checklist on their own.`
             : 'Pick a department above to choose members.'
         }
+        error={
+          showErrors && missingAssignees
+            ? 'Assign at least one member — nobody can complete an unassigned task.'
+            : undefined
+        }
       >
         {depts.length === 0 ? (
           <div className="text-sm text-grey">Select a department first.</div>
@@ -550,9 +574,14 @@ export function GoalForm({
           Cancel
         </Button>
         <Button
-          disabled={!canSubmit}
+          disabled={submitting}
           onClick={() => {
-            if (!canSubmit) return;
+            // Stay live rather than greying out, so a blocked save can say WHY
+            // instead of leaving the user poking a dead button.
+            if (!canSubmit) {
+              setShowErrors(true);
+              return;
+            }
             onSubmit({
               id: initial.id,
               ...form,

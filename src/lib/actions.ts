@@ -811,8 +811,17 @@ async function syncChecklist(
 // Replaces a goal's assignee set with exactly `userIds` (delete-all + insert).
 // Open to the Board and to a Manager for goals in the department they head —
 // RLS on goal_assignees enforces the manager's department/team scope.
-export async function setGoalAssignees(goalId: string, userIds: string[]) {
+export async function setGoalAssignees(
+  goalId: string,
+  userIds: string[],
+): Promise<{ ok: boolean; error?: string }> {
   const { supabase, userId } = await requireUser();
+  // A task always keeps an owner (see goalOwnershipError). This is the third
+  // way to reach zero — the handoff dialog, where a leaving member's tasks are
+  // passed on: they must be passed TO someone, not just taken away.
+  if (userIds.length === 0) {
+    return { ok: false, error: 'Assign at least one member to this task.' };
+  }
   const { data: goal } = await supabase
     .from('goals')
     .select('title')
@@ -821,6 +830,24 @@ export async function setGoalAssignees(goalId: string, userIds: string[]) {
   await replaceAssigneesAndNotify(supabase, goalId, goal?.title ?? 'a task', userIds, userId);
   revalidatePath('/goals');
   revalidatePath('/dashboard');
+  return { ok: true };
+}
+
+// Every task must land on a department AND on at least one member. An
+// assignee-less task is one nobody can complete: toggle_checklist_item lets
+// only a named assignee tick the checklist (falling back, on the legacy
+// unassigned tasks that predate this rule, to members of the task's own
+// department), so an unassigned task surfaces in people's "Your day" and then
+// refuses every tick. GoalForm blocks this in the UI; this is the real guard.
+//
+// It lives here rather than in the database because assignees sit in a child
+// table written after the goals row — no NOT NULL/CHECK can express it, and a
+// deferred constraint trigger is more machinery than the rule is worth.
+// Returns the complaint, or null when the task is properly owned.
+function goalOwnershipError(departments: string[], assigneeIds: string[]): string | null {
+  if (!departments.some((d) => d.trim())) return 'Pick a department for this task.';
+  if (assigneeIds.length === 0) return 'Assign at least one member to this task.';
+  return null;
 }
 
 export async function createGoal(input: {
@@ -837,13 +864,17 @@ export async function createGoal(input: {
   parentId: string | null;
   assigneeIds?: string[];
   checklist?: ChecklistInput[];
-}) {
+}): Promise<{ ok: boolean; error?: string }> {
   const { supabase, userId } = await requireUser();
-  const { count } = await supabase.from('goals').select('*', { count: 'exact', head: true });
-  const hasChecklist = !!input.checklist && input.checklist.length > 0;
   const departments =
     input.departments && input.departments.length ? input.departments : [input.department];
-  const { data: created } = await supabase
+  const assigneeIds = input.assigneeIds ?? [];
+  // Refuse the task outright rather than creating one nobody can complete.
+  const ownership = goalOwnershipError(departments, assigneeIds);
+  if (ownership) return { ok: false, error: ownership };
+  const { count } = await supabase.from('goals').select('*', { count: 'exact', head: true });
+  const hasChecklist = !!input.checklist && input.checklist.length > 0;
+  const { data: created, error: createError } = await supabase
     .from('goals')
     .insert({
       level: input.level,
@@ -863,24 +894,33 @@ export async function createGoal(input: {
     })
     .select('id')
     .single();
-  if (created && input.assigneeIds && input.assigneeIds.length) {
-    await supabase
-      .from('goal_assignees')
-      .insert(
-        input.assigneeIds.map((user_id) => ({
-          goal_id: created.id,
-          user_id,
-          assigned_by: userId,
-        })),
-      );
-    // Every assignee on a brand-new goal is new — notify all of them.
-    await notifyAssignees(supabase, created.id, input.title, input.assigneeIds);
+  if (createError || !created) {
+    return { ok: false, error: createError?.message || 'Could not create the task.' };
   }
-  if (created && hasChecklist) {
+  const { error: assignError } = await supabase
+    .from('goal_assignees')
+    .insert(
+      assigneeIds.map((user_id) => ({
+        goal_id: created.id,
+        user_id,
+        assigned_by: userId,
+      })),
+    );
+  // The assignees are the point — a task whose assignee insert was refused (RLS
+  // on an out-of-scope member, say) would be exactly the unassigned task this
+  // rule exists to prevent, so take the goal row back out rather than leave one.
+  if (assignError) {
+    await supabase.from('goals').delete().eq('id', created.id);
+    return { ok: false, error: assignError.message };
+  }
+  // Every assignee on a brand-new goal is new — notify all of them.
+  await notifyAssignees(supabase, created.id, input.title, assigneeIds);
+  if (hasChecklist) {
     await syncChecklist(supabase, created.id, input.checklist!);
   }
   revalidatePath('/goals');
   revalidatePath('/dashboard');
+  return { ok: true };
 }
 
 export async function updateGoal(
@@ -900,8 +940,20 @@ export async function updateGoal(
   }>,
   assigneeIds?: string[],
   checklist?: ChecklistInput[],
-) {
+): Promise<{ ok: boolean; error?: string }> {
   const { supabase, userId } = await requireUser();
+  // Same ownership rule as createGoal — an edit must not be able to strip a
+  // task back down to no department or no assignee. Each half is checked only
+  // when this call actually supplies it, so the status-only callers (which pass
+  // neither) are untouched.
+  const editedDepts =
+    patch.departments ?? (patch.department === undefined ? null : [patch.department]);
+  if (editedDepts && !editedDepts.some((d) => d.trim())) {
+    return { ok: false, error: 'Pick a department for this task.' };
+  }
+  if (assigneeIds && assigneeIds.length === 0) {
+    return { ok: false, error: 'Assign at least one member to this task.' };
+  }
   // When the goal has a checklist, its progress is owned by the trigger —
   // don't let a stale slider value from the form overwrite it.
   const finalPatch = { ...patch };
@@ -910,7 +962,8 @@ export async function updateGoal(
   if (finalPatch.departments && finalPatch.departments.length) {
     finalPatch.department = finalPatch.departments[0];
   }
-  await supabase.from('goals').update(finalPatch).eq('id', id);
+  const { error: updateError } = await supabase.from('goals').update(finalPatch).eq('id', id);
+  if (updateError) return { ok: false, error: updateError.message };
   if (checklist) {
     await syncChecklist(supabase, id, checklist);
   }
@@ -924,6 +977,7 @@ export async function updateGoal(
   }
   revalidatePath('/goals');
   revalidatePath('/dashboard');
+  return { ok: true };
 }
 
 export async function deleteGoal(id: string) {
