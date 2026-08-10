@@ -245,8 +245,8 @@ Founder (no department, sees everything, assigns everything)
   **eligibility**, reading the member's whole `departments` list (0060). Putting
   "Audit" on someone whose primary is "GST" makes them assignable to an Audit
   Director without moving them out of GST — and grants nothing until the
-  assignment is actually made. This is the one place multi-department changes an
-  outcome.
+  assignment is actually made. (0062 below extends the same rule to a
+  Manager's team.)
 - SQL: new `directs_user()`; `can_view_user()` / `can_manage_user()` swap their
   department arm for it, as do the `logs` / `leaves` read and `leaves` review
   policies. `punches`, `profiles` and `change_requests` follow automatically via
@@ -272,6 +272,32 @@ Founder (no department, sees everything, assigns everything)
 handing them to their primary department's sole Director. It never overwrites an
 existing assignment. Departments with no Director (currently *General*) keep
 nobody assigned — those members are visible to the Founders alone.
+
+### A Manager's team can also be picked from an additional department (done)
+
+Reported by the client: adding extra departments to an executive (and to a
+Manager) visibly changed nothing about who that Manager could pick for their
+team — the picker still only matched a candidate's **primary** department,
+even though the identical setup (extra departments + an assignment) already
+worked for Director → staff (0061). Migration
+`0062_manager_team_multi_department.sql` closes that gap by applying the same
+rule to `manager_id`:
+
+- `assert_hierarchy_consistent()`'s `manager_id` branch now checks the
+  candidate's whole `departments` list (primary or additional), the same
+  `my_depts` construction the `director_id` branch already used. Removing the
+  department a team link rests on raises rather than silently detaching it,
+  same as the Director side.
+- `setManagerTeam()` in `actions.ts` swapped its primary-only comparison for
+  `belongsToDepartment()`, mirroring `setDirectorReports()`.
+- UI: the "Team in `<department>`" picker in Manage member now shows anyone
+  who belongs to that department, primary or additional, with a department
+  chip on anyone picked in via an extra — the same treatment the "Direct
+  reports" panel already had.
+- **Nothing about who can SEE a team member changed** — `canViewMember()` /
+  `canManageMember()` still key off `manager_id` directly, never off
+  department, so this migration only widens who is *eligible* to receive that
+  link in the first place.
 
 ## reStrucAI Support desk (built, gated to Phase 2)
 

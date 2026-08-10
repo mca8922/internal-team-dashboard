@@ -153,10 +153,11 @@ export function isDirector(
 // first.
 //
 // The list is still not an access grant on its own: canViewMember /
-// canManageMember below never read it. What it decides (since 0061) is
-// ELIGIBILITY — putting "Audit" on someone whose primary is "GST" makes them
-// assignable to an Audit Director in canReportToDirector(). Nobody sees them
-// until the Founder actually makes that assignment.
+// canManageMember below never read it. What it decides is ELIGIBILITY —
+// putting "Audit" on someone whose primary is "GST" makes them assignable to
+// an Audit Director (canReportToDirector, 0061) or picked for an Audit
+// Manager's team (setManagerTeam in actions.ts, 0062). Nobody sees them or
+// answers to anyone differently until the Founder actually makes that pick.
 
 // Every department a person is listed under, primary first, normalised
 // (trimmed, de-duplicated, blanks dropped). Falls back to the primary alone
@@ -178,9 +179,10 @@ export function extraDepartmentsOf(
   return departmentsOf(profile).filter((d) => d !== primary);
 }
 
-// Is this person listed under `dept` at all — primary or additional? For
-// grouping and filtering only; never for an access decision (use
-// canViewMember/canManageMember, which are primary-only by design).
+// Is this person listed under `dept` at all — primary or additional? Used for
+// grouping/filtering AND for eligibility (a Director's or Manager's candidate
+// list) — never for an access decision itself (canViewMember/canManageMember
+// key off director_id/manager_id directly, not department).
 export function belongsToDepartment(
   profile: { department?: string | null; departments?: string[] | null } | null | undefined,
   dept: string,
