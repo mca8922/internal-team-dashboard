@@ -1947,11 +1947,11 @@ async function knownDepartments(): Promise<Set<string>> {
 // The member's primary/home department is untouched — it comes from
 // updateMemberDepartment above and stays element 0 of the stored array.
 //
-// These extras are a LABEL: they group the member for reporting and show as
-// chips on their card. They grant nothing. Access is still drawn on the primary
-// department alone (0058), so listing someone under a second department does
-// not expose them to that department's Director, nor widen what they can see.
-// Founder-only, like every other structural edit.
+// Adding a department here grants nothing BY ITSELF — it only makes the member
+// ELIGIBLE to be picked for that department's Director (setDirectorReports,
+// 0061) or Manager (setManagerTeam, 0062). Nobody actually sees or manages
+// the member differently until a Founder makes that pick. Founder-only, like
+// every other structural edit.
 export async function setMemberDepartments(memberId: string, extraDepartments: string[]) {
   const { supabase } = await requireFounder();
   // The Founders sit under NO department by design (0058) — giving them one
@@ -2633,17 +2633,20 @@ export async function setManagerTeam(managerId: string, memberIds: string[]) {
 
   const wanted = Array.from(new Set(memberIds)).filter((id) => id !== managerId);
 
-  // Validate every picked member is in the manager's department (and not the
-  // Founder). Pulled in one round-trip.
+  // Validate every picked member BELONGS TO the manager's department — primary
+  // or additional (0060/0062, mirroring setDirectorReports' eligibility rule)
+  // — and isn't the Founder. Pulled in one round-trip.
   if (wanted.length) {
     const { data: picks } = await supabase
       .from('profiles')
-      .select('id, department')
+      .select('id, name, department, departments')
       .in('id', wanted);
     for (const p of picks ?? []) {
       if (isFounderId(p.id)) throw new Error('The Founder cannot be on a team.');
-      if (p.department !== manager.managed_department) {
-        throw new Error('Team members must belong to the department this manager heads.');
+      if (!belongsToDepartment(p, manager.managed_department)) {
+        throw new Error(
+          `${p.name} doesn't belong to ${manager.managed_department}. Add ${manager.managed_department} to their departments in Manage member first.`,
+        );
       }
     }
   }

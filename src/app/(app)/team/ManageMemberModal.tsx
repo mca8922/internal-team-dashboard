@@ -34,6 +34,7 @@ import {
   weeklyTargetFromDaily,
   canReportToDirector,
   extraDepartmentsOf,
+  belongsToDepartment,
 } from '@/lib/roles';
 import { MemberGoalsHandoff } from '@/components/MemberGoalsHandoff';
 import { addMonths, calcAge, fmtFriendly, parseDate } from '@/lib/dates';
@@ -233,8 +234,10 @@ export function ManageMemberModal({
   };
 
   // ---- Department Manager controls ----
-  // Candidate team members: active, non-board members of the department this
-  // person heads (excluding the manager themselves and the Founder).
+  // Candidate team members: active, non-board members who BELONG TO the
+  // department this person heads — primary or additional (0060/0062,
+  // mirroring the Director "Direct reports" eligibility below) — excluding
+  // the manager themselves and the Founder.
   const teamCandidates = member
     ? allMembers.filter(
         (m) =>
@@ -242,7 +245,7 @@ export function ManageMemberModal({
           m.role !== 'board' &&
           !m.isFounder &&
           m.id !== member.id &&
-          m.department === headDept,
+          belongsToDepartment(m, headDept),
       )
     : [];
 
@@ -900,12 +903,13 @@ export function ManageMemberModal({
               hint={
                 structuralLocked
                   ? 'Only a Founder can change who reports to this manager.'
-                  : 'Pick the members this manager leads. Only members of the department they head are shown.'
+                  : `Anyone with ${headDept} in their departments can be picked, even if it isn't their primary one.`
               }
             >
               {teamCandidates.length === 0 ? (
                 <div className="text-xs text-grey">
-                  No other active members in {headDept} to assign yet.
+                  Nobody belongs to {headDept} yet. Add {headDept} to a member’s departments
+                  in Manage member to make them assignable here.
                 </div>
               ) : (
                 <div className="dept-pick-list">
@@ -922,6 +926,17 @@ export function ManageMemberModal({
                       <span className="text-xs text-grey dept-pick-meta">
                         {roleLabel(m.role)}
                       </span>
+                      {/* Eligible via an ADDITIONAL department, not their
+                          primary one — say so, so picking someone out of
+                          another department is never a surprise. */}
+                      {m.department !== headDept ? (
+                        <span
+                          className="dept-chip dept-pick-meta"
+                          title={`${m.name.split(' ')[0]}'s primary department is ${m.department}`}
+                        >
+                          {m.department}
+                        </span>
+                      ) : null}
                     </label>
                   ))}
                 </div>
