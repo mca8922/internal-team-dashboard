@@ -54,6 +54,7 @@ import {
   isOverdue,
   isPastDue,
   dueWithin,
+  dueUrgency,
   dueLine,
   goalDepts,
   goalInDept,
@@ -480,6 +481,9 @@ function GoalCard({
   const notMet = goal.status === 'not_met';
   const overdue = isOverdue(goal);
   const closed = isPastDue(goal);
+  // Graduated deadline-proximity look: approaching (4-7d) → urgent (1-3d) →
+  // today (spotlight) → overdue (red, handled by gb-overdue above).
+  const urgency = dueUrgency(goal);
   // Stable references so the progress useMemo below only recomputes on real
   // data changes (a bare `?? []` would make a new array every render).
   const items = React.useMemo(
@@ -539,7 +543,9 @@ function GoalCard({
       data-goal-id={goal.id}
       className={`gb-card gb-${meta.tone}${overdue ? ' gb-overdue' : ''}${
         completed ? ' gb-completed' : ''
-      }${notMet ? ' gb-notmet' : ''}${goal.id === ctx.flashId ? ' gb-flash' : ''}`}
+      }${notMet ? ' gb-notmet' : ''}${
+        !overdue && !completed && !notMet && urgency !== 'normal' ? ` gb-due-${urgency}` : ''
+      }${goal.id === ctx.flashId ? ' gb-flash' : ''}`}
     >
       {goal.id === ctx.flashId ? (
         <span className="gb-flash-pill" aria-hidden>

@@ -86,6 +86,23 @@ export const dueWithin = (g: Goal, days: number): boolean => {
   );
 };
 
+// Graduated deadline-proximity state for card styling. Settled goals
+// (Completed / Not met) never escalate — same rule isOverdue/dueWithin use.
+// today gets its own spotlight (brighter than the 1-3 day "urgent" band)
+// rather than blending into it.
+export type DueUrgency = 'normal' | 'approaching' | 'urgent' | 'today' | 'overdue';
+
+export const dueUrgency = (g: Goal): DueUrgency => {
+  if (g.status === 'achieved' || g.status === 'not_met') return 'normal';
+  const d = daysToDue(g);
+  if (d === null) return 'normal';
+  if (d < 0) return 'overdue';
+  if (d === 0) return 'today';
+  if (d <= 3) return 'urgent';
+  if (d <= 7) return 'approaching';
+  return 'normal';
+};
+
 export function dueLine(g: Goal): string {
   if (!g.due_date) return 'No due date';
   const part = fmtShort(parseDate(g.due_date));
