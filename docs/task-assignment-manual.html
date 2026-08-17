@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How to Assign a Task — A Complete Manual</title>
+<style>
+  @page { size: A4; margin: 13mm 12mm; }
+
+  :root {
+    --ink:      #16191d;
+    --muted:    #5d6672;
+    --line:     #d9dee5;
+    --gold:     #B8860B;
+    --gold-bg:  #fdf7e7;
+    --blue:     #1a56b8;
+    --blue-bg:  #eef3fc;
+    --green:    #1e7a44;
+    --green-bg: #ecf7f0;
+    --grey-bg:  #f5f7f9;
+    --red:      #a3282d;
+    --red-bg:   #fdeeee;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.48;
+    color: var(--ink);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .masthead {
+    border-bottom: 2.5px solid var(--ink);
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+  }
+  .masthead .eyebrow {
+    font-size: 8pt;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .masthead h1 { font-size: 20pt; margin: 4px 0 3px; letter-spacing: -0.02em; }
+  .masthead .sub { color: var(--muted); font-size: 9.8pt; }
+
+  h2 {
+    font-size: 12.5pt;
+    margin: 20px 0 4px;
+    padding-bottom: 5px;
+    border-bottom: 1.5px solid var(--ink);
+    letter-spacing: -0.01em;
+    page-break-after: avoid;
+  }
+  h2 .n {
+    display: inline-block;
+    background: var(--ink); color: #fff;
+    width: 18px; height: 18px; line-height: 18px;
+    text-align: center; border-radius: 3px;
+    font-size: 9pt; margin-right: 7px; vertical-align: 1px;
+  }
+  h3 { font-size: 10.3pt; margin: 13px 0 4px; page-break-after: avoid; }
+  p  { margin: 5px 0 8px; }
+  .lede { color: var(--muted); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 7px 0 11px;
+    font-size: 9pt;
+    page-break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 5px 7px;
+    text-align: left;
+    vertical-align: top;
+  }
+  thead th {
+    background: var(--ink); color: #fff;
+    font-size: 8pt; letter-spacing: 0.05em;
+    text-transform: uppercase; font-weight: 600;
+    border-color: var(--ink);
+  }
+  tbody tr:nth-child(even) td { background: #fafbfc; }
+  .rowhead { font-weight: 600; white-space: nowrap; }
+  td.req  { color: var(--red);   font-weight: 700; text-align: center; }
+  td.opt  { color: var(--muted); font-weight: 600; text-align: center; }
+  code {
+    background: var(--grey-bg);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 8.6pt;
+  }
+
+  .chip {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 8pt;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .chip-home  { background: var(--green-bg); color: var(--green); border: 1px solid #c2e2ce; }
+  .chip-extra { background: var(--grey-bg);  color: var(--muted); border: 1px solid var(--line); }
+  .chip-red   { background: var(--red-bg);   color: var(--red);   border: 1px solid #f0cccc; }
+
+  .note {
+    border-left: 3px solid var(--blue);
+    background: var(--blue-bg);
+    padding: 8px 11px;
+    margin: 9px 0 12px;
+    font-size: 9.1pt;
+    border-radius: 0 3px 3px 0;
+    page-break-inside: avoid;
+  }
+  .note.good { border-left-color: var(--green); background: var(--green-bg); }
+  .note.warn { border-left-color: var(--gold);  background: var(--gold-bg); }
+  .note.stop { border-left-color: var(--red);   background: var(--red-bg); }
+  .note strong:first-child { display: block; margin-bottom: 2px; }
+
+  a { color: var(--blue); }
+
+  .steps { counter-reset: s; padding: 0; margin: 8px 0 12px; list-style: none; }
+  .steps li {
+    counter-increment: s;
+    position: relative;
+    padding: 0 0 0 26px;
+    margin-bottom: 6px;
+    page-break-inside: avoid;
+  }
+  .steps li::before {
+    content: counter(s);
+    position: absolute; left: 0; top: 1px;
+    width: 18px; height: 18px;
+    background: var(--blue); color: #fff;
+    border-radius: 50%;
+    text-align: center; line-height: 18px;
+    font-size: 8.3pt; font-weight: 700;
+  }
+  .steps.big li::before { background: var(--green); }
+
+  .page-break { page-break-before: always; }
+
+  .bigrule {
+    border: 2px solid var(--red);
+    background: var(--red-bg);
+    border-radius: 4px;
+    padding: 10px 13px;
+    margin: 10px 0 14px;
+    page-break-inside: avoid;
+  }
+  .bigrule .label {
+    font-size: 8pt;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--red);
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .bigrule .headline { font-size: 11.5pt; font-weight: 700; margin-bottom: 4px; }
+
+  /* ---- Hierarchy map (Section 8) ---- */
+  .org-founder {
+    border: 2px solid var(--gold);
+    background: var(--gold-bg);
+    border-radius: 6px;
+    padding: 9px 14px;
+    text-align: center;
+    margin: 8px auto 0;
+    max-width: 420px;
+  }
+  .org-tier-label {
+    font-size: 7.3pt;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .org-founder .org-tier-label { color: var(--gold); }
+  .org-names { font-weight: 700; font-size: 9.4pt; margin: 2px 0; }
+  .org-desc { font-size: 8.2pt; color: var(--muted); }
+  .org-arrow {
+    text-align: center; font-size: 15pt; color: var(--muted);
+    line-height: 1; margin: 1px 0;
+  }
+  .org-arrow-sm {
+    text-align: center; font-size: 11pt; color: var(--muted);
+    line-height: 1; margin: 3px 0;
+  }
+  .org-depts { display: flex; gap: 8px; margin-top: 2px; align-items: stretch; }
+  .org-dept {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column;
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 7px; background: #fff;
+  }
+  .org-dept-name {
+    text-align: center; font-size: 8.4pt; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    margin-bottom: 5px; padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .org-box {
+    border: 1px solid var(--line); border-radius: 5px;
+    padding: 5px 6px; text-align: center;
+  }
+  .org-box .org-names { font-size: 8.3pt; line-height: 1.3; }
+  .org-box.org-director { background: var(--blue-bg);  border-color: #c6d7f2; }
+  .org-box.org-manager  { background: var(--green-bg); border-color: #c2e2ce; }
+  .org-box.org-exec     { background: var(--grey-bg); }
+  .org-box.org-none     { background: #fff; border-style: dashed; }
+  .org-box.org-none .org-desc { font-size: 7.6pt; margin-top: 1px; }
+
+  /* ---- Workflow diagram (Section 9) ---- */
+  .wf-box {
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 8px 12px; margin: 0 auto; max-width: 480px;
+    display: flex; align-items: flex-start; gap: 9px;
+    page-break-inside: avoid;
+  }
+  .wf-num {
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--blue); color: #fff;
+    font-size: 9pt; font-weight: 700;
+  }
+  .wf-title { font-weight: 700; font-size: 9.6pt; }
+  .wf-desc { font-size: 8.4pt; color: var(--muted); margin-top: 1px; }
+  .wf-box.wf-critical { border-color: var(--red); background: var(--red-bg); }
+  .wf-box.wf-critical .wf-num { background: var(--red); }
+  .wf-box.wf-done { border-color: var(--green); background: var(--green-bg); }
+  .wf-box.wf-done .wf-num { background: var(--green); }
+  .wf-arrow {
+    text-align: center; font-size: 13pt; color: var(--muted);
+    line-height: 1; margin: 1px 0;
+  }
+
+  footer {
+    margin-top: 20px;
+    padding-top: 7px;
+    border-top: 1px solid var(--line);
+    font-size: 8pt;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="eyebrow">Mahesh Chandra &amp; Associates · Internal Team Dashboard</div>
+  <h1>How to Assign a Task — A Complete Manual</h1>
+  <div class="sub">Every field, every step, in plain language. Written to answer the question
+  Rajesh Bohra raised: why an executive can&rsquo;t finish a task that has no checklist &mdash;
+  and exactly what to do about it.</div>
+  <div class="sub" style="margin-top:4px">
+    <strong>A quick note on the word &ldquo;your&rdquo;:</strong> it means the one shared MCA
+    Dashboard &mdash; the same system Rajesh, Dharmesh, every Director, every Manager and every
+    Executive all log into. It is never one specific person&rsquo;s private account.
+  </div>
+</div>
+
+<div class="bigrule">
+  <div class="label">The one rule that matters most</div>
+  <div class="headline">If a task has no checklist, the person it&rsquo;s assigned to has
+  nothing to click &mdash; no button, no tick box, nothing.</div>
+  <p style="margin:0">It doesn&rsquo;t matter if the task is overdue or the work is finished in real
+  life. The dashboard has no "Mark complete" button anywhere for a plain team member.
+  The <strong>only</strong> way they can show progress is by ticking off checklist steps you
+  gave them when you created the task. No checklist = no way for them to ever finish it
+  themselves.</p>
+</div>
+
+<h2><span class="n">1</span>A real example, from inside the MCA Dashboard today</h2>
+
+<p>Not a made-up example. This is one real task that exists in the system right now &mdash;
+and it belongs to <strong>Priyanka Rasal</strong> (a General department Manager), not to
+Rajesh or Dharmesh. It is simply the clearest live proof of the problem:</p>
+
+<table>
+  <thead><tr><th style="width:26%">Task</th><th style="width:14%">Assigned to</th><th style="width:12%">Due</th><th style="width:12%">Checklist steps</th><th style="width:12%">Progress</th><th>What she can do about it</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="rowhead">ARWL Form 146</td>
+      <td>Priyanka Rasal</td>
+      <td><span class="chip chip-red">Today</span></td>
+      <td class="opt">0</td>
+      <td class="opt">0%</td>
+      <td><strong>Nothing.</strong> No checklist means no tick box on her screen at all.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note good">
+  <strong>Now here is the same situation, but fixed</strong>
+  A different task was given 3 checklist steps. Its assignee ticked each one as they finished
+  it, and the task climbed to <strong>100%</strong> on its own &mdash; nobody had to press
+  anything else. That is the whole fix, in one sentence:
+  <strong>always add a checklist before you assign a task.</strong>
+</div>
+
+<h2><span class="n">2</span>How to assign a task &mdash; every step, in order</h2>
+
+<p>Walking through creating a real task: <strong>&ldquo;File GSTR-1 for July&rdquo;</strong>, a
+Monthly task for the General department, assigned to one person, with a 3-step checklist.</p>
+
+<ol class="steps big">
+  <li><strong>Open Team &rsaquo; Goals (Tasks)</strong> and press the green <strong>+ Add Task</strong>
+  button, top right.</li>
+  <li><strong>Pick the tier.</strong> A row of buttons: Yearly / Half-Yearly / Quarterly /
+  Monthly / Daily. For a monthly GST filing, pick <strong>Monthly</strong>.</li>
+  <li><strong>Type the Title.</strong> <code>File GSTR-1 for July</code>. This is required &mdash;
+  the form will not save without one.</li>
+  <li><strong>Type a Description (optional).</strong> A one-line note on what "done" looks
+  like, e.g. <code>Reconcile sales register, file on the GST portal, save the ARN.</code></li>
+  <li><strong>Pick the Department.</strong> <code>General</code>. Required &mdash; a task with no
+  department cannot be saved.</li>
+  <li><strong>Pick the Due date.</strong> The system shows you which financial quarter that
+  date falls in, just so you can double check it&rsquo;s right.</li>
+  <li><strong>Leave Status as Active</strong> (the default) unless the task is already finished
+  or on hold.</li>
+  <li><strong style="color:var(--red)">Build the Checklist. This is the step that was missed.</strong>
+  Press <strong>Add checklist item</strong> and type each real step of the work, one per line:
+    <ul style="margin:5px 0 0 18px;padding:0">
+      <li><code>Reconcile sales register</code></li>
+      <li><code>File on GST portal</code></li>
+      <li><code>Save the acknowledgement (ARN)</code></li>
+    </ul>
+  </li>
+  <li><strong>Set how often each step repeats.</strong> Every checklist line has its own small
+  dropdown: <strong>One-time</strong> (default, for a step done once), <strong>Daily</strong>,
+  <strong>Weekly</strong>, <strong>Monthly</strong>, or <strong>Custom days</strong> (pick exact
+  weekdays). For this filing, leave all three as <strong>One-time</strong>.</li>
+  <li><strong>Turn on &ldquo;Report Work&rdquo; only where you want it.</strong> See
+  <a href="#reportwork">Section 4</a> below &mdash; it adds an extra safety step before a tick
+  counts.</li>
+  <li><strong>Leave Progress alone.</strong> Once you&rsquo;ve typed at least one checklist step,
+  the Progress field locks itself and reads <em>"Tracked automatically from the checklist
+  above."</em> You never touch it again &mdash; it moves on its own as ticks come in.</li>
+  <li><strong style="color:var(--red)">Assign to members.</strong> Tick the person&rsquo;s name
+  &mdash; e.g. <strong>Priyanka Rasal</strong>. Required: a task with nobody assigned cannot be
+  saved, and the system tells you so if you try.</li>
+  <li>Press <strong>Add task</strong>. Done.</li>
+</ol>
+
+<div class="page-break"></div>
+
+<h2><span class="n">3</span>Every field, at a glance</h2>
+
+<table>
+  <thead><tr><th style="width:16%">Field</th><th style="width:10%">Required?</th><th style="width:34%">What it means</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td class="rowhead">Task level</td><td class="req">Yes</td><td>How big the task is: Yearly, Half-Yearly, Quarterly, Monthly, or Daily. A Daily task can be linked under a Monthly one, which sits under a Quarterly one, and so on.</td><td>A "Monthly" GST filing</td></tr>
+    <tr><td class="rowhead">Title</td><td class="req">Yes</td><td>The name of the task.</td><td>File GSTR-1 for July</td></tr>
+    <tr><td class="rowhead">Description</td><td class="opt">No</td><td>A short note on what finishing the task actually looks like.</td><td>Reconcile, file, save the ARN</td></tr>
+    <tr><td class="rowhead">Department(s)</td><td class="req">Yes</td><td>Which team owns the task. A Director can pick more than one department for a task; a Manager is locked to their own.</td><td>General</td></tr>
+    <tr><td class="rowhead">Due date</td><td class="req">Yes</td><td>Deadline. The screen shows which quarter it falls in, for reference only.</td><td>11 Aug 2026</td></tr>
+    <tr><td class="rowhead">Status</td><td class="opt">Defaults to Active</td><td>Not-Active / Active / Completed / Not met. <strong>Only a Director or Manager can change this</strong> &mdash; a team member never sees this control.</td><td>Active</td></tr>
+    <tr><td class="rowhead">Parent task</td><td class="opt">No</td><td>Links this task under a bigger one from the tier above, so it rolls up (e.g. a Daily task under its Monthly task).</td><td>&mdash;</td></tr>
+    <tr><td class="rowhead">Checklist</td><td class="opt">No, but see below</td><td><strong>The single most important field.</strong> The real, ticked-off steps of the work. With no checklist, the assignee has no way to show the task is done.</td><td>3 steps, see above</td></tr>
+    <tr><td class="rowhead">Report Work</td><td class="opt">No</td><td>A toggle on a checklist step. When on, the person must first write a short note about their work before that one step can be ticked.</td><td>Off, for a simple filing</td></tr>
+    <tr><td class="rowhead">Progress</td><td class="opt">Automatic once a checklist exists</td><td>A percentage bar. With a checklist, it is worked out for you and cannot be typed in. With no checklist, it&rsquo;s a manual slider &mdash; a number YOU type once, that never moves again by itself.</td><td>Locks to "Tracked automatically"</td></tr>
+    <tr><td class="rowhead">Assign to members</td><td class="req">Yes</td><td>Who the task is for. At least one person, always.</td><td>Priyanka Rasal</td></tr>
+  </tbody>
+</table>
+
+<h2><span class="n">4</span>What the assigned person actually sees</h2>
+
+<table>
+  <thead><tr><th style="width:30%">Situation</th><th>What the executive sees on their screen</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="rowhead">Task has no checklist</td>
+      <td>Just a title, a description if you wrote one, and a static progress bar. <strong>No
+      checkbox, no button, nothing to press.</strong> They cannot mark it done, no matter how
+      overdue it is.</td>
+    </tr>
+    <tr>
+      <td class="rowhead">Task has a checklist</td>
+      <td>Each step shown as a tick box, under the heading <strong>"Your checklist."</strong>
+      Ticking a box completes that step for them personally. The task&rsquo;s overall %
+      updates the moment they tick.</td>
+    </tr>
+    <tr id="reportwork">
+      <td class="rowhead">A step has "Report Work" turned on</td>
+      <td>That step is locked with a small padlock, labelled <strong>"Report to tick."</strong>
+      They must first write a short note about what they did that day; only then does the
+      tick unlock. If they try to tick first, the screen tells them: <em>"Report your work
+      first, then tick this task complete."</em></td>
+    </tr>
+    <tr>
+      <td class="rowhead">A step repeats (Daily / Weekly / Custom)</td>
+      <td>It shows a small clock badge, e.g. <strong>"Daily"</strong> or <strong>"Mon &middot;
+      Wed &middot; Fri."</strong> It resets to un-ticked at the start of each new day/week/month,
+      so the same step can be completed again and again over time.</td>
+    </tr>
+    <tr>
+      <td class="rowhead">The due date has passed</td>
+      <td>The checklist freezes with the message <strong>"Checklist closed. The due date has
+      passed."</strong> Nobody can tick anything on it anymore &mdash; another reason to
+      double-check the due date is realistic when you assign it.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note warn">
+  <strong>The "Progress" trap</strong>
+  A task with no checklist can still show a progress number &mdash; e.g. one of your live
+  tasks currently reads 20%. That number was simply typed once by whoever created it. It is
+  not a measurement of real work, it will never move on its own, and the assignee has no way
+  to change it either. Only a checklist gives you a progress number you can actually trust.
+</div>
+
+<div class="page-break"></div>
+
+<h2><span class="n">5</span>Who is allowed to do what</h2>
+
+<div class="note warn">
+  <strong>Founder and Director are the same, here</strong>
+  For <em>people</em> &mdash; who can see whom on the Team page &mdash; a Founder and a Director
+  are different (a Director is limited to their own department). But for <strong>tasks</strong>,
+  they are identical: a Founder or a Director can create and assign a task in <strong>any</strong>
+  department, not just their own. Only a Manager is department-locked here.
+</div>
+
+<table>
+  <thead><tr><th style="width:44%">Action</th><th style="width:20%">Founder / Director</th><th style="width:18%">Manager</th><th style="width:18%">Executive</th></tr></thead>
+  <tbody>
+    <tr><td>Create / assign a task</td><td class="req" style="color:var(--green)">Yes &mdash; any department</td><td class="req" style="color:var(--green)">Yes &mdash; own department only</td><td class="opt">No</td></tr>
+    <tr><td>Change a task&rsquo;s Status (Active / Completed / etc.)</td><td class="req" style="color:var(--green)">Yes</td><td class="req" style="color:var(--green)">Yes, for their own department</td><td class="opt">No</td></tr>
+    <tr><td>Tick their own checklist steps</td><td class="req" style="color:var(--green)">Yes</td><td class="req" style="color:var(--green)">Yes</td><td class="req" style="color:var(--green)">Yes &mdash; their only way to show progress</td></tr>
+    <tr><td>Assign a task to people in more than one department at once</td><td class="req" style="color:var(--green)">Yes</td><td class="opt">No</td><td class="opt">No</td></tr>
+    <tr><td>Archive / delete a task</td><td class="req" style="color:var(--green)">Yes</td><td class="opt">No</td><td class="opt">No</td></tr>
+  </tbody>
+</table>
+
+<h3>Your real accounts, by row above</h3>
+<p class="lede">Exactly who this table means, taken from your live account list today.</p>
+
+<table>
+  <thead><tr><th style="width:20%">Row above</th><th style="width:30%">Real accounts</th><th style="width:16%">Department</th><th>What it means for them</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="rowhead">Founder</td>
+      <td><strong>Rajesh Bohra</strong>, <strong>Dharmesh Bohra</strong></td>
+      <td><span class="chip chip-home">General</span></td>
+      <td>Their profile is set to General &mdash; but that field doesn&rsquo;t limit a Founder
+      the way it limits everyone else. Full access. Can create and assign a task in ANY
+      department, change any task&rsquo;s status, archive or delete anything.</td>
+    </tr>
+    <tr>
+      <td class="rowhead">Director</td>
+      <td><strong>Adityavikram Bohra</strong>, <strong>Dilip Pandey</strong> &mdash; Audit ·
+      <strong>Vipul Awaghade</strong> &mdash; GST · <strong>Rohit Bohra</strong> &mdash; MCA</td>
+      <td>Audit, GST, MCA</td>
+      <td>Same task powers as a Founder &mdash; any department, not just their own.</td>
+    </tr>
+    <tr>
+      <td class="rowhead">Manager</td>
+      <td><strong>Kabir Joshi, Vaibhav Chavan</strong> &mdash; Audit &middot; <strong>Meena
+      Panchal, Priyanka Rasal, Roshan Singh, Test</strong> &mdash; General &middot;
+      <strong>Pranita Awaghade</strong> &mdash; GST &middot; <strong>Anita Sharma, Salma
+      Mazgaonkar, Shruti Somani, Vaibhavi Pawar</strong> &mdash; MCA</td>
+      <td>Own team only</td>
+      <td>Can create and assign tasks, but only inside the one department they head, and only to
+      the team members given to them.</td>
+    </tr>
+    <tr>
+      <td class="rowhead">Executive</td>
+      <td>Everyone else &mdash; <strong>13 people</strong> across Audit, General and MCA (e.g.
+      Palak Mewada, Vaibhav Shitap, Deepika Das, Pratik Gowda&hellip;)</td>
+      <td>&mdash;</td>
+      <td>Cannot create or assign tasks, and cannot change a task&rsquo;s status. Their only
+      screen action anywhere in Goals is ticking their own checklist boxes &mdash; which is
+      exactly why Section 1&rsquo;s missing checklist locked Priyanka out completely.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <strong>One person, more than one department</strong>
+  Several names above appear under more than one department on their own profile (e.g. Roshan
+  Singh is General&rsquo;s Manager but also listed under Audit and GST). That only changes who
+  they can be <em>assigned to work under</em> on the Team page &mdash; it does not change these
+  task rules. A Manager&rsquo;s task power always stays locked to the ONE department they head.
+</div>
+
+<div class="page-break"></div>
+
+<h2><span class="n">6</span>Common problems, and the real cause</h2>
+
+<table>
+  <thead><tr><th style="width:38%">What you're seeing</th><th>Why, and what to do</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="rowhead">"The task is overdue and nobody has marked it done."</td>
+      <td>It almost certainly has no checklist. Open the task, add at least one checklist
+      step, save. The assignee will now have something to tick.</td>
+    </tr>
+    <tr>
+      <td class="rowhead">"The progress bar says 20% and never changes."</td>
+      <td>No checklist exists, so that number was typed once by hand and is frozen. Add a
+      checklist to get a real, moving percentage.</td>
+    </tr>
+    <tr>
+      <td class="rowhead">"I can&rsquo;t save the task."</td>
+      <td>You&rsquo;re missing one of the two things every task needs: a <strong>Department</strong>
+      and at least one <strong>assigned person</strong>. The screen names exactly which one is
+      missing.</td>
+    </tr>
+    <tr>
+      <td class="rowhead">"The executive says they can&rsquo;t tick a step."</td>
+      <td>Check whether <strong>Report Work</strong> is on for that step &mdash; they need to
+      submit a short work note first. Or the due date may already have passed, which freezes
+      the whole checklist.</td>
+    </tr>
+    <tr>
+      <td class="rowhead">"I don&rsquo;t see certain people to assign."</td>
+      <td>A Manager only sees their own team plus themselves. A person also has to belong to
+      the task&rsquo;s department &mdash; either as their main one or as an extra one on their
+      profile (Team &rsaquo; Manage &rsaquo; Multi department).</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2><span class="n">7</span>In short</h2>
+
+<table>
+  <thead><tr><th style="width:44%">Question</th><th>Answer</th></tr></thead>
+  <tbody>
+    <tr><td class="rowhead">Why couldn't the executive finish the task?</td><td>The task had no checklist. With no checklist, there is nothing on their screen to click at all.</td></tr>
+    <tr><td class="rowhead">What is the one thing to never skip when assigning a task?</td><td>Adding at least one checklist step.</td></tr>
+    <tr><td class="rowhead">Does the progress bar update itself?</td><td>Only if a checklist exists. Otherwise it's a number someone typed once, and it stays frozen forever.</td></tr>
+    <tr><td class="rowhead">What are the two fields that are always required?</td><td>Department, and at least one assigned person.</td></tr>
+    <tr><td class="rowhead">Can an executive change a task's Status themselves?</td><td>No &mdash; that control only exists for a Director or Manager. An executive's only tool is the checklist tick box.</td></tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<h2><span class="n">8</span>Hierarchy Map &mdash; Who Can Assign to Whom</h2>
+
+<p>Your whole team, in one picture. Real names, exactly as they stand today. Reading it top to
+bottom: whoever is higher up can assign a task to anyone below them, in their own box.</p>
+
+<div class="org-founder">
+  <div class="org-tier-label">Founder</div>
+  <div class="org-names">Rajesh Bohra &middot; Dharmesh Bohra</div>
+  <div class="org-desc">Their profile is set to General, but that does not limit them the way
+  it limits everyone else below. A Founder sees and controls everything, and can create or
+  assign a task in ANY department in this picture &mdash; not just one.</div>
+</div>
+<div class="org-arrow">&darr;</div>
+
+<div class="org-depts">
+  <div class="org-dept">
+    <div class="org-dept-name">Audit</div>
+    <div class="org-box org-director">
+      <div class="org-tier-label">Director</div>
+      <div class="org-names">Adityavikram Bohra<br>Dilip Pandey</div>
+    </div>
+    <div class="org-arrow-sm">&darr;</div>
+    <div class="org-box org-manager">
+      <div class="org-tier-label">Manager</div>
+      <div class="org-names">Kabir Joshi<br>Vaibhav Chavan</div>
+    </div>
+    <div class="org-arrow-sm">&darr;</div>
+    <div class="org-box org-exec">
+      <div class="org-tier-label">Executive</div>
+      <div class="org-names">6 team members</div>
+    </div>
+  </div>
+
+  <div class="org-dept">
+    <div class="org-dept-name">GST</div>
+    <div class="org-box org-director">
+      <div class="org-tier-label">Director</div>
+      <div class="org-names">Vipul Awaghade</div>
+    </div>
+    <div class="org-arrow-sm">&darr;</div>
+    <div class="org-box org-manager">
+      <div class="org-tier-label">Manager</div>
+      <div class="org-names">Pranita Awaghade</div>
+    </div>
+    <div class="org-arrow-sm">&darr;</div>
+    <div class="org-box org-exec">
+      <div class="org-tier-label">Executive</div>
+      <div class="org-names">&mdash; none yet &mdash;</div>
+    </div>
+  </div>
+
+  <div class="org-dept">
+    <div class="org-dept-name">MCA</div>
+    <div class="org-box org-director">
+      <div class="org-tier-label">Director</div>
+      <div class="org-names">Rohit Bohra</div>
+    </div>
+    <div class="org-arrow-sm">&darr;</div>
+    <div class="org-box org-manager">
+      <div class="org-tier-label">Manager</div>
+      <div class="org-names">Anita Sharma, Salma Mazgaonkar,<br>Shruti Somani, Vaibhavi Pawar</div>
+    </div>
+    <div class="org-arrow-sm">&darr;</div>
+    <div class="org-box org-exec">
+      <div class="org-tier-label">Executive</div>
+      <div class="org-names">6 team members</div>
+    </div>
+  </div>
+
+  <div class="org-dept">
+    <div class="org-dept-name">General</div>
+    <div class="org-box org-none">
+      <div class="org-tier-label">No Director</div>
+      <div class="org-desc">The Founders cover this department directly &mdash; nobody
+      needs to be appointed here.</div>
+    </div>
+    <div class="org-arrow-sm">&darr;</div>
+    <div class="org-box org-manager">
+      <div class="org-tier-label">Manager</div>
+      <div class="org-names">Meena Panchal, Priyanka Rasal,<br>Roshan Singh, Test</div>
+    </div>
+    <div class="org-arrow-sm">&darr;</div>
+    <div class="org-box org-exec">
+      <div class="org-tier-label">Executive</div>
+      <div class="org-names">1 team member</div>
+    </div>
+  </div>
+</div>
+
+<div class="note" style="margin-top:10px">
+  <strong>How to read the colours</strong>
+  Gold = Founder, blue = Director, green = Manager, grey = Executive. A dashed box means that
+  role is empty for that department right now. Everyone shown can be given tasks by anyone
+  above them in the same column &mdash; and the Founders, at the top, reach every column at once.
+</div>
+
+<h2><span class="n">9</span>Workflow &mdash; From Creating a Task to Done</h2>
+
+<p>The same six steps, every time, for every task, no matter who creates it.</p>
+
+<div class="wf-box">
+  <span class="wf-num">1</span>
+  <div>
+    <div class="wf-title">Someone with permission creates the task</div>
+    <div class="wf-desc">A Founder, a Director, or a Manager &mdash; never an Executive.</div>
+  </div>
+</div>
+<div class="wf-arrow">&darr;</div>
+
+<div class="wf-box wf-critical">
+  <span class="wf-num">2</span>
+  <div>
+    <div class="wf-title">They add a checklist &mdash; the step that gets missed</div>
+    <div class="wf-desc">The real, individual steps of the work. Skip this, and the person it&rsquo;s
+    given to will have nothing to click, ever.</div>
+  </div>
+</div>
+<div class="wf-arrow">&darr;</div>
+
+<div class="wf-box">
+  <span class="wf-num">3</span>
+  <div>
+    <div class="wf-title">They assign it to one or more people</div>
+    <div class="wf-desc">Always required &mdash; a task cannot be saved with nobody assigned.</div>
+  </div>
+</div>
+<div class="wf-arrow">&darr;</div>
+
+<div class="wf-box">
+  <span class="wf-num">4</span>
+  <div>
+    <div class="wf-title">The assigned person does the work, and ticks each step</div>
+    <div class="wf-desc">Their only tool. If a step needs "Report Work," they write a short note
+    first, then the tick unlocks.</div>
+  </div>
+</div>
+<div class="wf-arrow">&darr;</div>
+
+<div class="wf-box">
+  <span class="wf-num">5</span>
+  <div>
+    <div class="wf-title">The Progress % updates itself, the moment they tick</div>
+    <div class="wf-desc">Nobody has to touch it. It is worked out automatically from the
+    checklist.</div>
+  </div>
+</div>
+<div class="wf-arrow">&darr;</div>
+
+<div class="wf-box wf-done">
+  <span class="wf-num">6</span>
+  <div>
+    <div class="wf-title">Every step ticked &mdash; the task is done</div>
+    <div class="wf-desc">A Director or Manager can also set its Status to "Completed" if they
+    want the badge to say so, but the real work is already finished the moment the checklist
+    reaches 100%.</div>
+  </div>
+</div>
+
+<footer>
+  <span>Mahesh Chandra &amp; Associates &middot; Internal Team Dashboard</span>
+  <span>Written from the live system, 10 August 2026</span>
+</footer>
+
+</body>
+</html>

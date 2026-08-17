@@ -31,3 +31,5 @@ Priya_HR_AI_Employee.txt
 # temporary QA seed scripts + manifest (see scripts/_seed_cleanup.tmp.ts)
 scripts/_seed*.tmp.ts
 scripts/_seed_manifest.json
+
+*.pdf
