@@ -65,6 +65,7 @@ import { GoalsCanvas } from './GoalsCanvas';
 import { GoalCommandPalette } from './GoalCommandPalette';
 import { SavedViewsMenu } from './SavedViewsMenu';
 import { GoalsCleanup } from './GoalsCleanup';
+import { TaskCardGuide } from './TaskCardGuide';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import type {
   Goal,
@@ -2066,6 +2067,11 @@ export function GoalsView({
         <Icon name="search" size={14} /> Jump to task
         <kbd className="gb-kbd">Ctrl K</kbd>
       </button>
+      {/* Sits immediately left of Views, and is deliberately outside the
+          isBoard check below — a member reading the cascade is exactly who
+          needs to know why a card turned orange. With no Views button (a
+          member), its own auto margin parks it at the same right edge. */}
+      <TaskCardGuide />
       {isBoard ? (
         <SavedViewsMenu
           views={savedViews}

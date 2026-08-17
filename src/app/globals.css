@@ -4236,6 +4236,138 @@ body { font-size: 15px; }
 .gb-card.gb-notmet .goal-progress-fill { background: var(--color-violet); }
 .gb-card.gb-notmet .gb-due { color: var(--color-violet); font-weight: 600; }
 
+/* ── Task card guide ("?" beside the Tasks title) ───────────────────────
+   The legend for everything above. Kept next to the card states it explains
+   so the two are edited together; every swatch reads the same custom
+   properties as the real cards, so it can never describe a color the
+   cascade no longer uses. */
+.tcg-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-grey-text);
+  flex-shrink: 0;
+  align-self: center;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease,
+    transform 0.15s ease;
+}
+.tcg-trigger:hover {
+  color: var(--color-green-primary);
+  border-color: var(--color-green-primary);
+  background: var(--color-green-light);
+  transform: translateY(-1px);
+}
+.tcg-trigger:focus-visible {
+  outline: 2px solid var(--color-green-primary);
+  outline-offset: 2px;
+}
+/* In the tasks toolbar the "?" takes over the auto margin that used to park
+   Views on the right, so the two sit together as a pair at that edge. Without
+   the override the row would hold two auto margins and split the free space
+   between them, stranding the "?" mid-row. */
+.gb-nav-controls .tcg-trigger { margin-left: auto; }
+.gb-nav-controls .tcg-trigger + .gb-views-wrap { margin-left: 0; }
+
+.tcg { display: grid; gap: 22px; }
+
+/* The one idea, up top: hotter = closer. The rail shows the ramp itself
+   rather than describing it. */
+.tcg-lede {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.tcg-ramp {
+  display: flex;
+  flex-shrink: 0;
+  width: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex-direction: column;
+  align-self: stretch;
+  min-height: 46px;
+}
+.tcg-ramp i { flex: 1; }
+/* The copy is one paragraph, never a set of flex items — inline emphasis must
+   stay inside the sentence rather than becoming a column of its own. */
+.tcg-lede-text { margin: 0; }
+
+.tcg-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-grey-text);
+  margin: 0 0 4px;
+}
+.tcg-section-note {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-grey-text);
+}
+.tcg-rows { display: grid; gap: 2px; }
+
+.tcg-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+.tcg-row:hover { background: var(--color-bg); }
+
+/* A miniature of the real card: same 4px left edge, same tint. */
+.tcg-chip {
+  width: 54px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.tcg-chip--glow {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tcg-glow) 40%, transparent);
+}
+
+.tcg-text { min-width: 0; }
+.tcg-when { font-size: 13px; font-weight: 650; line-height: 1.35; }
+.tcg-meaning {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-grey-text);
+  margin-top: 1px;
+}
+
+.tcg-foot {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--color-grey-text);
+}
+.tcg-foot svg { flex-shrink: 0; margin-top: 2px; }
+
+@media (max-width: 560px) {
+  .tcg-chip { width: 40px; height: 26px; }
+  .tcg-row { gap: 11px; padding: 8px 6px; }
+}
+
 .gb-card-top {
   display: flex;
   align-items: center;
