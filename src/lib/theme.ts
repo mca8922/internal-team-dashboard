@@ -53,9 +53,39 @@ export function applyTheme(pref: ThemePref): ResolvedTheme {
   return resolved;
 }
 
+// Every control bound to the preference — the topbar cycle button, the
+// Appearance picker in Settings — has to move together. The colors always did
+// (they hang off one <html data-theme>), but each control used to keep its own
+// copy of the *preference*, so changing the theme in one place left the other
+// showing the old choice until it remounted. setThemePref() now announces the
+// change and useThemePref() (src/lib/useThemePref.ts) subscribes, so there is
+// one source of truth: localStorage.
+const CHANGE_EVENT = 'restruc:theme-changed';
+
+// Calls `onChange` whenever the preference moves, in this tab or another one.
+// Returns its own unsubscribe, matching what useSyncExternalStore expects.
+export function subscribeThemePref(onChange: () => void): () => void {
+  // A change from ANOTHER tab has not touched this document, so re-apply the
+  // resolved theme here before reporting it. `key` is null when a tab calls
+  // localStorage.clear(), which drops our key too — treat that as a change.
+  const onStorage = (e: StorageEvent) => {
+    if (e.key !== null && e.key !== STORAGE_KEY) return;
+    applyTheme(getThemePref());
+    onChange();
+  };
+  window.addEventListener(CHANGE_EVENT, onChange);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(CHANGE_EVENT, onChange);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
 export function setThemePref(pref: ThemePref): ResolvedTheme {
   window.localStorage.setItem(STORAGE_KEY, pref);
-  return applyTheme(pref);
+  const resolved = applyTheme(pref);
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+  return resolved;
 }
 
 // Inline script injected into <head> so the correct theme AND favicon are

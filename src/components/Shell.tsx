@@ -24,6 +24,7 @@ import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { AvatarLightbox } from '@/components/AvatarLightbox';
 import { fmtTimeFull, fmtFriendly, fmtDateDMY, parseDate } from '@/lib/dates';
 import { getThemePref, setThemePref, applyTheme, type ThemePref } from '@/lib/theme';
+import { useThemePref } from '@/lib/useThemePref';
 import type { Profile, Notification, NotificationType, Holiday } from '@/lib/types';
 
 const LOGO_LINES = ['MAHESH CHANDRA', '& ASSOCIATES'] as const;
@@ -583,7 +584,8 @@ export function Shell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [themePref, setThemePrefState] = React.useState<ThemePref>('device');
+  // Shared with the Appearance picker in Settings — both read the one store.
+  const themePref = useThemePref();
   const [collapsed, setCollapsed] = React.useState(false);
   const [moreOpen, setMoreOpen] = React.useState(false);
   const [online, setOnline] = React.useState<OnlineUser[]>([]);
@@ -692,11 +694,11 @@ export function Shell({
     return () => { supabase.removeChannel(channel); };
   }, [user.id, user.name, user.avatar_url, user.department, user.role, user.managed_department, user.is_manager, toast]);
 
-  // Restore client prefs and start following the OS in 'device' mode.
+  // Restore client prefs and start following the OS in 'device' mode. The
+  // preference itself comes from useThemePref() above; this only has to paint
+  // it, since the server-rendered markup could not.
   React.useEffect(() => {
-    const pref = getThemePref();
-    setThemePrefState(pref);
-    applyTheme(pref);
+    applyTheme(getThemePref());
     setCollapsed(localStorage.getItem('restruc:sidebar') === 'collapsed');
 
     // When the preference is 'device', re-resolve whenever the OS flips.
@@ -712,7 +714,6 @@ export function Shell({
   const cycleTheme = () => {
     const order: ThemePref[] = ['light', 'dark', 'device'];
     const next = order[(order.indexOf(themePref) + 1) % order.length];
-    setThemePrefState(next);
     setThemePref(next);
   };
   const toggleSidebar = () => {
