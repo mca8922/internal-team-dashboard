@@ -16,11 +16,13 @@ export const FEATURE_FLAGS = {
   // undismissable device reminders (upload avatar, change password) show —
   // everything else renders as a locked "Unlocks in Phase 2" row instead.
   notificationsFull: false,
-  // reStrucAI support desk. While off, the Support nav entry stays VISIBLE but
-  // locked and /support renders an "Unlocks in Phase 2" state — deliberately
-  // not hidden, so the team can see it is coming. The route must not call the
-  // support API while locked: see (app)/support/page.tsx.
-  support: false,
+  // reStrucAI support desk — OPEN to everyone (Phase 2 unlock). Never
+  // role-gated: an offboarded or read-only account keeps Support even when it
+  // is the only Tools entry left. While off, the nav entry stayed VISIBLE but
+  // locked and /support rendered an "Unlocks in Phase 2" state; the route must
+  // not call the support API while locked — see (app)/support/page.tsx.
+  // Requires SUPPORT_API_URL + SUPPORT_API_KEY server-side (no NEXT_PUBLIC_).
+  support: true,
   // Internship progress, flagged members, milestone replay.
   // Team pulse, department check-in, and the streak card are always on —
   // see dashboard/page.tsx.

@@ -299,23 +299,32 @@ rule to `manager_id`:
   department, so this migration only widens who is *eligible* to receive that
   link in the first place.
 
-## reStrucAI Support desk (built, gated to Phase 2)
+## reStrucAI Support desk (Phase 2 — UNLOCKED for everyone)
 
 A **Support** entry in the sidebar's Tools group (`/support`) is how this
 team raises requests with reStrucAI, follows their status, and closes them
-out. **Fully built and verified, then gated** behind `FEATURE_FLAGS.support`
-— flip that one flag to open it.
+out. Built and verified in Phase 1 but gated; `FEATURE_FLAGS.support` is now
+**`true`** — the first Phase 2 unlock, open to every account with no role
+gate.
 
-While locked it behaves differently from every other gated feature: the nav
-entry stays **visible with a padlock** rather than disappearing, and
-`/support` renders an "Unlocks in Phase 2" state. The gate returns *before*
-`listMyTickets()`, so a locked desk makes no API call, sends no reporter
-email to reStrucAI, and writes no mirror rows.
+The gate it used to sit behind is still in the code and still correct, in
+case it is ever closed again: while locked the nav entry stayed **visible
+with a padlock** rather than disappearing, and `/support` rendered an
+"Unlocks in Phase 2" state. That gate returns *before* `listMyTickets()`, so
+a locked desk makes no API call, sends no reporter email to reStrucAI, and
+writes no mirror rows. Locking it also cut off offboarded / read-only
+accounts — the people the entry exists for — which is part of why it went
+first.
 
-**Known consequence of gating:** an offboarded or read-only account cannot
-reach support either. That was the one thing the entry was designed to
-guarantee, and the flag overrides it — until Phase 2, those people need an
-email address instead.
+**Which address a ticket carries:** `getSupportUser()` in
+`src/support/current-user.ts` sends `profiles.commute_email` (the
+"Communication email" field in Manage Member) and falls back to
+`profiles.email`, the login username, when it is blank. That one value is
+both the reply-to on a new ticket *and* the key tickets are read back by
+(`listMyTickets`, `getTicket`, close). So filling in a Communication email
+**after** someone has filed tickets makes reStrucAI see a new reporter and
+drops their earlier tickets out of their own list — every active member
+should have one set.
 
 **reStrucAI's database is the source of truth.** Tickets are posted to
 reStrucAI's support API and read back from it; nothing the Support page
@@ -346,9 +355,10 @@ If the two ever disagree, reStrucAI is right.
   **`SUPPORT_API_KEY` must never carry a `NEXT_PUBLIC_` prefix** — the three
   server files guard this with `server-only`, so a client import fails the
   build rather than shipping the key.
-- Not feature-flagged, and deliberately not role-gated: an offboarded or
-  read-only account keeps Support even when it is the only Tools entry left.
-  Someone locked out of their own record is exactly who needs to reach us.
+- Flag-gated (`support`, now on) but deliberately **not role-gated**: an
+  offboarded or read-only account keeps Support even when it is the only Tools
+  entry left. Someone locked out of their own record is exactly who needs to
+  reach us.
 - Reached from the sidebar only — **no "?" button in the top bar**, which is
   the deliberate difference from reStrucAI's own dashboard. There is also no
   reply box: a ticket records state, and the conversation happens over email.
@@ -357,13 +367,13 @@ If the two ever disagree, reStrucAI is right.
 
 Flip the flag in `src/lib/featureFlags.ts` for whichever of these should
 come back:
+- ~~reStrucAI Support desk (`support`)~~ — **done, first Phase 2 unlock**;
+  open to everyone, see its section above
 - Daily Log, incl. its Analytics/Settings tie-ins (`dailyLog`)
 - Punch-time change requests (`punchRequests`)
 - Team Requests / change-request inbox (`teamRequests`)
 - Emails (`emails`)
 - Apps / Launchpad (`apps`)
-- reStrucAI Support desk (`support`) — built and verified, shown locked
-  rather than hidden; see its section above
 - Analytics filters, personal and team (`analyticsFilters`)
 - Goals cleanup/export (`goalsCleanup`)
 - Settings → Notifications section (`settingsNotifications`) — explicitly
