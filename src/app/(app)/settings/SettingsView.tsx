@@ -8,7 +8,8 @@ import { Button, Field, Toggle } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
 import { updateProfile, updatePassword } from '@/lib/actions';
-import { getThemePref, setThemePref, type ThemePref } from '@/lib/theme';
+import { setThemePref, type ThemePref } from '@/lib/theme';
+import { useThemePref } from '@/lib/useThemePref';
 import { calcAge } from '@/lib/dates';
 import { DatePicker } from '@/components/DatePicker';
 import { AvatarUpload } from './AvatarUpload';
@@ -82,11 +83,12 @@ export function SettingsView({
   const [err, setErr] = React.useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirm, setShowConfirm] = React.useState(false);
-  const [themePref, setThemePrefState] = React.useState<ThemePref>('device');
+  // Shared with the topbar theme button — both read the one store, so cycling
+  // it there moves this picker's highlight in the same tick, and vice versa.
+  const themePref = useThemePref();
   const [prefs, setPrefs] = React.useState<Prefs>(DEFAULT_PREFS);
 
   React.useEffect(() => {
-    setThemePrefState(getThemePref());
     const raw = localStorage.getItem('restruc:prefs');
     if (raw) {
       try {
@@ -113,10 +115,7 @@ export function SettingsView({
     window.addEventListener('restruc:push-denied', onDenied);
     return () => window.removeEventListener('restruc:push-denied', onDenied);
   }, []);
-  const pickTheme = (t: ThemePref) => {
-    setThemePrefState(t);
-    setThemePref(t);
-  };
+  const pickTheme = (t: ThemePref) => setThemePref(t);
 
   const saveProfile = async () => {
     if (form.password && form.password !== form.confirm) {
