@@ -84,6 +84,7 @@ function buildNavGroups(user: Profile) {
     { label: 'Dashboard', icon: 'home',   path: '/dashboard' },
     { label: 'Punch',     icon: 'clock',  path: '/punch' },
     ...(FEATURE_FLAGS.dailyLog ? [{ label: 'Daily Log', icon: 'edit' as const, path: '/log' }] : []),
+    ...(FEATURE_FLAGS.apps ? [{ label: 'Apps', icon: 'monitor' as const, path: '/apps', isNew: showNewBadge }] : []),
     { label: 'Tasks',     icon: 'target', path: '/goals' },
     { label: 'Analytics', icon: 'chart',  path: '/analytics' },
     { label: 'Leaves',    icon: 'plane',  path: '/leaves' },
@@ -96,7 +97,6 @@ function buildNavGroups(user: Profile) {
   ] : [];
 
   const toolsItems: NavItem[] = [
-    ...(FEATURE_FLAGS.apps ? [{ label: 'Apps', icon: 'monitor' as const, path: '/apps', isNew: showNewBadge }] : []),
     // Never role-gated, unlike everything around it: someone locked out of
     // their own record — offboarded, or read-only after a hand-off — is exactly
     // who needs to reach support, so this entry survives even when it is the

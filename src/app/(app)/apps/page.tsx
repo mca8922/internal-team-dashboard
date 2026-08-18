@@ -10,6 +10,7 @@ import {
   getAllDepartmentApps,
   getDepartmentColors,
 } from '@/lib/queries';
+import { isFounder } from '@/lib/roles';
 import { AppsView } from './AppsView';
 import { getAppAnalytics } from './app-analytics';
 import type { AppAnalyticsResult } from './app-analytics';
@@ -21,6 +22,7 @@ export default async function AppsPage() {
   if (!FEATURE_FLAGS.apps) redirect('/dashboard');
   const profile = (await getCurrentProfile())!;
   const isBoard = profile.role === 'board';
+  const founder = isFounder(profile);
 
   const [apps, deptColors, allApps, initialAnalytics] = await Promise.all([
     getDepartmentApps(),
@@ -43,6 +45,7 @@ export default async function AppsPage() {
     <AppsView
       apps={apps}
       isBoard={isBoard}
+      isFounder={founder}
       myDepartment={profile.department}
       deptColors={deptColors}
       allApps={allApps}
