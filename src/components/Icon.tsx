@@ -4,7 +4,7 @@ import * as React from 'react';
 export type IconName =
   | 'home' | 'clock' | 'edit' | 'target' | 'users' | 'chart' | 'plane' | 'settings'
   | 'logout' | 'play' | 'pause' | 'plus' | 'minus' | 'check' | 'x' | 'chevron-down'
-  | 'chevron-right' | 'chevron-left' | 'menu' | 'sidebar' | 'sun' | 'moon' | 'bell'
+  | 'chevron-right' | 'chevron-left' | 'chevron-up' | 'menu' | 'sidebar' | 'sun' | 'moon' | 'bell'
   | 'calendar' | 'flag' | 'trash' | 'eye' | 'eye-off' | 'search' | 'fire' | 'sparkles' | 'lock'
   | 'mail' | 'user' | 'grip' | 'building' | 'bolt' | 'arrow-right' | 'arrow-left' | 'archive'
   | 'monitor' | 'help-circle' | 'bot' | 'refresh' | 'copy' | 'more-vertical'
@@ -48,6 +48,7 @@ export function Icon({ name, size = 16, stroke = 1.6, style }: IconProps) {
     case 'check': return <svg {...props}><path d="M20 6 9 17l-5-5" /></svg>;
     case 'x': return <svg {...props}><path d="M18 6 6 18M6 6l12 12" /></svg>;
     case 'chevron-down': return <svg {...props}><path d="m6 9 6 6 6-6" /></svg>;
+    case 'chevron-up': return <svg {...props}><path d="m18 15-6-6-6 6" /></svg>;
     case 'chevron-right': return <svg {...props}><path d="m9 18 6-6-6-6" /></svg>;
     case 'chevron-left': return <svg {...props}><path d="m15 18-6-6 6-6" /></svg>;
     case 'menu': return <svg {...props}><path d="M3 6h18M3 12h18M3 18h18" /></svg>;

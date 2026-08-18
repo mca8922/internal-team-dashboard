@@ -11905,3 +11905,360 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
   .sup-about-glow { animation: none; }
   .sup-about-link:hover { transform: none; }
 }
+
+/* ── Tabbar — page-neutral pill tab switch ──────────────────────────────── */
+.tabbar {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  /* Never wraps to a second row on a narrow phone: it scrolls instead. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabbar::-webkit-scrollbar { display: none; }
+.tabbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-slate);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.tabbar-btn:hover { color: var(--color-black); }
+.tabbar-btn-on {
+  background: var(--color-card);
+  color: var(--color-black);
+  box-shadow: var(--shadow-card);
+}
+/* The icon carries the tab's identity at a glance; it takes the accent only
+   on the selected tab so the row reads as one selection, not three. */
+.tabbar-btn svg { flex: 0 0 auto; opacity: 0.75; transition: opacity 0.15s ease, color 0.15s ease; }
+.tabbar-btn-on svg { opacity: 1; color: var(--color-green-primary); }
+.tabbar-btn:focus-visible {
+  outline: 2px solid var(--color-green-primary);
+  outline-offset: -2px;
+}
+
+/* ── Requests inbox ───────────────────────────────────────────────────────
+   One table for punch corrections and account changes. A decision queue is
+   read column-wise (who / what / how long have they waited), so it is a real
+   table on desktop, built on the house .data-table, and reflows into stacked
+   cards on a phone where seven columns cannot fit. */
+.req-health {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(100deg, rgba(40, 138, 93, 0.07), transparent 55%),
+    var(--color-bg);
+}
+.req-health-stat { display: flex; align-items: baseline; gap: 7px; }
+.req-health-num {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-black);
+  font-variant-numeric: tabular-nums;
+}
+.req-health-lbl {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-grey-text);
+}
+.req-health-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-grey-text);
+}
+.req-health-hint svg { flex: 0 0 auto; color: var(--color-green-primary); }
+
+/* Type filter. Only rendered when both kinds actually exist, so it never
+   appears as a row of one. */
+.req-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.req-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-grey-text);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+.req-filter:hover { color: var(--color-black); }
+.req-filter.on {
+  color: var(--color-green-primary);
+  border-color: rgba(40, 138, 93, 0.35);
+  background: var(--color-green-light);
+}
+.req-filter-n { font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 700; opacity: 0.75; }
+
+.req-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 2px;
+  border-radius: 999px;
+  background: var(--color-green-primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.req-table-wrap {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+  overflow: hidden;
+}
+.req-table { width: 100%; table-layout: fixed; }
+/* With a fixed layout the cells must be told they may wrap, or long words
+   push a column past its declared width. */
+.req-table td { overflow-wrap: anywhere; }
+.req-table th {
+  background: var(--color-bg);
+  white-space: nowrap;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.req-table th:first-child, .req-table td:first-child { padding-left: 18px; }
+.req-table th:last-child, .req-table td:last-child { padding-right: 18px; }
+.req-table td { vertical-align: middle; }
+/* The house table tints the whole row green on hover, which fights the
+   pending rail and the status colours here. A neutral wash instead. */
+.req-table tr:hover td { background: var(--color-bg); }
+/* A left rail marks rows still needing a decision, so a mixed
+   pending/decided queue reads at a glance. */
+.req-table tr.is-pending td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-green-primary);
+}
+
+.req-member { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.req-member-text { display: flex; flex-direction: column; min-width: 0; }
+.req-who {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-black);
+  white-space: nowrap;
+}
+.req-by { font-size: 11px; color: var(--color-grey-text); white-space: nowrap; }
+
+.req-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.req-kind svg { flex: 0 0 auto; }
+.req-kind-punch { color: var(--color-green-primary); background: var(--color-green-light); }
+.req-kind-account { color: var(--color-violet); background: var(--color-violet-bg); }
+
+.req-day {
+  font-size: 12.5px;
+  color: var(--color-slate);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.req-dash { color: var(--color-grey-text); }
+
+/* The change itself: the one part a decision actually turns on, so it gets
+   the strongest weight in the row. */
+.req-change { display: flex; flex-direction: column; gap: 2px; }
+.req-change-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-grey-text);
+}
+.req-change-vals {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.req-change-vals svg { color: var(--color-grey-text); flex: 0 0 auto; }
+/* Struck through only where `from` is a value being REPLACED. A missed-punch
+   range sets both halves as .req-to, since neither time is a previous value. */
+.req-from { color: var(--color-grey-text); text-decoration: line-through; }
+.req-to { font-weight: 700; color: var(--color-black); }
+
+/* Clamped to two lines rather than one: most reasons on this queue fit
+   inside that, so the row stays comparable without hiding anything for the
+   majority. Anything longer gets a Show more control, since a title tooltip
+   is slow, invisible on touch, and left the decline note unreadable. */
+.req-reason,
+.req-note {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.req-reason.is-open,
+.req-note.is-open {
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  display: block;
+}
+.req-reason { font-size: 12.5px; color: var(--color-slate); font-style: italic; line-height: 1.45; }
+.req-note { font-size: 11.5px; color: var(--color-grey-text); margin-top: 4px; line-height: 1.45; }
+
+.req-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-green-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.req-more:hover { color: var(--color-green-darker); text-decoration: underline; }
+.req-more svg { flex: 0 0 auto; }
+
+.req-status-cell { white-space: nowrap; }
+.req-age {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-grey-text);
+  white-space: nowrap;
+}
+/* Past a day on a queue that usually turns around in under two hours. */
+.req-age.is-stale { color: var(--color-amber-text); }
+
+.req-action-cell { width: 1%; white-space: nowrap; }
+.req-actions { display: flex; align-items: center; gap: 7px; justify-content: flex-end; }
+/* The fixed table layout gives this column a set share of the width, so the
+   buttons are trimmed to fit it rather than the column being widened at the
+   Reason column's expense. */
+.req-actions .btn { padding-left: 10px; padding-right: 10px; gap: 5px; }
+
+@media (max-width: 900px) {
+  /* Seven columns will not fit a phone, so the table reflows into one card
+     per request: the header is hidden and each cell labels itself from the
+     data-label attribute it already carries. Reason and note un-truncate
+     here, since there is no hover to reveal a title tooltip on touch. */
+  .req-table-wrap { border: 0; background: none; overflow: visible; }
+  /* The app's global mobile rule turns every .data-table into a horizontally
+     scrolling block (white-space: nowrap, overflow-x: auto) at 768px. That is
+     the right default for a wide data grid, but this table reflows into cards
+     instead, and the inherited nowrap kept long reasons on one clipped line.
+     Opted out here specifically rather than changed globally, so every other
+     table on the app keeps the scrolling behaviour it was designed around. */
+  .data-table.req-table { white-space: normal; overflow-x: visible; }
+  .req-table, .req-table tbody, .req-table tr, .req-table td { display: block; width: 100%; }
+  .req-table thead { display: none; }
+
+  .req-table tr {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-card);
+    margin-bottom: 12px;
+    padding: 4px 0;
+    overflow: hidden;
+  }
+  .req-table tr.is-pending { border-left: 3px solid var(--color-green-primary); }
+  .req-table tr.is-pending td:first-child { box-shadow: none; }
+  .req-table tr:hover td { background: transparent; }
+
+  .req-table td {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 7px 14px !important;
+    border-bottom: 0;
+    font-size: 13px;
+  }
+  /* The label each cell already carries for accessibility becomes its
+     visible row label in this layout. */
+  .req-table td::before {
+    content: attr(data-label);
+    flex: 0 0 84px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-grey-text);
+  }
+  /* Member and actions read better without a label taking up the width. */
+  .req-table td:first-child::before,
+  .req-table td.req-action-cell::before { content: none; }
+  .req-table td:first-child { padding-top: 12px !important; }
+
+  /* A cell with nothing in it is a dash holding a column open, which only
+     matters while there are columns. */
+  .req-table td.req-cell-empty { display: none; }
+  /* The reason stacks under its label rather than beside it: as a flex ROW
+     the text could not shrink, so a long reason ran off the card instead of
+     wrapping, and the decline note sat alongside it rather than under it. */
+  .req-table td.req-reason-cell { flex-direction: column; align-items: stretch; gap: 4px; }
+  /* Must out-specify `.req-table td::before` above, which sets a
+     flex-basis of 84px — harmless as a width in a row, but 84px of empty
+     HEIGHT once this one cell becomes a column. */
+  .req-table td.req-reason-cell::before { flex: none; }
+  /* Nothing to save space for once each cell has the full width, and there
+     is no hover here to reveal what a clamp would hide. */
+  .req-reason, .req-note {
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    display: block;
+    min-width: 0;
+  }
+  .req-more { display: none; }
+  /* Every other cell is a label/value row; its value must be allowed to
+     shrink or long content pushes the card wider than the screen. */
+  .req-table td > span,
+  .req-table td > div { min-width: 0; }
+  .req-change { gap: 0; }
+  .req-change-label { display: none; }
+  .req-action-cell { width: auto; }
+  .req-actions { justify-content: stretch; width: 100%; }
+  .req-actions .btn { flex: 1; justify-content: center; }
+
+  .req-health { gap: 18px; padding: 12px 14px; }
+  .req-health-hint { margin-left: 0; width: 100%; }
+}

@@ -55,6 +55,7 @@ export default async function RequestsPage() {
       avatars={avatarMap}
       isBoard={isBoard}
       isFounder={founder}
+      currentUserId={profile.id}
     />
   );
 }
