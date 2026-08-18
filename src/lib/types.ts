@@ -179,6 +179,9 @@ export interface GoalViewConfig {
   dept: string; // 'all' or a department name
   status: 'all' | GoalStatus;
   due: 'all' | 'overdue' | 'week';
+  // 'all' or a member id. Optional so views saved before this filter existed
+  // still load (missing == 'all').
+  assignee?: string;
 }
 
 export interface SavedView {

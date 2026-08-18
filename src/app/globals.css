@@ -7282,8 +7282,12 @@ body { font-size: 15px; }
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1 1 240px;
-  min-width: 200px;
+  /* Fixed-ish basis, no grow — the search box used to soak up every pixel of
+     free space (flex-grow: 1), which pushed the department/due/assignee
+     dropdowns to the edge or onto a second row once a fourth filter was
+     added. It still shrinks on a narrow toolbar, just never grows past this. */
+  flex: 0 1 220px;
+  min-width: 160px;
   padding: 0 10px;
   height: 38px;
   border: 1px solid var(--color-border);
@@ -7325,6 +7329,142 @@ body { font-size: 15px; }
   width: auto;
   min-width: 130px;
   height: 38px;
+}
+.gb-toolbar-assignee {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 140px;
+  max-width: 190px;
+  height: 38px;
+}
+/* Searchable assignee filter — a button + popover standing in for a native
+   <select>, since a plain dropdown has no way to type-to-filter a long
+   member list. Deliberately text-only (no avatars) — a wall of thumbnails
+   reads busier than it helps when scanning names, and it collides with the
+   compact width the toolbar needs. */
+.gb-assignee-picker {
+  position: relative;
+  flex: 0 0 auto;
+}
+/* Carries the `.select` class for pixel-identical border/background/height/
+   focus-ring with its native <select> siblings — only the layout-specific
+   bits are overridden here (it renders its own icon + label + chevron as flex
+   children instead of native option text + background-image arrow). */
+.gb-assignee-picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background-image: none;
+  padding: 0 10px 0 12px;
+  cursor: pointer;
+  text-align: left;
+}
+/* Native selects keep their focus ring for as long as their OS dropdown is
+   open; this mirrors that (the search input inside the popover, not the
+   trigger, holds real DOM focus while it's open). */
+.gb-assignee-picker-trigger[aria-expanded='true'] {
+  border-color: var(--color-green-primary);
+  box-shadow: 0 0 0 3px rgba(31, 92, 62, 0.15);
+}
+.gb-assignee-picker-trigger.active { border-color: var(--color-green-primary); color: var(--color-green-primary); }
+.gb-assignee-picker-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gb-assignee-picker-chevron {
+  display: inline-flex;
+  color: var(--color-grey-text);
+  transition: transform 150ms ease;
+}
+.gb-assignee-picker-chevron.up { transform: rotate(180deg); }
+.gb-assignee-picker-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  width: 260px;
+  padding: 8px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lift);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: gb-assignee-picker-in 120ms ease;
+}
+@keyframes gb-assignee-picker-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.gb-assignee-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-grey-text);
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.gb-assignee-picker-search:focus-within {
+  border-color: var(--color-green-primary);
+  box-shadow: 0 0 0 3px rgba(31, 92, 62, 0.15);
+}
+.gb-assignee-picker-search input {
+  flex: 1;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--color-black);
+}
+.gb-assignee-picker-list {
+  max-height: 268px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.gb-assignee-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  padding: 8px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  color: var(--color-black);
+  cursor: pointer;
+  text-align: left;
+}
+.gb-assignee-picker-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gb-assignee-picker-item:hover { background: var(--color-bg); }
+.gb-assignee-picker-item.on {
+  background: var(--color-green-light);
+  color: var(--color-green-primary);
+  font-weight: 500;
+}
+.gb-assignee-picker-divider {
+  height: 1px;
+  margin: 2px 2px 3px;
+  background: var(--color-border);
+  flex: none;
+}
+.gb-assignee-picker-empty {
+  padding: 16px 8px;
+  font-size: 12.5px;
+  color: var(--color-grey-text);
+  text-align: center;
 }
 .gb-status-filter {
   display: inline-flex;
@@ -7952,7 +8092,9 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
 
 @media (max-width: 640px) {
   .gb-toolbar-dept,
+  .gb-assignee-picker,
   .gb-status-filter { flex: 1 1 100%; }
+  .gb-assignee-picker-trigger { width: 100%; }
   .gb-status-filter { justify-content: space-between; }
 }
 
@@ -10634,6 +10776,12 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
     background-position: right 10px center;
     background-size: 14px 14px;
   }
+  /* Not a native <select> (own chevron icon, own padding) — just needs the
+     same taller touch target as its siblings above. */
+  .gb-assignee-picker-trigger {
+    height: auto;
+    min-height: 42px;
+  }
   /* Comfortable touch targets. */
   .btn { min-height: 40px; }
   .btn-sm { min-height: 36px; }
@@ -10747,13 +10895,17 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
     min-width: 0;
     height: 42px;
   }
-  /* The two dropdowns share one row instead of each demanding 160/130px. */
+  /* The dropdowns share rows instead of each demanding its full min-width. */
   .gb-toolbar-dept,
-  .gb-toolbar-due {
+  .gb-toolbar-due,
+  .gb-assignee-picker {
     flex: 1 1 calc(50% - 4px);
     min-width: 0;
     width: auto;
   }
+  .gb-toolbar-assignee { max-width: none; }
+  .gb-assignee-picker-trigger { width: 100%; }
+  .gb-assignee-picker-menu { width: 100%; }
   /* Five nowrap chips needed ~350px - more than a 360px phone has after
      padding, and it was pushing the whole document sideways. */
   .gb-status-filter {

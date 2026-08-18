@@ -105,6 +105,7 @@ export function GoalsTable({
   dept,
   status,
   due,
+  assignee,
   grouping,
   setGrouping,
   sort,
@@ -119,6 +120,7 @@ export function GoalsTable({
   dept: string;
   status: 'all' | GoalStatus;
   due: 'all' | 'overdue' | 'week';
+  assignee: string;
   grouping: GoalGrouping;
   setGrouping: (g: GoalGrouping) => void;
   sort: { key: GoalSortKey; dir: 'asc' | 'desc' };
@@ -138,10 +140,12 @@ export function GoalsTable({
       if (status !== 'all' && g.status !== status) return false;
       if (due === 'overdue' && !isOverdue(g)) return false;
       if (due === 'week' && !dueWithin(g, 6)) return false;
+      if (assignee !== 'all' && !(assigneesByGoal[g.id] ?? []).some((a) => a.id === assignee))
+        return false;
       if (q && !`${g.title} ${plainText(g.description)}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [goals, query, dept, status, due]);
+  }, [goals, query, dept, status, due, assignee, assigneesByGoal]);
 
   // Pins always float to the top (from the full set, so they stay reachable
   // even when filtered out below).
@@ -173,7 +177,10 @@ export function GoalsTable({
     }));
   }, [filtered, grouping, sortRows]);
 
-  React.useEffect(() => setPage(0), [query, dept, status, due, grouping, sort.key, sort.dir]);
+  React.useEffect(
+    () => setPage(0),
+    [query, dept, status, due, assignee, grouping, sort.key, sort.dir],
+  );
 
   const toggleSort = (key: GoalSortKey) =>
     setSort(sort.key === key ? { key, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
