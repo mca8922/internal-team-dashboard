@@ -44,11 +44,13 @@ export function isMilestoneDay(joinedDate: string, now: Date = new Date()): bool
 }
 
 function labelFor(kind: MilestoneKind, months: number, internshipMonths: number | null): string {
-  if (kind === 'yearly') {
-    const y = Math.round(months / 12);
-    return `${y} year${y > 1 ? 's' : ''}`;
-  }
   if (kind === 'intern' || kind === 'intern-final') return `Month ${months} of ${internshipMonths}`;
+  if (months >= 12) {
+    const y = Math.floor(months / 12);
+    const rem = months % 12;
+    const yPart = `${y} year${y > 1 ? 's' : ''}`;
+    return rem === 0 ? yPart : `${yPart} ${rem} month${rem > 1 ? 's' : ''}`;
+  }
   return `${months} month${months > 1 ? 's' : ''}`;
 }
 

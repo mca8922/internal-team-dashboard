@@ -57,6 +57,16 @@ describe('milestoneForToday — full/part-timer tiers', () => {
     expect(m?.label).toBe('1 year');
     expect(milestonePings(m!)).toBe(true);
   });
+  it('quarter past a year labels as years + months', () => {
+    const m = milestoneForToday(member({}), ist('2027-08-18')); // 15 months
+    expect(m?.kind).toBe('quarterly');
+    expect(m?.label).toBe('1 year 3 months');
+  });
+  it('long tenure labels in years + months, not raw months', () => {
+    const m = milestoneForToday(member({ joined_date: '1992-10-16' }), ist('2026-08-16')); // 406 months
+    expect(m?.months).toBe(406);
+    expect(m?.label).toBe('33 years 10 months');
+  });
 });
 
 describe('milestoneForToday — interns', () => {
