@@ -1075,6 +1075,117 @@ function MemberSearchBar({
   );
 }
 
+// A searchable "filter by assignee" dropdown. Swapped in for a plain <select>
+// because the member list can run into the dozens — a type-to-filter search
+// box inside the panel keeps picking one person fast regardless of team size.
+function AssigneeFilterPicker({
+  members,
+  value,
+  onChange,
+}: {
+  members: AssignableMember[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const wrapRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const sorted = React.useMemo(
+    () => [...members].sort((a, b) => a.name.localeCompare(b.name)),
+    [members],
+  );
+  const filtered = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? sorted.filter((m) => m.name.toLowerCase().includes(q)) : sorted;
+  }, [sorted, search]);
+  const selected = value !== 'all' ? sorted.find((m) => m.id === value) : undefined;
+
+  React.useEffect(() => {
+    if (!open) return;
+    setSearch('');
+    const t = setTimeout(() => inputRef.current?.focus(), 0);
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('mousedown', onDoc);
+    };
+  }, [open]);
+
+  const choose = (id: string) => {
+    onChange(id);
+    setOpen(false);
+  };
+
+  return (
+    <div className="gb-assignee-picker" ref={wrapRef}>
+      <button
+        type="button"
+        className={`select gb-toolbar-assignee gb-assignee-picker-trigger${selected ? ' active' : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Filter by assignee"
+      >
+        <Icon name={selected ? 'user' : 'users'} size={14} />
+        <span className="gb-assignee-picker-label">{selected ? selected.name : 'Everyone'}</span>
+        <span className={`gb-assignee-picker-chevron${open ? ' up' : ''}`}>
+          <Icon name="chevron-down" size={13} />
+        </span>
+      </button>
+      {open ? (
+        <div className="gb-assignee-picker-menu" role="listbox">
+          <div className="gb-assignee-picker-search">
+            <Icon name="search" size={13} />
+            <input
+              ref={inputRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search people…"
+              aria-label="Search people"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setOpen(false);
+                if (e.key === 'Enter' && filtered.length === 1) choose(filtered[0].id);
+              }}
+            />
+          </div>
+          <div className="gb-assignee-picker-list">
+            <button
+              type="button"
+              className={`gb-assignee-picker-item${value === 'all' ? ' on' : ''}`}
+              onClick={() => choose('all')}
+            >
+              <Icon name="users" size={14} />
+              <span className="gb-assignee-picker-item-name">Everyone</span>
+              {value === 'all' ? <Icon name="check" size={13} /> : null}
+            </button>
+            {filtered.length > 0 ? <div className="gb-assignee-picker-divider" /> : null}
+            {filtered.length === 0 ? (
+              <div className="gb-assignee-picker-empty">No one matches “{search}”.</div>
+            ) : (
+              filtered.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={`gb-assignee-picker-item${value === m.id ? ' on' : ''}`}
+                  onClick={() => choose(m.id)}
+                >
+                  <span className="gb-assignee-picker-item-name">{m.name}</span>
+                  {value === m.id ? <Icon name="check" size={13} /> : null}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // ── Board management toolbar: search + department + status filters ──────────
 function BoardGoalsToolbar({
   query,
@@ -1085,7 +1196,10 @@ function BoardGoalsToolbar({
   setStatus,
   due,
   setDue,
+  assignee,
+  setAssignee,
   departments,
+  members,
   filtersActive,
   onClear,
 }: {
@@ -1097,7 +1211,10 @@ function BoardGoalsToolbar({
   setStatus: (s: 'all' | GoalStatus) => void;
   due: 'all' | 'overdue' | 'week';
   setDue: (s: 'all' | 'overdue' | 'week') => void;
+  assignee: string;
+  setAssignee: (s: string) => void;
   departments: string[];
+  members: AssignableMember[];
   filtersActive: boolean;
   onClear: () => void;
 }) {
@@ -1152,6 +1269,7 @@ function BoardGoalsToolbar({
         <option value="overdue">Overdue</option>
         <option value="week">Due this week</option>
       </select>
+      <AssigneeFilterPicker members={members} value={assignee} onChange={setAssignee} />
       <div className="gb-status-filter" role="group" aria-label="Filter by status">
         {statusChips.map((s) => (
           <button
@@ -1562,17 +1680,20 @@ export function GoalsView({
   const [deptFilter, setDeptFilter] = React.useState<string>('all');
   const [statusFilter, setStatusFilter] = React.useState<'all' | GoalStatus>('all');
   const [dueFilter, setDueFilter] = React.useState<'all' | 'overdue' | 'week'>('all');
+  const [assigneeFilter, setAssigneeFilter] = React.useState<string>('all');
   const filtersActive =
     query.trim() !== '' ||
     deptFilter !== 'all' ||
     statusFilter !== 'all' ||
-    dueFilter !== 'all';
+    dueFilter !== 'all' ||
+    assigneeFilter !== 'all';
   const filtering = isBoard && filtersActive;
   const clearFilters = () => {
     setQuery('');
     setDeptFilter('all');
     setStatusFilter('all');
     setDueFilter('all');
+    setAssigneeFilter('all');
   };
 
   // Shared filter predicate — used both by the flat board-results list and to
@@ -1585,13 +1706,15 @@ export function GoalsView({
       if (statusFilter !== 'all' && g.status !== statusFilter) return false;
       if (dueFilter === 'overdue' && !isOverdue(g)) return false;
       if (dueFilter === 'week' && !dueWithin(g, 6)) return false;
+      if (assigneeFilter !== 'all' && !(assigneeIdsByGoal[g.id] ?? []).includes(assigneeFilter))
+        return false;
       if (q) {
         const hay = `${g.title} ${plainText(g.description)}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     },
-    [query, deptFilter, statusFilter, dueFilter],
+    [query, deptFilter, statusFilter, dueFilter, assigneeFilter, assigneeIdsByGoal],
   );
 
   const results = React.useMemo(() => {
@@ -1748,6 +1871,7 @@ export function GoalsView({
     dept: deptFilter,
     status: statusFilter,
     due: dueFilter,
+    assignee: assigneeFilter,
   };
   const applyView = (cfg: GoalViewConfig) => {
     chooseView(cfg.view ?? 'cascade');
@@ -1757,6 +1881,7 @@ export function GoalsView({
     setDeptFilter(cfg.dept ?? 'all');
     setStatusFilter(cfg.status ?? 'all');
     setDueFilter(cfg.due ?? 'all');
+    setAssigneeFilter(cfg.assignee ?? 'all');
   };
 
   const submitGoal = async (data: GoalSubmit) => {
@@ -2538,7 +2663,10 @@ export function GoalsView({
           setStatus={setStatusFilter}
           due={dueFilter}
           setDue={setDueFilter}
+          assignee={assigneeFilter}
+          setAssignee={setAssigneeFilter}
           departments={departments}
+          members={members}
           filtersActive={filtersActive}
           onClear={clearFilters}
         />
@@ -2556,6 +2684,7 @@ export function GoalsView({
             dept={deptFilter}
             status={statusFilter}
             due={dueFilter}
+            assignee={assigneeFilter}
             isMatch={isMatch}
           />
           {modals}
@@ -2571,6 +2700,7 @@ export function GoalsView({
             dept={deptFilter}
             status={statusFilter}
             due={dueFilter}
+            assignee={assigneeFilter}
             grouping={grouping}
             setGrouping={setGrouping}
             sort={sort}

@@ -142,6 +142,7 @@ export function GoalsCanvas({
   dept,
   status,
   due,
+  assignee,
   isMatch,
 }: {
   goals: Goal[];
@@ -150,6 +151,7 @@ export function GoalsCanvas({
   dept: string;
   status: 'all' | GoalStatus;
   due: 'all' | 'overdue' | 'week';
+  assignee: string;
   isMatch: (g: Goal) => boolean;
 }) {
   // Daily goals collapsed by default (one badge per Monthly parent) — see
@@ -159,7 +161,8 @@ export function GoalsCanvas({
     () => layout(goals, expanded),
     [goals, expanded],
   );
-  const filtersActive = query.trim() !== '' || dept !== 'all' || status !== 'all' || due !== 'all';
+  const filtersActive =
+    query.trim() !== '' || dept !== 'all' || status !== 'all' || due !== 'all' || assignee !== 'all';
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {
