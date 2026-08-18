@@ -8,6 +8,47 @@ Feature visibility is controlled centrally in `src/lib/featureFlags.ts`
 (`FEATURE_FLAGS`). Flipping a flag from `false` to `true` re-enables a
 feature — no code needs to move.
 
+## Phase 2 — status
+
+Every `FEATURE_FLAGS` entry is **on** except `emails`, which stays deferred
+until there's a further requirement. Order they were unlocked in, each
+verified with `tsc --noEmit` + `vitest run` + `next build` before moving to
+the next:
+
+`support` → `teamRequests` → `punchRequests` → `goalsCleanup` →
+`analyticsFilters` → `apps` → `settingsNotifications` → `notificationsFull` →
+`dailyLog`.
+
+**Daily Log (`dailyLog`) is a flag flip only** — no behavior changed beyond
+what the flag already gated. In particular, punch in/out
+(`PunchConsole`, `punchIn`/`punchOut` in `actions.ts`) has no reference to
+logs anywhere in the codebase and was confirmed independent before the flip:
+a member who never writes a log can punch in and out completely normally,
+same as when the flag was off.
+
+`punchRequests` / `teamRequests` / `goalsCleanup`: their server actions
+(`submitPunchChangeRequest`, `submitChangeRequest`, `archiveGoals` /
+`restoreGoals` / `deleteGoals`, …) were never flag-gated — only the UI entry
+points were. `goalsCleanup`'s destructive actions are further backstopped by
+"goals: board update/delete" RLS, so the flag was UX polish on top of a real
+DB-level restriction, not the only gate.
+
+`settingsNotifications` / `notificationsFull`: notification rows and
+`sendPush()` already fire unconditionally regardless of these flags (and
+still do — that didn't change). These two flags only unlock the *reading*
+side: the Settings prefs UI, and the bell/toast/history UI. Sound prefs
+(punch/presence/notification chimes) already defaulted to on and were
+already playing before `settingsNotifications` was flipped; that flag only
+exposed the toggle to turn them off. Push was and remains a no-op without
+`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_EMAIL`, which aren't set in
+this environment.
+
+`apps`: works with an empty app list — the Board adds each department's
+tools from the page itself now that it's reachable.
+
+See "Phase 2 — Backlog" below for the per-flag detail table this replaces,
+kept for the historical "what each flag hides" reference.
+
 ## Phase 1 — Scope down to 6 core features (done)
 
 Removed the `graphify` knowledge-graph tooling entirely (it was config-only,
@@ -363,26 +404,23 @@ If the two ever disagree, reStrucAI is right.
   the deliberate difference from reStrucAI's own dashboard. There is also no
   reply box: a ticket records state, and the conversation happens over email.
 
-## Phase 2 — Backlog (re-enable when ready)
+## Phase 2 — Backlog (historical: what each flag hid in Phase 1)
 
-Flip the flag in `src/lib/featureFlags.ts` for whichever of these should
-come back:
-- ~~reStrucAI Support desk (`support`)~~ — **done, first Phase 2 unlock**;
-  open to everyone, see its section above
-- Daily Log, incl. its Analytics/Settings tie-ins (`dailyLog`)
-- Punch-time change requests (`punchRequests`)
-- Team Requests / change-request inbox (`teamRequests`)
-- Emails (`emails`)
-- Apps / Launchpad (`apps`)
-- Analytics filters, personal and team (`analyticsFilters`)
-- Goals cleanup/export (`goalsCleanup`)
-- Settings → Notifications section (`settingsNotifications`) — explicitly
-  deferred by the user to Phase 2
-- Full notification pipeline — goal/leave/punch/work-report bell items,
+All of these are now unlocked — see "Phase 2 — status" above. Table kept for
+what each flag gates, in case one is ever switched back off:
+- ~~reStrucAI Support desk (`support`)~~ — **done**; open to everyone, see
+  its section above
+- ~~Daily Log, incl. its Analytics/Settings tie-ins (`dailyLog`)~~ — **done**
+- ~~Punch-time change requests (`punchRequests`)~~ — **done**
+- ~~Team Requests / change-request inbox (`teamRequests`)~~ — **done**
+- Emails (`emails`) — **still off**, deferred until there's a requirement
+- ~~Apps / Launchpad (`apps`)~~ — **done**
+- ~~Analytics filters, personal and team (`analyticsFilters`)~~ — **done**
+- ~~Goals cleanup/export (`goalsCleanup`)~~ — **done**
+- ~~Settings → Notifications section (`settingsNotifications`)~~ — **done**
+- ~~Full notification pipeline — goal/leave/punch/work-report bell items,
   toasts, teammate punch-in/out toasts, `/notifications` history, and the
-  dashboard birthday wishing card (`notificationsFull`) — explicitly
-  deferred by the user to Phase 2; only the avatar/password/date-of-birth
-  device reminders stay on in Phase 1
+  dashboard birthday wishing card (`notificationsFull`)~~ — **done**
 
 Date of birth + auto-computed Age are always-on core profile fields (same
 tier as name/avatar) — set by a member in Settings or corrected by the Board
