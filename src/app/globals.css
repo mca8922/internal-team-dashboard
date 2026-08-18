@@ -4918,6 +4918,149 @@ body { font-size: 15px; }
 }
 
 /* =====================================================================
+   v5b — goal-form parent-task picker (searchable, department-scoped)
+   ===================================================================== */
+.parent-picker { position: relative; width: 100%; }
+/* No custom chevron icon here on purpose — it keeps the `.select` class's own
+   background-image arrow (same data-URI every native <select> in this form
+   uses), so the arrow is pixel-identical to Due date/Status instead of a
+   hand-drawn lookalike. */
+.parent-picker-trigger {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-grey-text);
+}
+.parent-picker-trigger.has-value { color: var(--color-black); }
+.parent-picker-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.parent-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  padding: 8px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lift);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.parent-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-grey-text);
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.parent-picker-search:focus-within {
+  border-color: var(--color-green-primary);
+  box-shadow: 0 0 0 3px rgba(31, 92, 62, 0.15);
+}
+.parent-picker-search input {
+  flex: 1;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--color-black);
+}
+.parent-picker-list {
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.parent-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  padding: 8px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  color: var(--color-black);
+  cursor: pointer;
+  text-align: left;
+}
+.parent-picker-item:hover { background: var(--color-bg); }
+.parent-picker-item.on {
+  background: var(--color-green-light);
+  color: var(--color-green-primary);
+}
+.parent-picker-item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.parent-picker-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.parent-picker-item-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--color-grey-text);
+}
+.parent-picker-item.on .parent-picker-item-meta { color: var(--color-green-primary); opacity: 0.8; }
+.parent-picker-divider {
+  height: 1px;
+  margin: 2px 2px 3px;
+  background: var(--color-border);
+  flex: none;
+}
+.parent-picker-empty {
+  padding: 14px 8px;
+  font-size: 12.5px;
+  color: var(--color-grey-text);
+  text-align: center;
+}
+.parent-picker-showall {
+  border: none;
+  background: none;
+  padding: 8px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-green-primary);
+  cursor: pointer;
+  text-align: left;
+}
+.parent-picker-showall:hover { background: var(--color-green-light); }
+/* Mirrors .gb-unlinked-banner's amber — same "will land in Unlinked Tasks"
+   consequence, just inline under the field instead of a standalone banner. */
+.parent-picker-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-amber-text);
+}
+
+/* =====================================================================
    v6 — goal checklist (board editor + member tick-off list)
    ===================================================================== */
 /* board-side editor inside the goal form */
