@@ -15,7 +15,7 @@ import { DatePicker } from '@/components/DatePicker';
 import { WEEKDAYS, recurrenceOptionsForLevel } from '@/lib/recurrence';
 import { periodEndDate, periodLabel } from '@/lib/fiscal';
 import { fmtDate, addDays } from '@/lib/dates';
-import { PARENT_LEVEL } from './goal-ui';
+import { PARENT_LEVEL, LEVEL_WORD, goalDepts } from './goal-ui';
 import type { Goal, GoalLevel, ChecklistRecurrence } from '@/lib/types';
 
 export interface AssignableMember {
@@ -68,6 +68,168 @@ const LEVELS: { value: GoalLevel; label: string }[] = [
 // Which level a goal of `level` hangs under (its parent tier), or null for the
 // top tier. Drives the parent picker: daily→monthly→quarterly→half-yearly→yearly.
 const PARENT_OF = PARENT_LEVEL;
+
+// Strips the trailing " · FY 2026-27" off periodLabel — full precision is
+// useful beside the due-date field, but a parent-picker row just needs the
+// short "Q2 · Jul–Sep" to tell two similarly-named tasks apart.
+const shortPeriod = (p: Goal): string | null => {
+  if (!p.due_date) return null;
+  const label = periodLabel(p.level, p.due_date);
+  return label ? label.replace(/ · FY \d{4}-\d{2}$/, '') : null;
+};
+
+// A searchable "pick a parent task" control, standing in for a native
+// <select> for the same reason as the Tasks toolbar's assignee filter: the
+// candidate list can run long, and a flat option list gives no way to tell
+// apart two similarly-named tasks. Scoped to the child task's own
+// department(s) by default — a parent almost always lives in the same
+// department — with an explicit opt-out for the rare cross-department link,
+// and each row shows the parent's period so title collisions aren't a
+// guessing game.
+function ParentTaskPicker({
+  options,
+  value,
+  onChange,
+  depts,
+  levelWord,
+}: {
+  options: Goal[];
+  value: string | null;
+  onChange: (id: string | null) => void;
+  depts: string[];
+  levelWord: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const [showAllDepts, setShowAllDepts] = React.useState(false);
+  const wrapRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const scoped = React.useMemo(
+    () => options.filter((p) => goalDepts(p).some((d) => depts.includes(d))),
+    [options, depts],
+  );
+  // Nothing to scope by (no department chosen yet) or scoping wouldn't hide
+  // anything — the toggle would be a no-op, so don't offer it.
+  const scopable = depts.length > 0 && scoped.length < options.length;
+  const pool = showAllDepts || depts.length === 0 ? options : scoped;
+  const sorted = React.useMemo(
+    () =>
+      [...pool].sort(
+        (a, b) =>
+          (a.due_date || '9999-99-99').localeCompare(b.due_date || '9999-99-99') ||
+          a.title.localeCompare(b.title),
+      ),
+    [pool],
+  );
+  const filtered = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? sorted.filter((p) => p.title.toLowerCase().includes(q)) : sorted;
+  }, [sorted, search]);
+  // Looked up from the FULL option list, not the scoped pool — an existing
+  // cross-department link (or one made just before a department edit) must
+  // still show its title even while the picker itself is scoped away from it.
+  const selected = value ? options.find((p) => p.id === value) : undefined;
+
+  React.useEffect(() => {
+    if (!open) return;
+    setSearch('');
+    const t = setTimeout(() => inputRef.current?.focus(), 0);
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('mousedown', onDoc);
+    };
+  }, [open]);
+
+  const choose = (id: string | null) => {
+    onChange(id);
+    setOpen(false);
+  };
+
+  const rowMeta = (p: Goal) => {
+    const parts = [goalDepts(p).join(' · '), shortPeriod(p)].filter(Boolean);
+    return parts.join('   ·   ');
+  };
+
+  return (
+    <div className="parent-picker" ref={wrapRef}>
+      <button
+        type="button"
+        className={`select parent-picker-trigger${selected ? ' has-value' : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Parent ${levelWord} task`}
+      >
+        <span className="parent-picker-label">
+          {selected ? selected.title : 'None — not linked'}
+        </span>
+      </button>
+      {open ? (
+        <div className="parent-picker-menu" role="listbox">
+          <div className="parent-picker-search">
+            <Icon name="search" size={13} />
+            <input
+              ref={inputRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${levelWord} tasks…`}
+              aria-label={`Search ${levelWord} tasks`}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setOpen(false);
+                if (e.key === 'Enter' && filtered.length === 1) choose(filtered[0].id);
+              }}
+            />
+          </div>
+          <div className="parent-picker-list">
+            <button
+              type="button"
+              className={`parent-picker-item${!value ? ' on' : ''}`}
+              onClick={() => choose(null)}
+            >
+              <span className="parent-picker-item-name">None</span>
+              {!value ? <Icon name="check" size={13} /> : null}
+            </button>
+            <div className="parent-picker-divider" />
+            {filtered.length === 0 ? (
+              <div className="parent-picker-empty">
+                No {levelWord} tasks match{search ? ` “${search}”` : ''}.
+              </div>
+            ) : (
+              filtered.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`parent-picker-item${value === p.id ? ' on' : ''}`}
+                  onClick={() => choose(p.id)}
+                >
+                  <span className="parent-picker-item-text">
+                    <span className="parent-picker-item-name">{p.title}</span>
+                    <span className="parent-picker-item-meta">{rowMeta(p)}</span>
+                  </span>
+                  {value === p.id ? <Icon name="check" size={13} /> : null}
+                </button>
+              ))
+            )}
+            {scopable && !showAllDepts ? (
+              <button
+                type="button"
+                className="parent-picker-showall"
+                onClick={() => setShowAllDepts(true)}
+              >
+                Show other departments ({options.length - scoped.length})
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function GoalForm({
   initial,
@@ -354,6 +516,29 @@ export function GoalForm({
         </Field>
       )}
 
+      {/* Own full-width row, right after Department: pick where the task lives,
+          then immediately anchor it in the tree — before due date/status/
+          checklist detail. Keyed on parentLevel (does this tier HAVE a parent
+          tier), not on whether candidates exist yet, so the field — and the
+          unlinked warning below it — never silently disappears. */}
+      {parentLevel ? (
+        <Field label={`Parent (${LEVEL_WORD[parentLevel]} task)`}>
+          <ParentTaskPicker
+            options={parentOptions}
+            value={form.parentId}
+            onChange={(id) => set('parentId', id)}
+            depts={depts}
+            levelWord={LEVEL_WORD[parentLevel]}
+          />
+          {!form.parentId ? (
+            <div className="parent-picker-warning">
+              <span aria-hidden>⚠</span>
+              Not linked — this task will land in “Unlinked Tasks” instead of the cascade.
+            </div>
+          ) : null}
+        </Field>
+      ) : null}
+
       <div className="form-row-2">
         <Field label="Due date">
           <DatePicker
@@ -368,10 +553,6 @@ export function GoalForm({
             <div className="field-hint">{periodLabel(form.level, form.dueDate)}</div>
           ) : null}
         </Field>
-        <div />
-      </div>
-
-      <div className="form-row-2">
         <Field label="Status">
           <select
             className="select"
@@ -386,24 +567,6 @@ export function GoalForm({
             <option value="not_met">Not met</option>
           </select>
         </Field>
-        {parentOptions.length > 0 ? (
-          <Field label={`Parent (${parentLevel} task)`}>
-            <select
-              className="select"
-              value={form.parentId || ''}
-              onChange={(e) => set('parentId', e.target.value || null)}
-            >
-              <option value="">None</option>
-              {parentOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
-          </Field>
-        ) : (
-          <div />
-        )}
       </div>
 
       {/* Checklist — the steps that make up the goal. Each can repeat, and a
