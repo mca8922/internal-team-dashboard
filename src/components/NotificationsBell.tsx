@@ -185,8 +185,9 @@ export function NotificationsBell({
           }
         },
       )
-      // Keep an open tab in sync when rows change elsewhere — a read toggled on
-      // another device, or a row cleared by the member / the nightly prune.
+      // Keep an open tab in sync when rows change elsewhere — a read toggled,
+      // or a dismiss (now an UPDATE, not a DELETE — see below), on another
+      // device.
       .on(
         'postgres_changes',
         {
@@ -197,11 +198,20 @@ export function NotificationsBell({
         },
         (payload) => {
           const n = payload.new as Notification;
-          setNotifs((cur) => cur.map((x) => (x.id === n.id ? n : x)));
+          // A dismiss is now an UPDATE (dismissed_at set), not a DELETE — see
+          // deleteNotification/clearNotifications — so a dismissal made on
+          // another device has to be dropped from THIS tab's list here rather
+          // than relying on the DELETE handler below to ever see it.
+          setNotifs((cur) =>
+            n.dismissed_at ? cur.filter((x) => x.id !== n.id) : cur.map((x) => (x.id === n.id ? n : x)),
+          );
         },
       )
-      // DELETE payloads carry only the primary key (no user_id to filter on), so
-      // we listen unfiltered and drop the id locally — a no-op if it isn't ours.
+      // A real DELETE only ever happens now via the nightly retention prune
+      // (sweepOldNotifications) — a member dismissing one is an UPDATE, handled
+      // above. DELETE payloads carry only the primary key (no user_id to filter
+      // on), so we listen unfiltered and drop the id locally — a no-op if it
+      // isn't ours.
       .on(
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'notifications' },
@@ -220,6 +230,7 @@ export function NotificationsBell({
         .from('notifications')
         .select('*')
         .eq('user_id', userId)
+        .is('dismissed_at', null)
         .order('created_at', { ascending: false })
         .limit(30);
       if (data) {

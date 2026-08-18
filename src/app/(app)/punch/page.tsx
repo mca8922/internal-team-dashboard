@@ -4,11 +4,12 @@ import {
   getCurrentProfile,
   getPunches,
   punchTotalMsForDate,
+  punchMsOnDate,
   punchStatus,
   activeOpenSession,
   getMyPunchChangeRequests,
 } from '@/lib/queries';
-import { fmtDate, addDays, addMonths, parseDate } from '@/lib/dates';
+import { fmtDate, addDays, addMonths, parseDate, clampToGoLive } from '@/lib/dates';
 import { targetHours } from '@/lib/roles';
 import { PunchConsole } from './PunchConsole';
 import { PunchRequestsCard } from './PunchRequestsCard';
@@ -23,7 +24,10 @@ function firstOfMonth(d: Date): Date {
 export default async function PunchPage() {
   const profile = (await getCurrentProfile())!;
   const today = fmtDate(new Date());
-  const windowStart = fmtDate(firstOfMonth(addMonths(new Date(), -1)));
+  // getPunches() floors this at GO_LIVE_DATE regardless, but clamping here
+  // too keeps the day-list loop below from generating a stretch of empty
+  // pre-go-live rows with nothing behind them.
+  const windowStart = clampToGoLive(fmtDate(firstOfMonth(addMonths(new Date(), -1))));
   const fromDate = fmtDate(addDays(new Date(), -14));
 
   const [windowPunches, myRequests] = await Promise.all([
@@ -36,9 +40,19 @@ export default async function PunchPage() {
 
   const active = activeOpenSession(windowPunches);
   const todayRows = windowPunches.filter((p) => p.work_date === today);
-  const sessionRows =
-    active && active.work_date !== today ? [active, ...todayRows] : todayRows;
-  const todaySessions = sessionRows.map((p) => ({ punch_in: p.punch_in, punch_out: p.punch_out }));
+  // A session dated a prior day whose punch-out (or, if still open, its
+  // capped end) lands after IST midnight still owes today some minutes —
+  // catches both a still-open overnight session AND one that was already
+  // punched out after midnight, not just whichever is currently active.
+  const carryoverRows = windowPunches.filter(
+    (p) => p.work_date !== today && punchMsOnDate(p, today) > 0,
+  );
+  const sessionRows = [...carryoverRows, ...todayRows];
+  const todaySessions = sessionRows.map((p) => ({
+    punch_in: p.punch_in,
+    punch_out: p.punch_out,
+    carriedOver: p.work_date !== today,
+  }));
 
   const heat: { ds: string; hours: number }[] = [];
   for (let i = 13; i >= 0; i--) {
@@ -67,6 +81,7 @@ export default async function PunchPage() {
   return (
     <>
       <PunchConsole
+        today={today}
         todaySessions={todaySessions}
         status={active ? 'in' : punchStatus(todayRows)}
         expectedHrs={targetHours(profile)}
