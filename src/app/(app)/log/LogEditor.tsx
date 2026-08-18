@@ -196,27 +196,27 @@ const learningTitleNode = (
 // Notes:    h1, code, table
 const EXAMPLE_JOURNAL: Block[] = [
   { id: 'eg-j0', type: 'h2', content: 'Tasks and updates' },
-  { id: 'eg-j1', type: 'bullet', content: 'Finalized the onboarding flow UI; resolved 3 open feedback points from the design review' },
-  { id: 'eg-j2', type: 'bullet', content: 'Paired with Priya on the API rate-limiting edge case; narrowed it to a missing backoff' },
+  { id: 'eg-j1', type: 'bullet', content: 'Completed the GSTR-3B reconciliation for Meridian Textiles; resolved 3 mismatches flagged in the input tax credit review' },
+  { id: 'eg-j2', type: 'bullet', content: 'Worked with Ananya on the TDS return for Q1; narrowed the discrepancy to a missing challan entry' },
   { id: 'eg-jd', type: 'divider', content: '' },
-  { id: 'eg-j3', type: 'todo', content: 'Review and merge PR #42: auth token refresh', done: true },
-  { id: 'eg-j4', type: 'todo', content: 'Follow up with design team on mobile breakpoint specs', done: false },
-  { id: 'eg-j5', type: 'callout', variant: 'info', icon: '💡', content: 'Stand-up ran long today. Timebox team updates to 2 min each.' },
+  { id: 'eg-j3', type: 'todo', content: 'File the ITR for Kunal Enterprises: advance tax computation', done: true },
+  { id: 'eg-j4', type: 'todo', content: 'Follow up with the client on pending Form 16 documents', done: false },
+  { id: 'eg-j5', type: 'callout', variant: 'info', icon: '💡', content: 'Client call ran long today. Timebox status updates to 2 min each.' },
 ];
 
 const EXAMPLE_LEARNING: Block[] = [
   { id: 'eg-l0', type: 'h3', content: 'Key insight' },
-  { id: 'eg-l1', type: 'text', content: '<b>Promise.allSettled</b> is safer than <b>Promise.all</b> when you want results even if some calls fail. Used it to clean up our batch API calls.' },
+  { id: 'eg-l1', type: 'text', content: '<b>Presumptive taxation (Section 44AD)</b> is simpler than maintaining full books when a client’s turnover is under the threshold. Used it to close out three proprietorship filings faster this week.' },
   { id: 'eg-l2', type: 'quote', content: 'The best teams over-communicate progress, not just blockers.' },
   { id: 'eg-l3', type: 'h3', content: 'How to apply it' },
-  { id: 'eg-l4', type: 'numbered', content: 'Find all Promise.all calls in the codebase' },
-  { id: 'eg-l5', type: 'numbered', content: 'Replace with allSettled where partial failure is acceptable' },
+  { id: 'eg-l4', type: 'numbered', content: 'Check which clients have turnover under ₹2 crore and no bookkeeping requirement' },
+  { id: 'eg-l5', type: 'numbered', content: 'Confirm with the client, then switch their filing to Section 44AD' },
 ];
 
 const EXAMPLE_NOTES: Block[] = [
-  { id: 'eg-n0', type: 'h1', content: 'Deployment notes' },
-  { id: 'eg-n1', type: 'text', content: '<b>user_sessions</b> DB migration must run before the next deployment. Coordinate with DevOps.' },
-  { id: 'eg-n2', type: 'code', content: 'SELECT * FROM user_sessions WHERE expires_at < NOW();' },
+  { id: 'eg-n0', type: 'h1', content: 'Filing notes' },
+  { id: 'eg-n1', type: 'text', content: '<b>26AS reconciliation</b> must be completed before the return is filed. Coordinate with the client for the TDS certificate.' },
+  { id: 'eg-n2', type: 'code', content: "=VLOOKUP(A2,'GSTR-2B'!$A:$D,4,0)" },
   {
     id: 'eg-n3',
     type: 'table',
@@ -224,8 +224,8 @@ const EXAMPLE_NOTES: Block[] = [
     props: {
       headers: ['Task', 'Owner', 'Due Date'],
       rows: [
-        ['Design handoff', 'Riya', 'Mon'],
-        ['API integration', 'Karan', 'Wed'],
+        ['Client data collation', 'Riya', 'Mon'],
+        ['GST filing', 'Karan', 'Wed'],
       ],
     },
   },
@@ -782,7 +782,7 @@ export function LogEditor({
                       set({ tags: log.tags.slice(0, -1) });
                     }
                   }}
-                  placeholder="e.g. client-acme, bug-fix…"
+                  placeholder="e.g. client-acme, gst-filing…"
                 />
               </div>
               {showTagSuggestions ? (

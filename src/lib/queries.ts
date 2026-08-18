@@ -13,6 +13,7 @@ import {
   istDayStartMs,
   daysBetween,
   GO_LIVE_DATE,
+  clampToGoLive,
 } from '@/lib/dates';
 import type {
   Profile,
@@ -46,6 +47,11 @@ import type {
   BirthdayWishRow,
 } from '@/lib/types';
 import { parseGoalTemplate, type GoalTemplate } from '@/lib/goal-templates';
+
+// GO_LIVE_DATE as a real instant (IST midnight) for comparing against
+// timestamptz columns (created_at) — the plain YYYY-MM-DD would otherwise be
+// cast as UTC midnight, shifting the boundary by IST's +5:30 offset.
+const GO_LIVE_INSTANT = new Date(istDayStartMs(GO_LIVE_DATE)).toISOString();
 
 // Wrapped in React.cache so the layout and the page (and anything else in
 // the same request) share ONE auth+profile round-trip instead of repeating
@@ -82,8 +88,12 @@ export const getProfile = cache(async (id: string): Promise<Profile | null> => {
 export const getPunches = cache(
   async (userId: string, fromDate?: string): Promise<Punch[]> => {
     const supabase = await createClient();
-    let q = supabase.from('punches').select('*').eq('user_id', userId).order('punch_in');
-    if (fromDate) q = q.gte('work_date', fromDate);
+    const q = supabase
+      .from('punches')
+      .select('*')
+      .eq('user_id', userId)
+      .order('punch_in')
+      .gte('work_date', clampToGoLive(fromDate));
     const { data } = await q;
     return data ?? [];
   },
@@ -91,8 +101,11 @@ export const getPunches = cache(
 
 export const getAllPunches = cache(async (fromDate?: string): Promise<Punch[]> => {
   const supabase = await createClient();
-  let q = supabase.from('punches').select('*').order('punch_in');
-  if (fromDate) q = q.gte('work_date', fromDate);
+  const q = supabase
+    .from('punches')
+    .select('*')
+    .order('punch_in')
+    .gte('work_date', clampToGoLive(fromDate));
   const { data } = await q;
   return data ?? [];
 });
@@ -103,6 +116,7 @@ export const getLogs = cache(async (userId: string): Promise<WorkLog[]> => {
     .from('logs')
     .select('*')
     .eq('user_id', userId)
+    .gte('log_date', GO_LIVE_DATE)
     .order('log_date', { ascending: false });
   return data ?? [];
 });
@@ -120,7 +134,7 @@ export const getRecentLogs = cache(
       .from('logs')
       .select('*')
       .eq('user_id', userId)
-      .gte('log_date', from)
+      .gte('log_date', clampToGoLive(from))
       .order('log_date', { ascending: false });
     return data ?? [];
   },
@@ -169,9 +183,10 @@ export const getLog = cache(
 // Omit it (the Team page) to get all history.
 export const getAllLogs = cache(async (fromDate?: string): Promise<WorkLog[]> => {
   const supabase = await createClient();
-  let q = supabase.from('logs').select('*');
-  if (fromDate) q = q.gte('log_date', fromDate);
-  const { data } = await q;
+  const { data } = await supabase
+    .from('logs')
+    .select('*')
+    .gte('log_date', clampToGoLive(fromDate));
   return data ?? [];
 });
 
@@ -405,7 +420,11 @@ export const getSavedViews = cache(async (_userId: string): Promise<SavedView[]>
 
 export const getLeaves = cache(async (userId?: string): Promise<Leave[]> => {
   const supabase = await createClient();
-  let q = supabase.from('leaves').select('*').order('start_date', { ascending: false });
+  let q = supabase
+    .from('leaves')
+    .select('*')
+    .gte('start_date', GO_LIVE_DATE)
+    .order('start_date', { ascending: false });
   if (userId) q = q.eq('user_id', userId);
   const { data } = await q;
   return data ?? [];
@@ -445,10 +464,16 @@ export const getNotifications = cache(
   async (userId: string, limit = 30): Promise<Notification[]> => {
     const supabase = await createClient();
     const muted = await getMutedInAppTypes(userId);
+    // Dismissed rows are kept (not deleted — see dismissed_at on Notification)
+    // so the daily sweeps never mistake a dismissed-but-still-true reminder
+    // for a fresh one; this is the one place that has to filter them back out
+    // of what the member actually sees.
     let q = supabase
       .from('notifications')
       .select('*')
       .eq('user_id', userId)
+      .is('dismissed_at', null)
+      .gte('created_at', GO_LIVE_INSTANT)
       .order('created_at', { ascending: false })
       .limit(limit);
     if (muted.length) q = q.not('type', 'in', `(${muted.join(',')})`);
@@ -465,58 +490,12 @@ export const getCompany = cache(async (): Promise<Company> => {
 
 // ---- derived helpers (ported from lib.js) ----
 
-// A single punch session can never count for more than 24 hours. A member who
-// forgets to punch out shouldn't rack up 28h+ — the session stops accruing at
-// 24h from punch-in (until they actually punch out).
-export const MAX_SESSION_MS = 24 * 60 * 60 * 1000;
-
-// Effective end time of a session: its punch_out, or — for an open session —
-// now, but never more than 24h after punch-in.
-function sessionEndMs(s: { punch_in: string; punch_out: string | null }, now: number): number {
-  const start = new Date(s.punch_in).getTime();
-  const rawEnd = s.punch_out ? new Date(s.punch_out).getTime() : now;
-  return Math.min(rawEnd, start + MAX_SESSION_MS);
-}
-
-export function punchTotalMs(sessions: Punch[]): number {
-  const now = Date.now();
-  return sessions.reduce((sum, s) => {
-    const a = new Date(s.punch_in).getTime();
-    return sum + Math.max(0, sessionEndMs(s, now) - a);
-  }, 0);
-}
-
-// The portion of a single punch session that falls inside one IST calendar day
-// (YYYY-MM-DD). A session punched in at 11:55 PM and out at 12:30 AM the next
-// day contributes 5 minutes to the first day and 30 minutes to the second.
-// Open sessions count up to `now`. Sessions that don't overlap the day → 0.
-export function punchMsOnDate(
-  s: { punch_in: string; punch_out: string | null },
-  ds: string,
-  now: number = Date.now(),
-): number {
-  const dayStart = istDayStartMs(ds);
-  const dayEnd = dayStart + 24 * 60 * 60 * 1000;
-  const start = new Date(s.punch_in).getTime();
-  // Open sessions are capped at 24h from punch-in (see MAX_SESSION_MS).
-  const end = sessionEndMs(s, now);
-  const lo = Math.max(start, dayStart);
-  const hi = Math.min(end, dayEnd);
-  return Math.max(0, hi - lo);
-}
-
-// Total time worked on one IST calendar day across a set of sessions, with each
-// session split at the midnight boundary (see punchMsOnDate). Pass any sessions
-// that might overlap the day — non-overlapping ones simply add nothing — so a
-// session whose work_date is the previous day still contributes its post-
-// midnight minutes to this day.
-export function punchTotalMsForDate(
-  sessions: { punch_in: string; punch_out: string | null }[],
-  ds: string,
-  now: number = Date.now(),
-): number {
-  return sessions.reduce((sum, s) => sum + punchMsOnDate(s, ds, now), 0);
-}
+// The punch time-math itself lives in dates.ts (a client component —
+// PunchConsole — needs it directly, and dates.ts is the one of these two
+// modules safe to import from the browser). Re-exported here so every
+// existing Server Component caller keeps importing from '@/lib/queries'
+// unchanged.
+export { MAX_SESSION_MS, punchTotalMs, punchMsOnDate, punchTotalMsForDate } from '@/lib/dates';
 
 // ---- quarterly leaves ----
 
@@ -647,6 +626,7 @@ export const getChangeRequests = cache(
     let q = supabase
       .from('change_requests')
       .select('*')
+      .gte('created_at', GO_LIVE_INSTANT)
       .order('created_at', { ascending: false });
     if (status) q = q.eq('status', status);
     const { data } = await q;
@@ -676,6 +656,7 @@ export const getMyPunchChangeRequests = cache(
       .from('punch_change_requests')
       .select('*')
       .eq('user_id', userId)
+      .gte('created_at', GO_LIVE_INSTANT)
       .order('created_at', { ascending: false });
     return (data ?? []) as PunchChangeRequest[];
   },
@@ -690,6 +671,7 @@ export const getPunchChangeRequests = cache(
     let q = supabase
       .from('punch_change_requests')
       .select('*')
+      .gte('created_at', GO_LIVE_INSTANT)
       .order('created_at', { ascending: false });
     if (status) q = q.eq('status', status);
     const { data } = await q;

@@ -276,13 +276,17 @@ const NOTIFICATION_RETENTION_DAYS = Number(process.env.NOTIFICATION_RETENTION_DA
 // treated as an edit and does NOT re-notify reviewers. Tunable via env.
 const NOTIFY_DEBOUNCE_MINUTES = Number(process.env.NOTIFY_DEBOUNCE_MINUTES) || 45;
 
-// Deletes already-seen notifications older than NOTIFICATION_RETENTION_DAYS
-// across all members. Runs from the daily cron (see api/cron/daily) so the
-// table self-prunes even when nobody opens the app. Scoped to is_read=true so
-// an unread, still-actionable reminder (e.g. an unopened goal_due_soon) is
-// kept regardless of age — only notifications the member has already seen age
-// out. Service-role client: a retention sweep must reach every member's rows,
-// beyond any one caller's RLS scope.
+// Deletes already-seen OR already-dismissed notifications older than
+// NOTIFICATION_RETENTION_DAYS across all members. Runs from the daily cron
+// (see api/cron/daily) so the table self-prunes even when nobody opens the
+// app. An unread, still-showing reminder (e.g. an unopened goal_due_soon) is
+// kept regardless of age — only notifications the member has already seen OR
+// dismissed age out. This is also the point where a *dismissed* reminder for
+// a condition that is somehow still true (say a punch left open for over a
+// week) genuinely gets a fresh notification again — a week of silence is long
+// enough that re-reminding is the right call, not a repeat of the bug this
+// dismissed_at column exists to fix. Service-role client: a retention sweep
+// must reach every member's rows, beyond any one caller's RLS scope.
 export async function sweepOldNotifications(): Promise<void> {
   const admin = createAdminClient();
   const cutoffISO = new Date(
@@ -291,8 +295,8 @@ export async function sweepOldNotifications(): Promise<void> {
   await admin
     .from('notifications')
     .delete()
-    .eq('is_read', true)
-    .lt('created_at', cutoffISO);
+    .lt('created_at', cutoffISO)
+    .or('is_read.eq.true,dismissed_at.not.is.null');
 }
 
 // Goal-deadline reminder. Runs on every app load. For each active goal due
@@ -1405,21 +1409,34 @@ export async function loadMemberGoalsForHandoff(memberId: string): Promise<{
 
 // ---- notifications ----
 
-// Permanently deletes one of the caller's notifications. Used by the dismiss
-// (×) button in the bell dropdown. RLS "delete own" policy prevents removing
-// another member's notifications.
+// Dismisses one of the caller's notifications — the (×) button in the bell
+// dropdown. A soft dismiss (dismissed_at), NOT a delete: the row has to stay
+// so the daily sweeps (sweepMissedPunchOuts / sweepGoalDeadlines / etc. below)
+// still see it and never mistake a dismissed-but-still-true reminder for a
+// fresh one. Hard-deleting used to erase that memory, which is why clearing a
+// reminder for a still-unfixed problem (an open punch session, say) made it
+// come right back on the very next page load. RLS "update own" policy
+// prevents touching another member's notifications.
 export async function deleteNotification(id: string) {
   const { supabase, userId } = await requireUser();
-  await supabase.from('notifications').delete().eq('id', id).eq('user_id', userId);
+  await supabase
+    .from('notifications')
+    .update({ dismissed_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('user_id', userId);
 }
 
-// Deletes ALL of the caller's notifications — the "Clear all" control in the
-// bell and the Notifications page. RLS scopes the delete to the owner, so a
-// member can only ever clear their own. (.neq on a non-null id matches every
-// row while satisfying PostgREST's required-filter guard.)
+// Dismisses ALL of the caller's notifications — the "Clear all" control in the
+// bell and the Notifications page. Same soft-dismiss as deleteNotification,
+// same reason. RLS scopes the update to the owner, so a member can only ever
+// clear their own.
 export async function clearNotifications() {
   const { supabase, userId } = await requireUser();
-  await supabase.from('notifications').delete().eq('user_id', userId);
+  await supabase
+    .from('notifications')
+    .update({ dismissed_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .is('dismissed_at', null);
 }
 
 // Sets one channel (in-app bell or web-push) on/off for one notification type
@@ -1547,22 +1564,21 @@ export async function createLeave(input: {
   }).select('id').single();
   const leaveHref = created ? `/leaves?leave=${created.id}` : '/leaves';
 
-  // Notify every Board member with a popup + chime via Realtime. RLS only
-  // allows board callers to insert into `notifications`; leaves are created
-  // by non-board members too, so use the service-role client.
+  // Notify the Founders only — not every Director — with a popup + chime via
+  // Realtime. A Director can still open /leaves and act on a pending request
+  // if they come across one (reviewLeave has no role check beyond "some kind
+  // of Board Member"), but the proactive "you have something to review" ping
+  // is deliberately scoped down to the two Founders. RLS only allows board
+  // callers to insert into `notifications`; leaves are created by non-board
+  // members too, so use the service-role client.
   const admin = createAdminClient();
-  const [{ data: me }, { data: boards }] = await Promise.all([
-    admin.from('profiles').select('name').eq('id', userId).single(),
-    admin
-      .from('profiles')
-      .select('id')
-      .eq('role', 'board')
-      .eq('is_active', true),
-  ]);
-  // Never notify the requester about their own request — a Board Member
-  // applying for leave can't review it (see reviewLeave below), so pinging
-  // them to "review" their own submission would be both noisy and wrong.
-  const reviewers = (boards ?? []).filter((b) => b.id !== userId);
+  const { data: me } = await admin.from('profiles').select('name').eq('id', userId).single();
+  // Never notify the requester about their own request — a Founder applying
+  // for leave can't review it (see reviewLeave below), so pinging them to
+  // "review" their own submission would be both noisy and wrong.
+  const reviewers = (FOUNDER_USER_IDS as readonly string[])
+    .filter((id) => id !== userId)
+    .map((id) => ({ id }));
   if (reviewers.length) {
     const range = leaveRange(input.startDate, input.endDate, input.isHalfDay);
     const leaveTitle = `${me?.name ?? 'A teammate'} requested leave`;
@@ -3069,19 +3085,25 @@ export async function submitPunchChangeRequest(input: {
           input.isHalfDay ? ' - half-day' : ''
         }`;
   const href = '/team/requests';
-  await admin.from('notifications').insert(
-    FOUNDER_USER_IDS.map((id) => ({
-      user_id: id,
-      type: 'punch_change_requested',
-      title,
-      body,
-      href,
-    })),
-  );
-  after(() => sendPush(FOUNDER_USER_IDS as unknown as string[], { title, body, url: href }, 'punch_change_requested'));
-  after(() =>
-    notifyByEmail([...FOUNDER_USER_IDS], { eventType: 'punch_change_requested', title, body, href }),
-  );
+  // If the requester is themselves a Founder, they can't review their own
+  // (now-pending) request — exclude them so only the OTHER Founder gets
+  // pinged to act. Mirrors reviewLeave's founderReviewers filter below.
+  const founderReviewers = (FOUNDER_USER_IDS as readonly string[]).filter((id) => id !== userId);
+  if (founderReviewers.length) {
+    await admin.from('notifications').insert(
+      founderReviewers.map((id) => ({
+        user_id: id,
+        type: 'punch_change_requested',
+        title,
+        body,
+        href,
+      })),
+    );
+    after(() => sendPush(founderReviewers, { title, body, url: href }, 'punch_change_requested'));
+    after(() =>
+      notifyByEmail(founderReviewers, { eventType: 'punch_change_requested', title, body, href }),
+    );
+  }
 
   revalidatePath('/team/requests');
   revalidatePath('/punch');
@@ -3122,6 +3144,10 @@ export async function approvePunchChangeRequest(id: string): Promise<{ error?: s
     .eq('id', id)
     .single();
   if (!req) return { error: 'Request not found.' };
+  // A Founder can never approve their own punch request — accepting your own
+  // correction isn't a real review. The other Founder has to do it. Mirrors
+  // reviewLeave's identical self-check.
+  if (req.user_id === userId) return { error: 'You cannot review your own punch request.' };
   if (req.status !== 'pending') return { error: 'This request was already reviewed.' };
 
   if (req.request_type === 'missed_punch') {
@@ -3177,6 +3203,8 @@ export async function rejectPunchChangeRequest(
     .eq('id', id)
     .single();
   if (!req) return { error: 'Request not found.' };
+  // Same self-check as approve above — a rejection is still a review.
+  if (req.user_id === userId) return { error: 'You cannot review your own punch request.' };
   if (req.status !== 'pending') return { error: 'This request was already reviewed.' };
 
   await admin

@@ -25,6 +25,44 @@ export function appIconName(icon: string): IconName {
 
 const COMPANY_WIDE = '__company__';
 
+// Hard-coded, Founder-only — deliberately NOT a department_apps row. reStrucAI's
+// own client dashboard, where the two Founders manage this account with
+// reStrucAI directly; no other Director or member should ever see or open it.
+// Living here instead of the database means there is no row a permissions bug
+// or a stray query could leak to anyone else — the gate is the isFounder prop
+// below, computed server-side in page.tsx from FOUNDER_USER_IDS.
+const FOUNDER_APPS: { id: string; name: string; url: string; image: string }[] = [
+  {
+    id: 'restrucai-client-dashboard',
+    name: 'reStrucAI Client Dashboard',
+    url: 'https://restrucai-clients.vercel.app/',
+    // reStrucAI's own wordmark, supplied by the Founder — public/ rather than
+    // a department_apps.image_url data URL, since this tile has no DB row to
+    // hang one off. Same 1:1 image treatment as AppCard's image_url branch.
+    image: '/restrucai-logo.png',
+  },
+];
+
+// Same tile look as AppCard below, minus logAppClick — there's no real
+// department_apps row for this id, so there is nothing meaningful to log a
+// click against.
+function FounderAppCard({ app }: { app: (typeof FOUNDER_APPS)[number] }) {
+  return (
+    <a href={app.url} target="_blank" rel="noopener noreferrer" className="app-tile">
+      <div className="app-tile-img">
+        <img src={app.image} alt="" />
+      </div>
+      <div className="app-tile-tint" />
+      <span className="app-tile-open" aria-hidden>
+        <Icon name="arrow-right" size={15} />
+      </span>
+      <div className="app-tile-bar">
+        <div className="app-tile-name">{app.name}</div>
+      </div>
+    </a>
+  );
+}
+
 // Lets us set a CSS custom property in an inline style object without TS noise.
 function accentStyle(name: string, accent: string | null): React.CSSProperties | undefined {
   return accent ? ({ [name]: accent } as React.CSSProperties) : undefined;
@@ -91,6 +129,7 @@ function Group({
 export function AppsView({
   apps,
   isBoard,
+  isFounder,
   myDepartment,
   deptColors,
   allApps,
@@ -99,6 +138,7 @@ export function AppsView({
 }: {
   apps: DepartmentApp[];
   isBoard: boolean;
+  isFounder: boolean;
   myDepartment: string;
   deptColors: Record<string, string>;
   allApps: DepartmentApp[];
@@ -147,6 +187,21 @@ export function AppsView({
           </div>
         )}
       </div>
+
+      {isFounder && (
+        <section className="launchpad-section">
+          <div className="launchpad-head">
+            <span className="dot" aria-hidden />
+            <h2>Founder tools</h2>
+            <span className="count">{FOUNDER_APPS.length}</span>
+          </div>
+          <div className="launchpad-grid">
+            {FOUNDER_APPS.map((a) => (
+              <FounderAppCard key={a.id} app={a} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {groups.length === 0 ? (
         <div className="empty-state">

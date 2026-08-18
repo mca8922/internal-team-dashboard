@@ -316,6 +316,13 @@ export interface Notification {
   // the "Company / General" section. See src/lib/notif-sections.ts.
   department: string | null;
   is_read: boolean;
+  // Set the moment the member dismisses it (the bell's "x", or "Clear all") —
+  // null while still showing. A soft marker, not a delete: the row has to
+  // survive so the daily sweeps (sweepMissedPunchOuts etc., src/lib/actions.ts)
+  // still see it and never mistake a dismissed-but-still-true reminder for a
+  // fresh one. getNotifications() filters these out; sweepOldNotifications
+  // eventually hard-deletes them for real once they're old enough.
+  dismissed_at: string | null;
   created_at: string;
 }
 

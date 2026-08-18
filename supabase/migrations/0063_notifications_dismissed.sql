@@ -1,0 +1,16 @@
+-- Dismissing a notification (the "x" in the bell, or "Clear all") used to
+-- hard-delete the row. That erased the ONLY memory that the member had
+-- already been told about it — so a still-true condition (an open punch
+-- session nobody has fixed yet, a goal still due tomorrow) got re-detected by
+-- the next sweep and re-notified, making a "cleared" reminder come right back
+-- on the very next page load. sweepMissedPunchOuts / sweepGoalDeadlines /
+-- sweepWorkAnniversaries / sweepBirthdays (src/lib/actions.ts) all
+-- de-duplicate by checking whether a notification row already EXISTS for the
+-- same (user, event) — deleting it made them forget it ever happened.
+--
+-- Dismissal is now a soft marker instead of a delete: the row stays (so the
+-- sweeps still see it and never mistake a dismissed-but-still-true reminder
+-- for a fresh one), it just stops being SHOWN. sweepOldNotifications still
+-- hard-deletes it for real once it's old enough — see that function's updated
+-- comment for why that's still safe.
+alter table notifications add column if not exists dismissed_at timestamptz;

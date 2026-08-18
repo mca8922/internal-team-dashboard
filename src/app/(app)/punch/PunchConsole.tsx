@@ -6,35 +6,33 @@ import * as React from 'react';
 import { Progress, EmptyState } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { punchIn, punchOut } from '@/lib/actions';
-import { fmtTimeFull, fmtTime, fmtFriendly, durationMs, durationHours } from '@/lib/dates';
+import {
+  fmtTimeFull,
+  fmtTime,
+  fmtFriendly,
+  durationMs,
+  durationHours,
+  punchMsOnDate,
+  punchTotalMsForDate,
+} from '@/lib/dates';
 
 type Status = 'not-started' | 'in' | 'complete';
 interface Session {
   punch_in: string;
   punch_out: string | null;
-}
-
-// A single session never counts for more than 24h — a member who forgot to
-// punch out doesn't keep accumulating past a day.
-const MAX_SESSION_MS = 24 * 60 * 60 * 1000;
-
-function sessionDuration(s: Session, now: number): number {
-  const a = new Date(s.punch_in).getTime();
-  const rawB = s.punch_out ? new Date(s.punch_out).getTime() : now;
-  return Math.max(0, Math.min(rawB, a + MAX_SESSION_MS) - a);
-}
-
-function totalMs(sessions: Session[]): number {
-  const now = Date.now();
-  return sessions.reduce((sum, s) => sum + sessionDuration(s, now), 0);
+  // True for a session dated a prior day whose post-midnight minutes still
+  // count toward today (see punch/page.tsx's carryoverRows).
+  carriedOver: boolean;
 }
 
 export function PunchConsole({
+  today,
   todaySessions,
   status: serverStatus,
   expectedHrs,
   heat,
 }: {
+  today: string;
   todaySessions: Session[];
   status: Status;
   expectedHrs: number;
@@ -54,7 +52,9 @@ export function PunchConsole({
     return () => clearInterval(id);
   }, []);
 
-  const total = totalMs(todaySessions);
+  // Clips each session to today's IST window so a carried-over session only
+  // counts its post-midnight portion — matching the dashboard's total exactly.
+  const total = punchTotalMsForDate(todaySessions, today, now ? now.getTime() : Date.now());
   const isOvertime = total > 9 * 60 * 60 * 1000;
   const pct = Math.min(100, (total / (expectedHrs * 60 * 60 * 1000)) * 100);
 
@@ -191,11 +191,18 @@ export function PunchConsole({
               {todaySessions.map((s, i) => {
                 const inT = new Date(s.punch_in);
                 const outT = s.punch_out ? new Date(s.punch_out) : null;
-                const dur = sessionDuration(s, Date.now());
+                // Today's portion only — a carried-over session's pre-midnight
+                // minutes belong to yesterday, not this total.
+                const dur = punchMsOnDate(s, today, Date.now());
                 return (
                   <tr key={i}>
                     <td className="text-grey">{i + 1}</td>
-                    <td className="font-mono">{fmtTime(inT)}</td>
+                    <td className="font-mono">
+                      {fmtTime(inT)}
+                      {s.carriedOver ? (
+                        <span className="text-xs text-grey"> (yesterday)</span>
+                      ) : null}
+                    </td>
                     <td className="font-mono">
                       {outT ? (
                         fmtTime(outT)

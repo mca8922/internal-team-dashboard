@@ -94,9 +94,21 @@ export function daysBetween(a: Date | string, b: Date | string): number {
   return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / DAY_MS);
 }
 
-// Mahesh Chandra & Associates go-live date — Monday 18 May 2026. Nothing before this counts
-// as a working day for streaks or the missing-log check.
-export const GO_LIVE_DATE = '2026-05-18';
+// Mahesh Chandra & Associates go-live date — Wednesday 29 July 2026. Nothing before this
+// counts as a working day for streaks or the missing-log check, and (see
+// clampToGoLive below) nothing before it is fetched by any history query
+// either — nothing was deleted, it's just outside what the dashboard shows.
+export const GO_LIVE_DATE = '2026-07-29';
+
+// Raises a query's "from" date up to GO_LIVE_DATE when it would otherwise
+// reach further back — nothing before go-live is ever shown, no matter how
+// wide the caller's own window is. Pass undefined for "no lower bound
+// requested"; the floor still applies. Plain string comparison is exact here
+// because both are YYYY-MM-DD, which sorts lexically the same as
+// chronologically.
+export function clampToGoLive(fromDate?: string): string {
+  return !fromDate || fromDate < GO_LIVE_DATE ? GO_LIVE_DATE : fromDate;
+}
 
 // Mahesh Chandra & Associates official working days are Monday–Friday, 9 AM–6 PM.
 // A "working day" is a weekday (IST) on or after go-live.
@@ -209,6 +221,64 @@ export function durationMs(ms: number): string {
 
 export function durationHours(ms: number): number {
   return Math.round((ms / (60 * 60 * 1000)) * 10) / 10;
+}
+
+// ---- punch time-math ----
+// Lives here (not queries.ts, which pulls in the server-only Supabase client)
+// so a client component — PunchConsole, specifically — can import it
+// directly. queries.ts re-exports these for its Server Component callers.
+
+// A single punch session can never count for more than 24 hours. A member who
+// forgets to punch out shouldn't rack up 28h+ — the session stops accruing at
+// 24h from punch-in (until they actually punch out).
+export const MAX_SESSION_MS = 24 * 60 * 60 * 1000;
+
+// Effective end time of a session: its punch_out, or — for an open session —
+// now, but never more than 24h after punch-in.
+function sessionEndMs(s: { punch_in: string; punch_out: string | null }, now: number): number {
+  const start = new Date(s.punch_in).getTime();
+  const rawEnd = s.punch_out ? new Date(s.punch_out).getTime() : now;
+  return Math.min(rawEnd, start + MAX_SESSION_MS);
+}
+
+export function punchTotalMs(sessions: { punch_in: string; punch_out: string | null }[]): number {
+  const now = Date.now();
+  return sessions.reduce((sum, s) => {
+    const a = new Date(s.punch_in).getTime();
+    return sum + Math.max(0, sessionEndMs(s, now) - a);
+  }, 0);
+}
+
+// The portion of a single punch session that falls inside one IST calendar day
+// (YYYY-MM-DD). A session punched in at 11:55 PM and out at 12:30 AM the next
+// day contributes 5 minutes to the first day and 30 minutes to the second.
+// Open sessions count up to `now`. Sessions that don't overlap the day → 0.
+export function punchMsOnDate(
+  s: { punch_in: string; punch_out: string | null },
+  ds: string,
+  now: number = Date.now(),
+): number {
+  const dayStart = istDayStartMs(ds);
+  const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+  const start = new Date(s.punch_in).getTime();
+  // Open sessions are capped at 24h from punch-in (see MAX_SESSION_MS).
+  const end = sessionEndMs(s, now);
+  const lo = Math.max(start, dayStart);
+  const hi = Math.min(end, dayEnd);
+  return Math.max(0, hi - lo);
+}
+
+// Total time worked on one IST calendar day across a set of sessions, with each
+// session split at the midnight boundary (see punchMsOnDate). Pass any sessions
+// that might overlap the day — non-overlapping ones simply add nothing — so a
+// session whose work_date is the previous day still contributes its post-
+// midnight minutes to this day.
+export function punchTotalMsForDate(
+  sessions: { punch_in: string; punch_out: string | null }[],
+  ds: string,
+  now: number = Date.now(),
+): number {
+  return sessions.reduce((sum, s) => sum + punchMsOnDate(s, ds, now), 0);
 }
 
 export function weekNumber(d: Date | string): number {
