@@ -278,7 +278,8 @@ function ActivityTimeline({
                 {rowI % 2 === 1 && (
                   <rect
                     x={0} y={rowY} width={VB_W} height={ROW_H}
-                    fill="rgba(255,255,255,0.018)"
+                    fill="var(--color-border)"
+                    fillOpacity={0.35}
                   />
                 )}
                 {/* App name */}
@@ -287,7 +288,7 @@ function ActivityTimeline({
                   y={rowY + ROW_H / 2 + 4}
                   textAnchor="end"
                   fontSize={10}
-                  fill="rgba(255,255,255,0.42)"
+                  fill="var(--color-grey-text)"
                   fontFamily="inherit"
                 >
                   {label}
@@ -339,7 +340,7 @@ function ActivityTimeline({
                 <line
                   x1={LABEL_W} y1={rowY + ROW_H}
                   x2={VB_W}    y2={rowY + ROW_H}
-                  stroke="rgba(255,255,255,0.05)"
+                  stroke="var(--color-border)"
                 />
               </g>
             );
@@ -362,7 +363,7 @@ function ActivityTimeline({
                   x={x} y={totalH - 4}
                   textAnchor="middle"
                   fontSize={9}
-                  fill="rgba(255,255,255,0.28)"
+                  fill="var(--color-grey-text)"
                   fontFamily="inherit"
                 >
                   {dateLabel}

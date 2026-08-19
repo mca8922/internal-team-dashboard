@@ -9878,9 +9878,16 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
   bottom: 0; left: 0; right: 0;
   z-index: 3;
   padding: 40px 14px 16px;
-  background: rgba(6, 9, 13, 0.58);
-  backdrop-filter: blur(22px) saturate(170%);
-  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  /* Two-layer scrim: the flat rgba gives a guaranteed-dark floor so the
+     backdrop-filter's saturate() can never lighten it into illegibility
+     over a bright (e.g. white-logo) image — this is what was washing the
+     name out in light mode / over light-image tiles. The gradient on top
+     darkens further right at the text baseline. */
+  background:
+    linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.55) 60%, rgba(0, 0, 0, 0.85) 100%),
+    rgba(6, 9, 13, 0.78);
+  backdrop-filter: blur(22px) saturate(120%);
+  -webkit-backdrop-filter: blur(22px) saturate(120%);
   /* The mask makes the entire element (blur included) fade from transparent
      at the top to fully opaque at the bottom — no visible hard edge. */
   mask-image: linear-gradient(to bottom, transparent 0%, black 38%);
@@ -9895,6 +9902,9 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Belt-and-braces legibility: guarantees contrast against any image
+     brightness/theme, independent of the scrim above. */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 1px 10px rgba(0, 0, 0, 0.5);
 }
 .app-tile-open {
   position: absolute;
