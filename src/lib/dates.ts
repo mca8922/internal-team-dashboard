@@ -148,7 +148,7 @@ export function fmtTime(d: Date | string): string {
 
 // Hour of day (0-23) in IST — use this instead of Date#getHours(), which
 // resolves in the server's own timezone (UTC on Vercel) and silently shifts
-// "before 10am" checks by 5:30.
+// "before 11am" checks by 5:30.
 export function istHour(d: Date | string): number {
   const hour = Number(
     new Intl.DateTimeFormat('en-US', {

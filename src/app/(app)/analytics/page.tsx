@@ -200,7 +200,7 @@ export default async function AnalyticsPage({
     const sessions = punches
       .filter((p) => p.work_date === ds)
       .sort((a, b) => a.punch_in.localeCompare(b.punch_in));
-    if (sessions.length && istHour(sessions[0].punch_in) < 10) onTime += 1;
+    if (sessions.length && istHour(sessions[0].punch_in) < 11) onTime += 1;
   }
   const consistency = totalDays ? Math.round((onTime / totalDays) * 100) : 0;
 
@@ -278,7 +278,7 @@ export default async function AnalyticsPage({
             </span>
           </div>
           <div className="stat-card-value">{consistency}%</div>
-          <div className="stat-card-meta">Before 10am</div>
+          <div className="stat-card-meta">Before 11am</div>
         </div>
 
         <div className="card stat-card">

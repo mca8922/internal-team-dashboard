@@ -247,7 +247,7 @@ export default async function EmployeePage({
     const sessions = punches
       .filter((p) => p.work_date === ds)
       .sort((a, b) => a.punch_in.localeCompare(b.punch_in));
-    if (sessions.length && istHour(sessions[0].punch_in) < 10) onTime += 1;
+    if (sessions.length && istHour(sessions[0].punch_in) < 11) onTime += 1;
   }
   const consistency = totalDays ? Math.round((onTime / totalDays) * 100) : 0;
 
@@ -364,7 +364,7 @@ export default async function EmployeePage({
         <div className="card">
           <div className="card-subtitle">Punch on-time</div>
           <div className="text-3xl fw-bold mt-1">{consistency}%</div>
-          <div className="text-xs text-grey mt-1">Before 10am</div>
+          <div className="text-xs text-grey mt-1">Before 11am</div>
         </div>
         {canSeeLeave ? (
           <div className="card">
