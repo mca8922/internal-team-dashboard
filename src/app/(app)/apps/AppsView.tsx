@@ -34,7 +34,7 @@ const COMPANY_WIDE = '__company__';
 const FOUNDER_APPS: { id: string; name: string; url: string; image: string }[] = [
   {
     id: 'restrucai-client-dashboard',
-    name: 'reStrucAI Client Dashboard',
+    name: 'Client Dashboard',
     url: 'https://restrucai-clients.vercel.app/',
     // reStrucAI's own wordmark, supplied by the Founder — public/ rather than
     // a department_apps.image_url data URL, since this tile has no DB row to
