@@ -20,6 +20,7 @@ import type {
   UserRole,
   Punch,
   WorkLog,
+  Block,
   Goal,
   GoalAssignee,
   GoalChecklistItem,
@@ -723,13 +724,28 @@ export function activeOpenSession<T extends { punch_in: string; punch_out: strin
   return best;
 }
 
+// True once a log carries actual typed text, not just the day's seeded
+// section headings. LogEditor autosaves every 30s (and on unmount) with no
+// emptiness check, so `blocks` is never actually empty — a day the member
+// opened but never wrote in still gets the three h3 prompts + blank text
+// blocks persisted. Mirrors LogEditor's own `isEmpty` check (h3 headings
+// are structural, not content) so "logged" means the same thing everywhere
+// this gets checked — streaks, calendars, dashboards, team views.
+export function logHasContent(blocks: Block[] | null | undefined): boolean {
+  if (!blocks || !blocks.length) return false;
+  return blocks.some((b) => {
+    if (b.type === 'h3') return false;
+    return (b.content || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() !== '';
+  });
+}
+
 // Consecutive working days (Mon–Fri, on/after go-live) with a non-empty log,
 // counted back from the most recent working day. Today only breaks the
 // streak if it is itself a past working day with no log — an as-yet-unlogged
 // "today" doesn't reset a streak built on prior days.
 export function logStreak(logs: WorkLog[]): number {
   const logged = new Set(
-    logs.filter((l) => l.blocks && l.blocks.length).map((l) => l.log_date),
+    logs.filter((l) => logHasContent(l.blocks)).map((l) => l.log_date),
   );
   let streak = 0;
   let d = startOfDay(new Date());

@@ -16,6 +16,7 @@ import {
   punchStatus,
   activeOpenSession,
   logStreak,
+  logHasContent,
   isOnLeave,
   visibleGoals,
   getBirthdayCelebrants,
@@ -201,7 +202,7 @@ export default async function DashboardPage() {
   );
   // Most recent logs that actually have content, newest first.
   const recentLogs = [...myLogs]
-    .filter((l) => l.blocks && l.blocks.length)
+    .filter((l) => logHasContent(l.blocks))
     .sort((a, b) => b.log_date.localeCompare(a.log_date))
     .slice(0, 4);
 

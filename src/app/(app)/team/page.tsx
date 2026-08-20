@@ -15,6 +15,7 @@ import {
   punchStatus,
   activeOpenSession,
   isOnLeave,
+  logHasContent,
 } from '@/lib/queries';
 import {
   fmtDate,
@@ -101,7 +102,7 @@ export default async function TeamPage() {
     }
 
     const userLogDates = logs
-      .filter((l) => l.user_id === u.id && l.blocks && l.blocks.length)
+      .filter((l) => l.user_id === u.id && logHasContent(l.blocks))
       .map((l) => l.log_date)
       .sort();
     const lastLog = userLogDates.length ? userLogDates[userLogDates.length - 1] : null;

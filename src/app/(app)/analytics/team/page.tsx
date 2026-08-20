@@ -11,6 +11,7 @@ import {
   getDepartmentColors,
   punchTotalMsForDate,
   logStreak,
+  logHasContent,
 } from '@/lib/queries';
 import Link from 'next/link';
 import { targetHours, isManager } from '@/lib/roles';
@@ -183,7 +184,7 @@ export default async function TeamAnalyticsPage({
 
   // log completion — every weekday in the selected range
   const logSet = new Set(
-    logs.filter((l) => l.blocks && l.blocks.length).map((l) => `${l.user_id}|${l.log_date}`),
+    logs.filter((l) => logHasContent(l.blocks)).map((l) => `${l.user_id}|${l.log_date}`),
   );
   let logged = 0;
   for (const u of profiles) {

@@ -8,6 +8,7 @@ import {
   getHolidays,
   punchTotalMsForDate,
   logStreak,
+  logHasContent,
   leaveUsage,
   isOnLeave,
   isHoliday,
@@ -180,7 +181,7 @@ export default async function AnalyticsPage({
     const d = addDays(today, -i);
     if (!isWorkingDay(d)) continue;
     const log = logMap.get(fmtDate(d));
-    if (log && log.blocks && log.blocks.length) {
+    if (log && logHasContent(log.blocks)) {
       run += 1;
       longest = Math.max(longest, run);
     } else run = 0;

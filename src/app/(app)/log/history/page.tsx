@@ -1,6 +1,6 @@
 // Log history - calendar view of every working day.
 import { redirect } from 'next/navigation';
-import { getCurrentProfile, getLogs, getLeaves, getHolidays, logStreak } from '@/lib/queries';
+import { getCurrentProfile, getLogs, getLeaves, getHolidays, logStreak, logHasContent } from '@/lib/queries';
 import { LogCalendar } from './LogCalendar';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
@@ -16,7 +16,7 @@ export default async function LogHistoryPage() {
   ]);
 
   const loggedDates = logs
-    .filter((l) => l.blocks && l.blocks.length)
+    .filter((l) => logHasContent(l.blocks))
     .map((l) => ({ date: l.log_date, mood: l.mood, tags: l.tags || [] }));
   const energyVals = logs.filter((l) => l.energy_level).map((l) => l.energy_level);
   const avgEnergy = energyVals.length

@@ -13,6 +13,7 @@ import {
   punchTotalMsForDate,
   punchStatus,
   logStreak,
+  logHasContent,
   leaveUsage,
   isOnLeave,
   isHoliday,
@@ -227,7 +228,7 @@ export default async function EmployeePage({
     const d = addDays(today, -i);
     if (isWeekend(d)) continue;
     const log = logMap.get(fmtDate(d));
-    if (log && log.blocks && log.blocks.length) {
+    if (log && logHasContent(log.blocks)) {
       run += 1;
       longest = Math.max(longest, run);
     } else run = 0;
@@ -279,7 +280,7 @@ export default async function EmployeePage({
 
   // ---- logs with content, newest first, for the reader ----
   const logDates = logs
-    .filter((l) => l.blocks && l.blocks.length)
+    .filter((l) => logHasContent(l.blocks))
     .sort((a, b) => b.log_date.localeCompare(a.log_date));
 
   return (
