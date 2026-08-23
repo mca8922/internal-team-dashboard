@@ -33,6 +33,7 @@ const TYPE_META: Record<NotificationType, { icon: IconName; tone: 'warning' | 'i
   work_report_submitted: { icon: 'inbox', tone: 'info', label: 'Report to review' },
   work_report_reviewed: { icon: 'star', tone: 'info', label: 'Work reviewed' },
   task_unlocked: { icon: 'lock', tone: 'info', label: 'Task opened' },
+  member_task_created: { icon: 'target', tone: 'info', label: 'Task created' },
   punch_change_requested: { icon: 'clock', tone: 'warning', label: 'Punch change requested' },
   punch_change_approved: { icon: 'check', tone: 'info', label: 'Punch change approved' },
   punch_change_rejected: { icon: 'x', tone: 'warning', label: 'Punch change declined' },

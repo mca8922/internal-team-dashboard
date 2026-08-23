@@ -158,6 +158,13 @@ export interface Goal {
   parent_id: string | null;
   created_by: string | null;
   created_at: string;
+  // Last real EDIT of the task — title/description/due/department/status/
+  // assignees/checklist. Deliberately NOT bumped by a member ticking a
+  // checklist item or by the progress trigger: those are the daily work the
+  // task exists for, not a modification of the task. Null on rows written
+  // before migration 0064, which is rendered as "never edited".
+  updated_at: string | null;
+  updated_by: string | null;
   // Soft-archive (Goals cleanup): non-null means the goal is archived — hidden
   // from every view but retained and restorable. See migration 0044.
   archived_at: string | null;
@@ -265,6 +272,12 @@ export interface GoalChecklistItem {
   is_done: boolean;
   done_by: string | null;
   done_at: string | null;
+  // Null = a SHARED item: assigned by the Board/Manager and owed by everyone on
+  // the task (every item written before migration 0064 is one of these).
+  // Non-null = a PERSONAL item a member added to their own list — only they see
+  // it, only they can tick it, and only the Board can remove it.
+  owner_id: string | null;
+  created_by: string | null;
   created_at: string;
 }
 
@@ -291,6 +304,9 @@ export type NotificationType =
   | 'work_report_reviewed'
   // A member tapped to reveal a custom-day task description.
   | 'task_unlocked'
+  // An executive created a task for themselves — their Director is told, so
+  // leadership sees what the team is self-assigning.
+  | 'member_task_created'
   // A member submitted a punch time change request (Founder-only).
   | 'punch_change_requested'
   // The Founder approved / rejected a member's punch time change request.

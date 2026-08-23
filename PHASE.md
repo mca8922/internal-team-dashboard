@@ -404,6 +404,219 @@ If the two ever disagree, reStrucAI is right.
   the deliberate difference from reStrucAI's own dashboard. There is also no
   reply box: a ticket records state, and the conversation happens over email.
 
+## Executive task powers (done — `executiveTasks`, migration 0064)
+
+Creating a task used to be Board/Manager work. It no longer is: an
+**Executive** — the Team modals' third tier, meaning anyone who is neither a
+Director (`role: 'board'`) nor a Department Manager (`is_manager`) — can now
+create and manage their own work. Scope, exactly:
+
+| Power | Executive | Manager | Director / Founder |
+|---|---|---|---|
+| Create a task | any tier, **self-assigned only**, in a department they belong to | department they head, their own team | anything |
+| Edit a task | only the ones **they created** — title, description, due date, status, checklist | department they head | anything |
+| Reassign / duplicate | no | their team | yes |
+| **Delete or archive** | **no** | **no** | **yes** |
+
+Deletion is the line the whole feature is drawn against. Archiving is a soft
+delete (0044 hides an archived task from every live view), so opening the
+goals UPDATE policy to a task's creator would have handed every executive a
+delete button by another name. It can't be expressed in a policy — archiving
+is an UPDATE, and a policy only sees the new row — so the
+`goals_archive_is_board` trigger in 0064 compares OLD to NEW and refuses it.
+
+### Attribution
+
+`goals` gained `updated_at` / `updated_by`; `created_by` already existed. Every
+task card now shows **"Added by <name> · date · time"** and, once edited,
+**"Edited · date · time"** — to everyone who can see the card, not just
+leadership. Only `updateGoal` and `setGoalAssignees` move `updated_at`:
+checklist ticks, the progress trigger and the deadline sweep deliberately leave
+it alone, so "Edited" means the task changed, not that somebody did the day's
+work on it. `updated_by` is recorded but not rendered — surfacing it later is a
+render change, not a migration.
+
+### Personal checklist steps
+
+`goal_checklist_items.owner_id` is the whole mechanism. NULL — every row
+written before 0064 — means a **shared** step, assigned by leadership and owed
+by everyone on the task. Non-null means a **personal** step the member added to
+their own list on any task assigned to them, including one a Director wrote.
+
+- Only its owner sees it, and only its owner can tick it
+  (`toggle_checklist_item` refuses everyone else).
+- **It cannot be removed by the member who added it** — that is a Founder's or
+  Director's call. Renaming is allowed; deleting is not, and there is no delete
+  control anywhere in `GoalChecklist`. The Manager delete arm is narrowed to
+  shared items for the same reason.
+- It carries a **title and a rich-text description**, written in the same
+  editor the Board's checklist uses (bold/italic/lists/links). The description
+  starts collapsed behind "Add description" — most steps are a title and
+  nothing else. Editing reopens both fields; a blank description is normalised
+  to `''` server-side so leftover `<p><br></p>` never reopens the editor.
+- **Executives only.** A Director or Manager who happens to be an assignee does
+  not get the composer: they already edit that task's real checklist, and a
+  second private list would split the record of the same work in two. Enforced
+  in `addPersonalChecklistItem`, not just hidden in the UI — 0064's RLS is
+  deliberately wider (any participant), so the action is where the rule lives.
+- It is styled apart — violet spine, tinted panel, "Self-added" badge — for
+  **every** viewer, including the Director reading the per-member panel, so
+  assigned work and volunteered work never blur together. **The spine is a
+  `::before`, not an inset `box-shadow`** — `.goal-check-row:hover` and
+  `.board-cl-item:hover` both set `box-shadow: var(--shadow-card)`, and since
+  box-shadow is one property the hover value REPLACED the spine, so the violet
+  bar vanished exactly when the row was being looked at. Restating it per
+  hover/done/not-due state fixed the known cases and would have broken on the
+  next state added; a pseudo-element owns a property nothing else touches.
+- It never travels: excluded from "Save as template", from Duplicate, and from
+  the edit form's checklist (which would otherwise let a save silently delete
+  someone's step — `syncChecklist` filters on `owner_id is null` server-side
+  for the same reason).
+
+Progress became owner-aware in the same migration. `recompute_goal_progress`
+and its client mirror `computeGoalProgress` now sum what each assignee actually
+owes — `(shared due items × assignees) + (personal due items whose owner is an
+assignee)` — instead of the old `items × people`. So a member adding a step
+lengthens their own row and moves the task's combined %, and leaves every
+teammate's denominator exactly where it was.
+
+### Timestamps and assignment, on every task
+
+**Every checklist row** — assigned or self-added, on the member's own list and
+in the Board's per-member panel — now shows **"Added · date · time"** beside
+the existing **completion** stamp. No backfill was needed: `created_at` has
+been on `goal_checklist_items` since 0009, so all 595 pre-existing rows carry
+it.
+
+**Every task card** shows who assigned it, to **every** viewer — not just to
+the person it was handed to, which is all the old badge did. A Director reading
+another member's task now sees the same "Assigned by ‹name›" that member sees.
+
+`assigned_by` is per assignee row, so a task could in principle carry two
+assigners; in practice it cannot, because `setGoalAssignees` rewrites every row
+with one editor's id, and all 259 rows in the database agree per task. Where
+they ever did diverge, the viewer's own row wins, so they see who assigned
+*them*.
+
+A task whose every row names its own holder as the assigner reads
+**"Self-assigned · ‹name›"** in violet instead. This is not only executives:
+**172 of the 219 assigned tasks** in the database today are Directors and
+Managers who created a task and gave it to themselves, and 181 of those 189
+rows have that same person as the task's `created_by`, so the label is the
+accurate description of what happened rather than a data artifact. It still
+names the person, so it is no less transparent than the "Assigned by" form — it
+just stops a card reading "Assigned by Priyanka" on Priyanka's own task.
+
+### Notification
+
+An executive creating a task notifies **their Director** (`director_id` from
+0061, falling back to the Founders when nobody is assigned to them), type
+`member_task_created`. Adding a personal step notifies nobody — the badge and
+the per-member panel are the record.
+
+### Flag
+
+`executiveTasks` hides the "Add my task" button, the Edit control on a task an
+executive created, and the "Add your own step" composer. It does **not** hide
+personal steps that already exist — their owner keeps seeing and ticking them,
+because hiding work someone committed to would silently drop it — and it does
+not roll back 0064's RLS.
+
+## Director task scope (done — migration 0065)
+
+**The bug.** `visibleGoals()` opened with `if (profile.role === 'board') return
+goals`, and the `goals` table carried `"goals: read all authenticated"` from
+0002. A Director is board-level, so every Director read all 228 tasks across
+every department — Rohit Bohra, listed under MCA and RBI, was seeing Audit, GST
+and General too.
+
+**The rule now.** A Director sees the tasks of the departments they are LISTED
+under — primary or additional (0060) — plus anything assigned to them
+personally, so a task handed to them from outside those departments never
+vanishes off their own checklist. Founders are exempt and still read everything:
+they sit under no department (0058 sets it to `''`), so a department test would
+scope them to nothing, and scoping them would have stopped Rajesh seeing Rohit's
+tasks at all.
+
+| Viewer | Before | After |
+|---|---|---|
+| Rajesh / Dharmesh (Founders) | 228 | 228 |
+| Rohit Bohra (MCA, RBI) | 228 | **92** |
+| Salma (MCA, General) | 228 | 162 |
+| Vipul / Dilip / Adityavikram (3 depts each) | 228 | 142 |
+
+**This is NOT the same rule that scopes PEOPLE.** `canViewMember()` /
+`can_view_user()` scope who a Director can see by `director_id` (0061), on
+purpose — `roles.ts` says outright that a Director's scope "is not their
+department". Tasks are scoped by department at the client's explicit request.
+The two rules are allowed to disagree, and they do: Rohit holds no `director_id`
+reports at all, so the 0061 rule would have shown him 11 tasks and looked
+broken.
+
+**Enforced in both halves.** `visibleGoals()` is the UI half; the
+`"goals: read scoped"` policy in 0065 is the real one, so the rows are not
+merely hidden — a Director cannot read another department's task through the
+API either. `"checklist: read all"` was narrowed the same way via
+`can_read_goal()`, because leaving it open would have hidden the task titles
+while leaving their checklist labels and descriptions world-readable, which is
+where the actual content lives.
+
+The policy also keeps a `goal_ancestor_assigned_to_me()` arm so the cascade
+inheritance `visibleGoals()` implements (a task is visible if any ancestor is
+assigned to you) is not silently disabled at the DB layer. Only 4 of 228 tasks
+are parented today and none currently inherit visibility, but the walk is there
+for when a real cascade is built. It is guarded on `parent_id is not null`, so
+224 of 228 rows skip the function entirely.
+
+Everything downstream of `visibleGoals()` was checked rather than assumed: the
+Goals page's `allGoals`, archived list, department picker and assignee picker
+all keyed off `isBoard` and would have handed a Director org-wide data through
+the back door — they now key off `isFounder`. Verified unaffected: the dashboard
+(already routes through `visibleGoals`), Team's `goalDeptCounts` (feeds a
+Founder-only modal, and `deleteDepartment()` re-counts server-side under
+`requireFounder()`), and cross-department parent links (zero in the data, so no
+cascade is orphaned). Team Analytics goal figures now narrow to a Director's own
+departments, which follows from the same rule.
+
+`visibleGoals()` moved to `src/lib/goal-visibility.ts` so it is unit-testable
+without `queries.ts`'s Supabase server client — the same split
+`notif-events.ts` made from `notify-email.ts`. `queries.ts` re-exports it, so
+every existing import still resolves. Covered by `visible-goals.test.ts`.
+
+### The management surface follows the Director, not the tier
+
+Scoping Directors surfaced a second bug behind the first. `GoalsView`
+early-returns a stripped layout when `yearly.length === 0 && viewMode ===
+'cascade'`, and that branch rendered no `BoardGoalsToolbar` and no
+`BoardHealthStrip` — no search, no department/status/due filters, no
+totals strip.
+
+Nobody hit it before because every board account could see all 19 yearly tasks
+in the company. Scoping by department is what started routing a real Director
+down it: **Rohit Bohra's departments (MCA, RBI) hold no yearly task at all** —
+92 tasks, all monthly and daily — so he lost the entire management surface the
+moment his scope was narrowed. Every other Director has yearly tasks in scope
+and never saw the difference.
+
+The branch now renders the toolbar and the health strip in the same order the
+main layout does, and its list is driven by the same `results` set, so the
+filters that appear actually filter. Having no top-tier task says nothing about
+whether a Director needs to search or see their totals.
+
+Their strip is scoped like everything else — Rohit sees 92 / 76 active / 11
+overdue / 16 completed, not the company's 228 / 123 / 34 / 105.
+
+### Known gap, deliberately left
+
+The policy's department arm applies to everyone, so an EXECUTIVE listed under
+several departments can still read those departments' tasks through the API —
+Ashok Nemade (General, Audit, GST, MCA) reads 227 of 228. That is not a
+regression (they read all 228 before) and the UI still shows them only their
+assigned tasks, but it is looser than the UI. Tightening it to
+"assigned to me, or an unassigned task in my department" would match the UI
+exactly and affects only the 9 tasks that currently have no assignee — not done
+here because the request was specifically about Directors.
+
 ## Phase 2 — Backlog (historical: what each flag hid in Phase 1)
 
 All of these are now unlocked — see "Phase 2 — status" above. Table kept for

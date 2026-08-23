@@ -5344,6 +5344,253 @@ body { font-size: 15px; }
   letter-spacing: 0.03em;
 }
 
+/* ── Self-added checklist steps (migration 0064) ───────────────────────────
+   Two kinds of work share one list: what a Director ASSIGNED (the green house
+   accent everything else on this card already uses) and what the member added
+   for THEMSELVES. Violet carries the second — a hue used nowhere else in the
+   checklist, so the distinction survives at a glance and in a screenshot, and
+   it reads the same for every viewer: the member on their own list, and the
+   Director in the per-member panel below. */
+.goal-check-row.goal-check-own {
+  background: var(--color-violet-bg);
+  border-color: color-mix(in srgb, var(--color-violet) 32%, transparent);
+  padding-left: 17px;
+}
+/* The spine is a PSEUDO-ELEMENT, not an inset box-shadow.
+   It started life as `box-shadow: inset 3px 0 0`, which looked right until you
+   pointed at the row: `.goal-check-row:hover` and `.board-cl-item:hover` both
+   set `box-shadow: var(--shadow-card)`, and box-shadow is a single property —
+   the hover value REPLACED the spine rather than adding to it, so the violet
+   bar vanished exactly when the row was being looked at. Restating the spine in
+   every hover/done/not-due combination fixed the cases we listed and would have
+   kept breaking on the next state someone added.
+   A ::before owns a property nothing else in this stylesheet touches, so the
+   spine is now structurally incapable of being clobbered — by these rules or by
+   any future one. */
+.goal-check-row.goal-check-own::before,
+.board-cl-item.board-cl-own::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-violet);
+  /* Match the card's own left corners so the bar doesn't overhang them. */
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  pointer-events: none;
+}
+.goal-check-row.goal-check-own:hover {
+  background: color-mix(in srgb, var(--color-violet) 12%, var(--color-violet-bg));
+  /* Border stays violet — the base hover swings it green. */
+  border-color: color-mix(in srgb, var(--color-violet) 62%, transparent);
+}
+/* Completion still reads as completion — keep the green "done" cue. */
+.goal-check-row.goal-check-own.done {
+  background: color-mix(in srgb, var(--color-violet-bg) 55%, var(--color-green-light));
+}
+/* An off-day row is dimmed by the shared .not-due rule, which drops the whole
+   row to 55% opacity — the spine dims with it, which is what we want; it just
+   must not disappear. Its hover keeps the violet border too. */
+.goal-check-row.goal-check-own.not-due:hover {
+  border-color: color-mix(in srgb, var(--color-violet) 45%, transparent);
+}
+.goal-check-own-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-violet) 16%, transparent);
+  color: var(--color-violet);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.goal-check-own-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--color-grey-text);
+}
+.goal-check-own-rename {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-violet);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.goal-check-own-rename:hover { text-decoration: underline; }
+/* Shared by the "add a step" composer and the edit-in-place form. Stacked, not
+   inline: it holds a title AND a rich-text description now, so a single row
+   would squeeze the editor toolbar into nothing. */
+.goal-check-own-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed color-mix(in srgb, var(--color-violet) 40%, transparent);
+  background: color-mix(in srgb, var(--color-violet-bg) 60%, transparent);
+}
+.goal-check-own-editor-row { display: flex; }
+.goal-check-own-editor-row .input { flex: 1; min-width: 0; }
+/* Keep the editor surface readable against the violet panel behind it. */
+.goal-check-own-editor-desc .rte,
+.goal-check-own-editor-desc .rte-input {
+  background: var(--color-card);
+}
+.goal-check-own-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* The Added stamp — on every checklist row, on the member's list and in the
+   Board's per-member panel alike. It lives INSIDE the label column in both, so
+   it wraps under the title instead of competing with it (and with the status
+   tag) for the row's width on a narrow screen.
+   `flex-wrap` plus the nowrap date span is what makes it responsive: the label
+   and the timestamp break onto separate lines rather than the date itself
+   splitting across "23-08-" / "2026". No icon — the word carries it. */
+.goal-check-added {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 7px;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--color-grey-text);
+}
+/* Keep a single date/time atom together across a wrap. */
+.goal-check-added > time,
+.goal-check-added .goal-check-added-at { white-space: nowrap; }
+.goal-check-added.is-own {
+  color: color-mix(in srgb, var(--color-violet) 75%, var(--color-grey-text));
+}
+/* Phones: the stamp is provenance, not content — let it shrink a touch further
+   so a long "Added by <name>" never pushes the row taller than it needs. */
+@media (max-width: 640px) {
+  .goal-check-added { font-size: 10px; gap: 2px 6px; }
+}
+.goal-check-add {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--color-border);
+}
+.goal-check-add-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in srgb, var(--color-violet) 45%, transparent);
+  background: none;
+  color: var(--color-violet);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.goal-check-add-trigger:hover {
+  background: var(--color-violet-bg);
+  border-color: var(--color-violet);
+}
+.goal-check-add-note {
+  margin: 7px 0 0;
+  font-size: 10.5px;
+  color: var(--color-grey-text);
+}
+/* The same tell in the Board's per-member panel. Lighter touch there: that
+   panel is dense, so the spine and badge carry it without a full tint. */
+.board-cl-item.board-cl-own {
+  padding-left: 14px;
+  background: color-mix(in srgb, var(--color-violet-bg) 60%, transparent);
+  border-color: color-mix(in srgb, var(--color-violet) 32%, transparent);
+}
+/* The ::before above is absolutely positioned, so this row needs to be its
+   containing block. .goal-check-row is already position:relative; this is not. */
+.board-cl-item.board-cl-own { position: relative; }
+.board-cl-item.board-cl-own:hover {
+  border-color: color-mix(in srgb, var(--color-violet) 60%, transparent);
+}
+
+/* "Self-assigned" — the same badge shape as "Assigned by", recoloured to the
+   violet that marks self-directed work everywhere else on the card, so work
+   somebody took on themselves is distinguishable at a glance from work handed
+   down. Every green-tinted part of the base badge is restated here (gradient,
+   border, both shadows, the avatar ring, the label) — overriding only the
+   background would leave a half-green chip. It still NAMES the person, so this
+   is no less transparent than the "Assigned by" form: it just stops a card
+   reading "Assigned by Priyanka" on Priyanka's own task. */
+.gb-assigned-by.gb-self-assigned {
+  border-color: color-mix(in srgb, var(--color-violet) 38%, transparent);
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--color-violet) 22%, transparent),
+    color-mix(in srgb, var(--color-violet) 7%, transparent)
+  );
+  box-shadow:
+    0 1px 4px color-mix(in srgb, var(--color-violet) 16%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+}
+.gb-assigned-by.gb-self-assigned:hover {
+  box-shadow:
+    0 2px 9px color-mix(in srgb, var(--color-violet) 26%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+}
+.gb-assigned-by.gb-self-assigned .avatar {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-violet) 45%, transparent);
+}
+.gb-assigned-by.gb-self-assigned .gb-assigned-by-label {
+  color: color-mix(in srgb, var(--color-violet) 88%, var(--color-grey-text));
+}
+
+/* A locked, single-name assignee row — an Executive's task is always their own,
+   so the picker states that instead of offering a choice of one. */
+.assignee-row-locked {
+  cursor: default;
+  color: var(--color-grey-text);
+}
+
+/* ── Task authorship ──────────────────────────────────────────────────────
+   Who created the task and when it was last really edited. Quiet by design: it
+   is provenance, not content, so it sits below the progress line at the smallest
+   readable size and never competes with the title. */
+.gb-authorship {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: var(--color-grey-text);
+}
+.gb-authorship-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.gb-authorship-item strong {
+  font-weight: 650;
+  color: var(--color-dark-grey);
+}
+
 /* "Assigned to" chip row on a goal card */
 .gb-assignees {
   margin-top: 14px;
@@ -11336,6 +11583,18 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
      a second line, indented to sit under the title. */
   .goal-checklist { padding: 12px; }
   .goal-check-row { flex-wrap: wrap; row-gap: 8px; }
+  /* Self-added rows: the 3px spine plus its 17px inset costs width the phone
+     layout above has already budgeted to the pixel, so pull the extra back. */
+  .goal-check-row.goal-check-own { padding-left: 14px; }
+  .board-cl-item.board-cl-own { padding-left: 12px; }
+  /* The composer holds a rich-text editor; give it the row's full width and
+     let its toolbar and action buttons wrap rather than overflow. */
+  .goal-check-own-editor { padding: 10px; }
+  .goal-check-own-editor .rte-toolbar { flex-wrap: wrap; }
+  .goal-check-own-editor-actions .btn { flex: 1 1 auto; justify-content: center; }
+  /* "Self-added" sits after the title; on a phone let it drop to its own line
+     instead of forcing a one-word orphan out of the title. */
+  .goal-check-own-badge { margin-left: 6px; }
   .goal-check-label { flex: 1 1 auto; min-width: calc(100% - 31px); }
   .goal-check-completed-at,
   .goal-check-recur { align-self: flex-start; }

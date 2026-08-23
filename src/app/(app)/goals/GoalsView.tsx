@@ -40,7 +40,7 @@ import {
   removeGoalPin,
 } from '@/lib/actions';
 import { isDueToday, isCompletionCurrent, isCarriedOverDone, currentReport } from '@/lib/recurrence';
-import { computeGoalProgress } from '@/lib/goal-progress';
+import { computeGoalProgress, itemBelongsTo } from '@/lib/goal-progress';
 import { type GoalTemplate } from '@/lib/goal-templates';
 import { fmtDate, fmtShort, fmtDateDMY, fmtTime } from '@/lib/dates';
 import {
@@ -89,10 +89,15 @@ export interface AssigneeChip {
   avatar_url: string | null;
 }
 
-// Who assigned a goal to the current viewer — drives the "Assigned by" badge.
+// Who assigned a goal — drives the "Assigned by" badge, which is shown on
+// EVERY visible task to every viewer, not only on the ones pointed at them.
 export interface AssignerInfo {
+  id: string;
   name: string;
   avatar_url: string | null;
+  // The task's holders assigned it to themselves — an executive's own task.
+  // Reads "Self-assigned" instead of naming the person twice.
+  selfAssigned: boolean;
 }
 
 // Shared bag of data every card/node needs, threaded down the tree.
@@ -118,6 +123,9 @@ interface CardCtx {
   isBoard: boolean;
   canDelete: boolean;
   canAdmin: boolean;
+  // The viewer is an Executive (migration 0064): they manage no one else's
+  // tasks, but they fully manage the ones they created — see canManageCard.
+  selfManage: boolean;
   members: AssignableMember[];
   // User IDs on approved leave today — excluded from "due" progress and badged.
   onLeave: Set<string>;
@@ -137,6 +145,16 @@ interface CardCtx {
   flashReason: 'notif' | 'report';
   // Request to open a specific checklist item's report editor (from "Your day").
   reportReq: { itemId: string; n: number } | null;
+}
+
+// May the viewer open the edit form on THIS card? The Board and Managers
+// manage every task in their scope; an Executive manages the ones they created
+// and nothing else. Deleting is never part of it — that stays ctx.canDelete
+// (Founders and Directors), matching the "goals: board delete" policy and the
+// goals_archive_is_board trigger from migration 0064.
+function canManageCard(goal: Goal, ctx: CardCtx): boolean {
+  if (ctx.isBoard) return true;
+  return ctx.selfManage && goal.created_by === ctx.currentUserId;
 }
 
 // Per-card quick actions (Board only): change status or reassign members
@@ -564,13 +582,33 @@ function GoalCard({
         {(() => {
           const assigner = ctx.assignerByGoal[goal.id];
           if (!assigner) return null;
-          // Modern "who handed you this goal" badge, top-right of the card.
+          // "Who handed this over" badge, top-right of the card — on every task
+          // for every viewer, so the chain of responsibility is legible without
+          // having to be the person it was handed to.
+          if (assigner.selfAssigned) {
+            return (
+              <span
+                className="gb-assigned-by gb-self-assigned"
+                title={`${assigner.name} created this task for themselves`}
+              >
+                <Avatar name={assigner.name} size="sm" src={assigner.avatar_url} />
+                <span className="gb-assigned-by-text">
+                  <span className="gb-assigned-by-label">Self-assigned</span>
+                  <span className="gb-assigned-by-name">
+                    {assigner.id === ctx.currentUserId ? 'You' : assigner.name}
+                  </span>
+                </span>
+              </span>
+            );
+          }
           return (
             <span className="gb-assigned-by" title={`Assigned by ${assigner.name}`}>
               <Avatar name={assigner.name} size="sm" src={assigner.avatar_url} />
               <span className="gb-assigned-by-text">
                 <span className="gb-assigned-by-label">Assigned by</span>
-                <span className="gb-assigned-by-name">{assigner.name}</span>
+                <span className="gb-assigned-by-name">
+                  {assigner.id === ctx.currentUserId ? 'You' : assigner.name}
+                </span>
               </span>
             </span>
           );
@@ -592,17 +630,24 @@ function GoalCard({
             );
           })()}
           {collapseToggle}
+          {/* Edit is open to whoever manages this task — the Board and Managers
+              over their scope, an Executive over the tasks they created. The
+              tools beside it stay Board/Manager: duplicating and the quick
+              reassign menu both exist to move work between people, which an
+              executive never does, and archiving is a delete by another name. */}
+          {canManageCard(goal, ctx) ? (
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => ctx.onEdit(goal)}
+              aria-label="Edit task"
+              title="Edit task"
+            >
+              <Icon name="edit" size={14} />
+            </button>
+          ) : null}
           {ctx.isBoard ? (
             <>
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => ctx.onEdit(goal)}
-                aria-label="Edit task"
-                title="Edit task"
-              >
-                <Icon name="edit" size={14} />
-              </button>
               <button
                 type="button"
                 className="icon-btn"
@@ -647,6 +692,8 @@ function GoalCard({
           {combined ? `· combined of ${assigneeIds.length} team members` : 'complete'}
         </span>
       </div>
+
+      <GoalAuthorship goal={goal} ctx={ctx} />
 
       {assigneeChips.length > 0 ? <AssigneeRow assignees={assigneeChips} /> : null}
 
@@ -701,6 +748,15 @@ function GoalCard({
         <>
           <GoalChecklist
             items={items}
+            goalId={goal.id}
+            // Self-added steps are an EXECUTIVE's tool: they have no other way
+            // to shape their own workload, since they cannot edit a task a
+            // Director assigned them. A Director or Manager who is also an
+            // assignee already edits that task's real checklist, so handing
+            // them a second, private list would only split the record in two.
+            // Not once the task is closed either: past the due date the
+            // checklist is frozen for everyone.
+            canAddOwn={FEATURE_FLAGS.executiveTasks && ctx.selfManage && !closed}
             completionsByItem={ctx.completionsByItem}
             currentUserId={ctx.currentUserId}
             reportsByItem={ctx.reportsByItem}
@@ -740,6 +796,49 @@ function GoalCard({
     </div>
   );
 }
+// Who wrote this task, and when it was last really edited. Shown to everyone
+// who can see the card, not just leadership: once anybody can create a task,
+// "where did this come from" is a question every assignee has too.
+//
+// "Edited" reads off goals.updated_at, which only updateGoal / setGoalAssignees
+// move (migration 0064). Ticking a checklist item and the progress trigger
+// deliberately leave it alone — otherwise every card would claim it was edited
+// each time somebody simply did the day's work on it. A task written before
+// 0064, or never edited since, shows the "Added" half alone.
+function GoalAuthorship({ goal, ctx }: { goal: Goal; ctx: CardCtx }) {
+  const author = goal.created_by ? ctx.reviewerById[goal.created_by] : null;
+  const editor = goal.updated_by ? ctx.reviewerById[goal.updated_by] : null;
+  // Nothing to attribute: a legacy row with no creator recorded. Say nothing
+  // rather than invent a name.
+  if (!author && !goal.created_at) return null;
+  const stamp = (iso: string) => `${fmtDateDMY(iso)} · ${fmtTime(iso)}`;
+  return (
+    <div className="gb-authorship">
+      <span className="gb-authorship-item" title={`Created ${stamp(goal.created_at)}`}>
+        <Icon name="plus" size={11} />
+        Added by{' '}
+        <strong>
+          {author ? (author.id === ctx.currentUserId ? 'you' : author.name) : 'a former member'}
+        </strong>{' '}
+        · {stamp(goal.created_at)}
+      </span>
+      {goal.updated_at ? (
+        // Just when, not by whom: the ask was for the modification TIME, and a
+        // name here would compete with the "Added by" it sits beside. updated_by
+        // is recorded all the same, so surfacing it later is a render change,
+        // not a migration.
+        <span
+          className="gb-authorship-item"
+          title={editor ? `Last edited by ${editor.name}` : 'Last edited'}
+        >
+          <Icon name="edit" size={11} />
+          Edited · {stamp(goal.updated_at)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 interface PP extends AssigneeChip {
   done: number;
   total: number;
@@ -814,8 +913,13 @@ function BoardChecklistPanel({
     doneByItem.set(it.id, set);
   }
 
-  const dueItems = closed ? [] : items.filter((it) => isDueToday(it));
-  const allItems = items; // show all items (due + not-due) for full picture
+  // Each member's section lists what THEY owe: the shared steps, plus the ones
+  // they added for themselves (migration 0064). A teammate's self-added step
+  // belongs in that teammate's section and nowhere else — which is also why the
+  // counts below are per member rather than against one shared total.
+  const itemsFor = (uid: string) => items.filter((it) => itemBelongsTo(it, uid));
+  const dueFor = (uid: string) =>
+    closed ? [] : itemsFor(uid).filter((it) => isDueToday(it));
 
   return (
     <div className="board-checklist-panel">
@@ -839,9 +943,10 @@ function BoardChecklistPanel({
       {assigneeChips.map((chip) => {
         const isOpen = expanded.has(chip.id);
         const memberOnLeave = onLeave.has(chip.id);
-        const memberDone = dueItems.filter((it) => doneByItem.get(it.id)?.has(chip.id)).length;
-        const pct =
-          dueItems.length > 0 ? Math.round((memberDone * 100) / dueItems.length) : 0;
+        const memberItems = itemsFor(chip.id);
+        const memberDue = dueFor(chip.id);
+        const memberDone = memberDue.filter((it) => doneByItem.get(it.id)?.has(chip.id)).length;
+        const pct = memberDue.length > 0 ? Math.round((memberDone * 100) / memberDue.length) : 0;
         return (
           <div key={chip.id} className={`board-cl-member${memberOnLeave ? ' board-cl-onleave' : ''}`}>
             <button
@@ -859,7 +964,7 @@ function BoardChecklistPanel({
               ) : (
                 <>
                   <span className="board-cl-member-count">
-                    {memberDone}/{dueItems.length}
+                    {memberDone}/{memberDue.length}
                   </span>
                   <span className="board-cl-pct" style={{ color: pct === 100 ? 'var(--color-green-primary)' : undefined }}>
                     {pct}%
@@ -870,7 +975,7 @@ function BoardChecklistPanel({
             </button>
             {isOpen ? (
               <div className="board-cl-items">
-                {allItems.map((it) => {
+                {memberItems.map((it) => {
                   const due = closed ? false : isDueToday(it);
                   const done = doneByItem.get(it.id)?.has(chip.id) ?? false;
                   // On an off day, keep showing a tick if the member completed it
@@ -892,13 +997,33 @@ function BoardChecklistPanel({
                       key={it.id}
                       className={`board-cl-item${
                         isDone ? ' board-cl-done' : ''
-                      }${!due ? ' board-cl-notdue' : ''}`}
+                      }${!due ? ' board-cl-notdue' : ''}${
+                        it.owner_id ? ' board-cl-own' : ''
+                      }`}
                     >
                       <span className="board-cl-tick" aria-hidden>
                         {isDone ? <Icon name="check" size={11} /> : null}
                       </span>
                       <span className="board-cl-label">
-                        <span className="board-cl-title">{it.label}</span>
+                        <span className="board-cl-title">
+                          {it.label}
+                          {/* Same tell the member sees on their own list, so a
+                              Director reading this panel can separate the work
+                              they assigned from the work the member took on. */}
+                          {it.owner_id ? (
+                            <span className="goal-check-own-badge">Self-added</span>
+                          ) : null}
+                        </span>
+                        {/* When the step came into existence, on every row — the
+                            same stamp the member sees on their own list. Inside
+                            the label column so it wraps under the title rather
+                            than competing with it for the row's width. */}
+                        <span className={`goal-check-added${it.owner_id ? ' is-own' : ''}`}>
+                          <span>Added{it.owner_id ? ` by ${chip.name}` : ''}</span>
+                          <span className="goal-check-added-at">
+                            {fmtDateDMY(it.created_at)} · {fmtTime(it.created_at)}
+                          </span>
+                        </span>
                         {/* For Report Work items, spine labels in the left gutter
                             separate the GIVEN task from the GOT submission. */}
                         {it.description ? (
@@ -1485,6 +1610,7 @@ export function GoalsView({
   isBoard,
   canDelete,
   canAdmin,
+  selfManage,
   viewerRole,
   tenureMonths,
   currentUserId,
@@ -1512,6 +1638,7 @@ export function GoalsView({
   isBoard: boolean;
   canDelete: boolean;
   canAdmin: boolean;
+  selfManage: boolean;
   viewerRole: UserRole;
   tenureMonths: number | null;
   currentUserId: string;
@@ -1983,6 +2110,7 @@ export function GoalsView({
     isBoard,
     canDelete,
     canAdmin,
+    selfManage,
     members,
     onLeave,
     // Highlight search matches anywhere a query is active (board results or a
@@ -2025,7 +2153,9 @@ export function GoalsView({
           department: g.department,
           title: g.title,
           description: g.description,
-          checklist: (checklistsByGoal[g.id] ?? []).map((it) => ({
+          // The shared checklist is the blueprint. A member's personal steps
+          // are their own note to themselves and don't travel with the task.
+          checklist: (checklistsByGoal[g.id] ?? []).filter((it) => !it.owner_id).map((it) => ({
             label: it.label,
             description: it.description || '',
             recurrence: it.recurrence,
@@ -2055,8 +2185,9 @@ export function GoalsView({
         parent_id: g.parent_id,
         _duplicate: true,
         _seedAssignees: assigneeIdsByGoal[g.id] ?? [],
-        _seedChecklist: (checklistsByGoal[g.id] ?? []).map((it) => ({
+        _seedChecklist: (checklistsByGoal[g.id] ?? []).filter((it) => !it.owner_id).map((it) => ({
           // Intentionally no `id` — these become new checklist rows on the copy.
+          // Personal steps stay with their author and are not copied over.
           label: it.label,
           description: it.description || '',
           recurrence: it.recurrence,
@@ -2094,7 +2225,7 @@ export function GoalsView({
           )}
         </div>
       </div>
-      {isBoard ? (
+      {isBoard || selfManage ? (
         <div className="page-header-actions">
           {canAdmin ? (
             <>
@@ -2115,9 +2246,14 @@ export function GoalsView({
             </Button>
           ) : null}
           {/* Monthly is the default new-task tier: it's the lowest tier that
-              still groups work, so it's what the Board reaches for most. */}
-          <Button icon="plus" onClick={() => setEditing({ level: 'monthly' })}>
-            Add Task
+              still groups work, so it's what the Board reaches for most. An
+              executive starts on Daily instead — the tier their own work
+              actually lands on — though the form still offers all five. */}
+          <Button
+            icon="plus"
+            onClick={() => setEditing({ level: selfManage ? 'daily' : 'monthly' })}
+          >
+            {selfManage ? 'Add my task' : 'Add Task'}
           </Button>
         </div>
       ) : null}
@@ -2260,7 +2396,13 @@ export function GoalsView({
               editing._duplicate || editing._template
                 ? editing._seedChecklist ?? []
                 : editing.id
-                  ? (checklistsByGoal[editing.id] || []).map((it) => ({
+                  ? (checklistsByGoal[editing.id] || [])
+                      // Personal items belong to the member who wrote them, not
+                      // to this form. Showing them would let a save rename or
+                      // drop somebody else's step; syncChecklist skips them on
+                      // the server for the same reason.
+                      .filter((it) => !it.owner_id)
+                      .map((it) => ({
                       id: it.id,
                       label: it.label,
                       description: it.description || '',
@@ -2270,6 +2412,7 @@ export function GoalsView({
                     }))
                   : []
             }
+            selfAssignee={selfManage ? members[0] : undefined}
             onSubmit={submitGoal}
             onCancel={() => setEditing(null)}
             submitting={submitting}
@@ -2552,15 +2695,57 @@ export function GoalsView({
   if (yearly.length === 0 && viewMode === 'cascade') {
     const flat = subYearly;
     const memberQ = !isBoard ? query.trim().toLowerCase() : '';
-    const flatShown = memberQ
-      ? flat.filter((g) => `${g.title} ${plainText(g.description)}`.toLowerCase().includes(memberQ))
-      : flat;
+    // The Board's own search/department/status/due filters drive this list too,
+    // now that the toolbar is rendered here — `results` is the same filtered,
+    // sorted set the main layout uses. Without this the controls would render
+    // but do nothing on the one screen that shows them.
+    const flatShown = isBoard
+      ? filtersActive
+        ? results
+        : flat
+      : memberQ
+        ? flat.filter((g) =>
+            `${g.title} ${plainText(g.description)}`.toLowerCase().includes(memberQ),
+          )
+        : flat;
     return (
       <div>
         {header}
         {missionVision}
         {myToday}
+        {/* A Director whose departments hold no YEARLY task lands here — and
+            used to lose the whole management surface with it: no search, no
+            department/status/due filters, no health strip. Nothing about having
+            no top-tier task makes those irrelevant, and scoping Directors to
+            their own departments (0065) is what started routing a real Director
+            down this branch. Mirror the main layout's order: toolbar, nav
+            controls, health strip. */}
+        {isBoard ? (
+          <BoardGoalsToolbar
+            query={query}
+            setQuery={setQuery}
+            dept={deptFilter}
+            setDept={setDeptFilter}
+            status={statusFilter}
+            setStatus={setStatusFilter}
+            due={dueFilter}
+            setDue={setDueFilter}
+            assignee={assigneeFilter}
+            setAssignee={setAssigneeFilter}
+            departments={departments}
+            members={members}
+            filtersActive={filtersActive}
+            onClear={clearFilters}
+          />
+        ) : null}
         {navControls}
+        {isBoard ? (
+          <BoardHealthStrip
+            counts={healthCounts}
+            onStatus={setStatusFilter}
+            onOverdue={() => setDueFilter('overdue')}
+          />
+        ) : null}
         {isBoard ? (
           <>
             <div className="gb-section-head">

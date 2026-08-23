@@ -6,6 +6,10 @@ const MON = new Date(2026, 5, 15, 10); // Monday
 
 const item = (id: string, recurrence: ChecklistRecurrence = 'daily', recur_days: number[] = []) =>
   ({ id, recurrence, recur_days }) as GoalChecklistItem;
+// A PERSONAL item (migration 0064) — one member added it to their own list, so
+// only they owe it.
+const own = (id: string, owner_id: string, recurrence: ChecklistRecurrence = 'daily') =>
+  ({ id, owner_id, recurrence, recur_days: [] }) as unknown as GoalChecklistItem;
 const comp = (item_id: string, user_id: string, done_at = MON.toISOString()) =>
   ({ item_id, user_id, done_at }) as GoalChecklistCompletion;
 
@@ -79,6 +83,57 @@ describe('computeGoalProgress', () => {
     const items = [item('a', 'weekdays'), item('b', 'custom', [6])]; // 'b' only due Saturday
     const r = computeGoalProgress({ items, completionsByItem: {}, assigneeIds: ['u1'], now: MON });
     expect(r.dueCount).toBe(1); // only the weekdays item counts on a Monday
+  });
+
+  it('charges a personal item to its owner alone', () => {
+    // One shared item both owe, plus one item u1 added for themselves. u1 owes
+    // 2, u2 still owes only the 1 they were assigned.
+    const items = [item('a'), own('mine', 'u1')];
+    const r = computeGoalProgress({
+      items,
+      completionsByItem: {},
+      assigneeIds: ['u1', 'u2'],
+      now: MON,
+    });
+    expect(r.perPerson.find((p) => p.id === 'u1')?.total).toBe(2);
+    expect(r.perPerson.find((p) => p.id === 'u2')?.total).toBe(1);
+    expect(r.pct).toBe(0);
+  });
+
+  it('counts a personal item in the combined % without inflating teammates', () => {
+    // Denominator is 3 (u1 owes 2, u2 owes 1), not 4 as the old items×people
+    // formula gave. Both tick the shared item; u1's own item is still pending.
+    const items = [item('a'), own('mine', 'u1')];
+    const completionsByItem = { a: [comp('a', 'u1'), comp('a', 'u2')] };
+    const r = computeGoalProgress({
+      items,
+      completionsByItem,
+      assigneeIds: ['u1', 'u2'],
+      now: MON,
+    });
+    expect(r.pct).toBe(67); // 2 of 3
+  });
+
+  it("never credits a teammate's tick on someone else's personal item", () => {
+    const items = [own('mine', 'u1')];
+    // A stray completion by u2 (the DB refuses these; belt and braces here).
+    const completionsByItem = { mine: [comp('mine', 'u2')] };
+    const r = computeGoalProgress({
+      items,
+      completionsByItem,
+      assigneeIds: ['u1', 'u2'],
+      now: MON,
+    });
+    expect(r.pct).toBe(0);
+    expect(r.perPerson.find((p) => p.id === 'u2')?.total).toBe(0);
+  });
+
+  it('skips personal items on a department goal with no assignees', () => {
+    // Nobody to attribute them to — mirrors recompute_goal_progress.
+    const items = [item('a'), own('mine', 'u1')];
+    const completionsByItem = { a: [comp('a', 'u9')] };
+    const r = computeGoalProgress({ items, completionsByItem, assigneeIds: [], now: MON });
+    expect(r.pct).toBe(100); // the one shared item is done
   });
 
   it('reports per-person done/total for every assignee', () => {

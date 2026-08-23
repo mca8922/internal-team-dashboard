@@ -223,41 +223,10 @@ export const getGoalAssignees = cache(async (): Promise<GoalAssignee[]> => {
   return data ?? [];
 });
 
-// Goals visible to a member: a goal counts if it (or any ancestor) is
-// assigned directly to them. Including descendants of a visible goal means an
-// assigned yearly goal also surfaces its half-yearly/quarterly children in the focus
-// view. A goal with no assignees is hidden from everyone except the Board —
-// department-tagging alone no longer grants visibility.
-export function visibleGoals(
-  goals: Goal[],
-  assignees: GoalAssignee[],
-  profile: Profile,
-): Goal[] {
-  if (profile.role === 'board') return goals;
-
-  const assignedIds = new Set(
-    assignees.filter((a) => a.user_id === profile.id).map((a) => a.goal_id),
-  );
-  const byId = new Map(goals.map((g) => [g.id, g]));
-
-  // Directly visible: explicitly assigned to me.
-  const directlyVisible = (g: Goal) => assignedIds.has(g.id);
-
-  // A goal is visible if it, or any ancestor up the parent chain, is
-  // directly visible.
-  const isVisible = (g: Goal): boolean => {
-    let cur: Goal | undefined = g;
-    const seen = new Set<string>(); // guard against cyclic parent_id
-    while (cur && !seen.has(cur.id)) {
-      if (directlyVisible(cur)) return true;
-      seen.add(cur.id);
-      cur = cur.parent_id ? byId.get(cur.parent_id) : undefined;
-    }
-    return false;
-  };
-
-  return goals.filter(isVisible);
-}
+// Who can see which task lives in goal-visibility.ts — pure, and therefore
+// unit-testable without this module's Supabase server client. Re-exported here
+// so every existing `import { visibleGoals } from '@/lib/queries'` still works.
+export { visibleGoals, goalDepartments } from '@/lib/goal-visibility';
 
 // All goal checklist items, ordered for display. The app groups these by
 // goal_id; goals without items simply have none.

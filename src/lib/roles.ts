@@ -54,6 +54,54 @@ export function isManager(
   return profile.role !== 'board' && !!profile.is_manager;
 }
 
+// ── Executive ───────────────────────────────────────────────────────────────
+// An "Executive" is the third tier the Team modals offer beside Director and
+// Manager (see ManageMemberModal): anyone who is neither. It is not a stored
+// role — it's what's left once board and is_manager are ruled out — so it is
+// derived here rather than read off a column.
+export function isExecutive(
+  profile: { id: string; role: UserRole; is_manager?: boolean | null } | null | undefined,
+): boolean {
+  if (!profile) return false;
+  return profile.role !== 'board' && !isManager(profile);
+}
+
+// ── Task powers (migration 0064) ────────────────────────────────────────────
+// Who may CREATE a task. Everyone can, now — the difference is scope, not
+// permission: the Board picks any department and any assignees, a Manager the
+// department they head and their own team, and an Executive gets exactly one
+// choice of assignee (themselves), which the Goals page enforces by handing
+// their form a members list of one. See canManageTask for editing.
+export function canCreateTask(
+  profile: { id: string; role: UserRole; is_manager?: boolean | null } | null | undefined,
+): boolean {
+  return !!profile;
+}
+
+// May `viewer` open the edit form on `goal`? The Board and Managers manage the
+// tasks in their scope as before; an Executive manages the ones they created
+// themselves, fully — title, description, due date, status, checklist. The one
+// thing that edit can never become is a deletion, which is why archiving is
+// blocked by its own trigger in 0064 rather than left to this check.
+export function canManageTask(
+  viewer: { id: string; role: UserRole; is_manager?: boolean | null },
+  goal: { created_by?: string | null },
+  canManageAll: boolean,
+): boolean {
+  if (canManageAll) return true;
+  return !!goal.created_by && goal.created_by === viewer.id;
+}
+
+// Deleting (and archiving, its soft twin) a task is the Board's alone —
+// Founders and Directors. A Manager creates and edits but never removes, and
+// neither does the Executive who created the task. Mirrors the
+// "goals: board delete" policy and the goals_archive_is_board trigger.
+export function canDeleteTask(
+  profile: { role: UserRole } | null | undefined,
+): boolean {
+  return profile?.role === 'board';
+}
+
 // Role-based default daily hours, used when the board hasn't set a
 // per-member target.
 export function roleDefaultHours(role: UserRole): number {

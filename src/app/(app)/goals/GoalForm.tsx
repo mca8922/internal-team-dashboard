@@ -242,6 +242,7 @@ export function GoalForm({
   onCancel,
   submitting,
   multiDept = false,
+  selfAssignee,
 }: {
   initial: Partial<Goal> & { level: GoalLevel };
   parents: Goal[];
@@ -256,6 +257,10 @@ export function GoalForm({
   // multi-select and members from every chosen department can be assigned).
   // Managers keep the single-department picker for the department they head.
   multiDept?: boolean;
+  // An Executive's task is always their own (migration 0064): pass them here
+  // and the assignee picker becomes a single locked row saying so. Leaving it
+  // undefined keeps the full Board/Manager picker.
+  selfAssignee?: AssignableMember;
 }) {
   const [form, setForm] = React.useState({
     level: initial.level,
@@ -282,7 +287,12 @@ export function GoalForm({
         ? [initial.department]
         : [],
   );
-  const [assignees, setAssignees] = React.useState<string[]>(initialAssignees);
+  // Locked to the one person who may own it when selfAssignee is set — the
+  // executive case, where the picker below is a read-only row rather than a
+  // list of checkboxes.
+  const [assignees, setAssignees] = React.useState<string[]>(
+    selfAssignee ? [selfAssignee.id] : initialAssignees,
+  );
   const [checklist, setChecklist] = React.useState<ChecklistRow[]>(() =>
     // Auto-reveal the description on rows that already have one (so editing an
     // existing goal shows what's there); new rows start collapsed.
@@ -430,7 +440,7 @@ export function GoalForm({
   // then refuses every tick. createGoal/updateGoal enforce the same rule server
   // side — this is only the courtesy half.
   const missingDepts = depts.length === 0;
-  const missingAssignees = assignees.length === 0;
+  const missingAssignees = !selfAssignee && assignees.length === 0;
   const canSubmit =
     !!form.title.trim() && !missingDepts && !missingAssignees && !submitting;
   // Errors stay hidden until the first submit attempt: a form that scolds you
@@ -699,11 +709,13 @@ export function GoalForm({
       {/* Assign to members. Each completes the checklist independently, so two
           assignees double the expected output. */}
       <Field
-        label="Assign to members"
+        label={selfAssignee ? 'Assigned to' : 'Assign to members'}
         hint={
-          depts.length > 0
-            ? `Showing ${deptsLabel}. Each assignee completes the checklist on their own.`
-            : 'Pick a department above to choose members.'
+          selfAssignee
+            ? 'A task you create is your own. Ask a Director to hand work to anyone else.'
+            : depts.length > 0
+              ? `Showing ${deptsLabel}. Each assignee completes the checklist on their own.`
+              : 'Pick a department above to choose members.'
         }
         error={
           showErrors && missingAssignees
@@ -711,7 +723,15 @@ export function GoalForm({
             : undefined
         }
       >
-        {depts.length === 0 ? (
+        {selfAssignee ? (
+          <div className="assignee-list">
+            <div className="assignee-row assignee-row-locked">
+              <Icon name="lock" size={13} />
+              <span className="flex-1">{selfAssignee.name}</span>
+              <span className="text-xs text-grey">You</span>
+            </div>
+          </div>
+        ) : depts.length === 0 ? (
           <div className="text-sm text-grey">Select a department first.</div>
         ) : deptMembers.length === 0 ? (
           <div className="text-sm text-grey">No members in {deptsLabel}.</div>

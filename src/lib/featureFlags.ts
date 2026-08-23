@@ -56,6 +56,17 @@ export const FEATURE_FLAGS = {
   // not call the support API while locked — see (app)/support/page.tsx.
   // Requires SUPPORT_API_URL + SUPPORT_API_KEY server-side (no NEXT_PUBLIC_).
   support: true,
+  // Executives creating their own tasks (the "Add my task" button + the Edit
+  // control on a task they created) and adding self-added checklist steps to
+  // any task on their list. Off, this restores the Board/Manager-only surface
+  // exactly: no create button for members, no "Add your own step" composer.
+  //
+  // It does NOT hide personal steps that already exist — they keep rendering,
+  // and their owner keeps ticking them, because hiding work someone committed
+  // to would silently drop it off their list. It also does not roll back
+  // migration 0064's RLS: the database still permits what the UI stops
+  // offering, which is the same shape every other flag here has.
+  executiveTasks: true,
   // Internship progress, flagged members, milestone replay.
   // Team pulse, department check-in, and the streak card are always on —
   // see dashboard/page.tsx.

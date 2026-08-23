@@ -741,7 +741,11 @@ async function replaceAssigneesAndNotify(
     supabase,
     goalId,
     goalTitle,
-    userIds.filter((id) => !before.has(id)),
+    // Never notify the person doing the assigning about their own name: an
+    // executive assigning themselves a task they just wrote does not need to be
+    // told about it, and RLS would refuse them the notification row anyway
+    // (notifications are Board-insert only).
+    userIds.filter((id) => !before.has(id) && id !== assignedBy),
   );
 }
 
@@ -766,11 +770,16 @@ async function syncChecklist(
   supabase: ServerClient,
   goalId: string,
   items: ChecklistInput[],
+  createdBy: string,
 ) {
+  // Only the SHARED checklist is the form's to rewrite. A member's personal
+  // items (owner_id set — migration 0064) never appear in it, so sweeping them
+  // into `existing` would make every save of the task silently delete them.
   const { data: existing } = await supabase
     .from('goal_checklist_items')
     .select('id')
-    .eq('goal_id', goalId);
+    .eq('goal_id', goalId)
+    .is('owner_id', null);
   const existingIds = new Set((existing ?? []).map((r) => r.id));
   const keptIds = new Set(items.map((i) => i.id).filter(Boolean) as string[]);
 
@@ -807,6 +816,10 @@ async function syncChecklist(
           recurrence: it.recurrence,
           recur_days: recurDays,
           report_required: !!it.reportRequired,
+          // The form writes the SHARED checklist — owed by everyone on the
+          // task. Personal items come in through addPersonalChecklistItem.
+          owner_id: null,
+          created_by: createdBy,
         });
     }
   }
@@ -832,9 +845,43 @@ export async function setGoalAssignees(
     .eq('id', goalId)
     .single();
   await replaceAssigneesAndNotify(supabase, goalId, goal?.title ?? 'a task', userIds, userId);
+  // Changing who owns a task is a real edit of it — same stamp updateGoal makes.
+  await supabase
+    .from('goals')
+    .update({ updated_at: new Date().toISOString(), updated_by: userId })
+    .eq('id', goalId);
   revalidatePath('/goals');
   revalidatePath('/dashboard');
   return { ok: true };
+}
+
+// ── Who is acting on this task? (migration 0064) ────────────────────────────
+// The Board and Department Managers manage other people's work. Everybody else
+// — the Executives — manages only their own: a task they create must land on
+// themselves and nobody else, and the only tasks they may edit are the ones
+// they created. RLS holds the same line in the database, but a server action is
+// a public endpoint: the form only ever offers an executive their own name, and
+// this is what makes that true rather than merely displayed.
+async function taskActor(supabase: ServerClient, userId: string) {
+  const { data } = await supabase
+    .from('profiles')
+    .select('role, is_manager')
+    .eq('id', userId)
+    .single();
+  // A Founder is Board-level even if the role column were somehow wrong.
+  const isBoard =
+    data?.role === 'board' || (FOUNDER_USER_IDS as readonly string[]).includes(userId);
+  const isMgr = !isBoard && !!data?.is_manager;
+  return { isBoard, isMgr, selfOnly: !isBoard && !isMgr };
+}
+
+// The one assignee an executive is allowed to name is themselves. Returns the
+// complaint, or null when the set is acceptable.
+function selfAssignError(userId: string, assigneeIds: string[]): string | null {
+  if (assigneeIds.length !== 1 || assigneeIds[0] !== userId) {
+    return 'You can only create tasks assigned to yourself.';
+  }
+  return null;
 }
 
 // Every task must land on a department AND on at least one member. An
@@ -876,6 +923,11 @@ export async function createGoal(input: {
   // Refuse the task outright rather than creating one nobody can complete.
   const ownership = goalOwnershipError(departments, assigneeIds);
   if (ownership) return { ok: false, error: ownership };
+  const actor = await taskActor(supabase, userId);
+  if (actor.selfOnly) {
+    const selfErr = selfAssignError(userId, assigneeIds);
+    if (selfErr) return { ok: false, error: selfErr };
+  }
   const { count } = await supabase.from('goals').select('*', { count: 'exact', head: true });
   const hasChecklist = !!input.checklist && input.checklist.length > 0;
   const { data: created, error: createError } = await supabase
@@ -917,14 +969,65 @@ export async function createGoal(input: {
     await supabase.from('goals').delete().eq('id', created.id);
     return { ok: false, error: assignError.message };
   }
-  // Every assignee on a brand-new goal is new — notify all of them.
-  await notifyAssignees(supabase, created.id, input.title, assigneeIds);
+  // Every assignee on a brand-new goal is new — notify all of them except the
+  // author (see replaceAssigneesAndNotify for why).
+  await notifyAssignees(
+    supabase,
+    created.id,
+    input.title,
+    assigneeIds.filter((id) => id !== userId),
+  );
   if (hasChecklist) {
-    await syncChecklist(supabase, created.id, input.checklist!);
+    await syncChecklist(supabase, created.id, input.checklist!, userId);
+  }
+  // An executive self-assigning work is the one creation leadership does not
+  // already know about, so their Director is told. A Board or Manager creating
+  // a task is the normal course of things and stays silent.
+  if (actor.selfOnly) {
+    after(() => notifyLeadershipOfMemberTask(created.id, userId));
   }
   revalidatePath('/goals');
   revalidatePath('/dashboard');
   return { ok: true };
+}
+
+// "<name> created a task for themselves" — delivered to the member's own
+// Director (the Founder-assigned director_id from 0061), falling back to the
+// Founders when nobody has been assigned to them yet, so this never lands
+// nowhere. Goes through the admin client because the notifications table is
+// Board-insert only and the member who triggered it is, by definition, not.
+async function notifyLeadershipOfMemberTask(goalId: string, memberId: string) {
+  const admin = createAdminClient();
+  const [{ data: goal }, { data: member }] = await Promise.all([
+    admin.from('goals').select('id, title, department').eq('id', goalId).single(),
+    admin.from('profiles').select('name, director_id').eq('id', memberId).single(),
+  ]);
+  if (!goal) return;
+  const memberName = member?.name ?? 'A team member';
+
+  const recipientIds = new Set<string>();
+  if (member?.director_id) recipientIds.add(member.director_id);
+  else for (const id of FOUNDER_USER_IDS) recipientIds.add(id);
+  recipientIds.delete(memberId);
+  const ids = Array.from(recipientIds);
+  if (!ids.length) return;
+
+  const title = `${memberName} created a task`;
+  const body = goal.title;
+  await admin.from('notifications').insert(
+    ids.map((user_id) => ({
+      user_id,
+      type: 'member_task_created' as NotificationType,
+      title,
+      body,
+      href: `/goals?goal=${goal.id}`,
+      goal_id: goal.id,
+      department: goal.department ?? null,
+    })),
+  );
+  after(() =>
+    sendPush(ids, { title, body, url: `/goals?goal=${goal.id}` }, 'member_task_created'),
+  );
 }
 
 export async function updateGoal(
@@ -958,6 +1061,24 @@ export async function updateGoal(
   if (assigneeIds && assigneeIds.length === 0) {
     return { ok: false, error: 'Assign at least one member to this task.' };
   }
+  // An executive edits the tasks they created, and only those — and an edit can
+  // never hand the work to somebody else. RLS refuses both anyway; checking
+  // here is what turns a silent refusal into a sentence the member can read.
+  const actor = await taskActor(supabase, userId);
+  if (actor.selfOnly) {
+    const { data: existing } = await supabase
+      .from('goals')
+      .select('created_by')
+      .eq('id', id)
+      .single();
+    if (!existing || existing.created_by !== userId) {
+      return { ok: false, error: 'You can only edit tasks you created yourself.' };
+    }
+    if (assigneeIds) {
+      const selfErr = selfAssignError(userId, assigneeIds);
+      if (selfErr) return { ok: false, error: 'You can only assign this task to yourself.' };
+    }
+  }
   // When the goal has a checklist, its progress is owned by the trigger —
   // don't let a stale slider value from the form overwrite it.
   const finalPatch = { ...patch };
@@ -966,10 +1087,19 @@ export async function updateGoal(
   if (finalPatch.departments && finalPatch.departments.length) {
     finalPatch.department = finalPatch.departments[0];
   }
-  const { error: updateError } = await supabase.from('goals').update(finalPatch).eq('id', id);
+  // Stamp the edit. This is the ONLY place that moves updated_at: a member
+  // ticking a checklist item, the progress trigger and the deadline sweep all
+  // leave it alone, so the card's "Edited" line means the task itself changed —
+  // not that somebody did the day's work on it.
+  const stamped = {
+    ...finalPatch,
+    updated_at: new Date().toISOString(),
+    updated_by: userId,
+  };
+  const { error: updateError } = await supabase.from('goals').update(stamped).eq('id', id);
   if (updateError) return { ok: false, error: updateError.message };
   if (checklist) {
-    await syncChecklist(supabase, id, checklist);
+    await syncChecklist(supabase, id, checklist, userId);
   }
   if (assigneeIds) {
     const { data: goal } = await supabase
@@ -1053,6 +1183,104 @@ export async function toggleChecklistItem(itemId: string, done: boolean) {
   if (error) throw new Error(error.message);
   revalidatePath('/goals');
   revalidatePath('/dashboard');
+}
+
+// ---- personal checklist items (migration 0064) ----
+
+// A member adds a step to their OWN list on a task they are a participant on —
+// including a task a Director assigned them. The item is theirs alone: nobody
+// else sees it, nobody else can tick it, and — deliberately — not even they can
+// remove it afterwards. Once you have written down that you owe a piece of
+// work, taking it back off the list is a Founder's or Director's call, which is
+// why there is an add and a rename here but no delete.
+//
+// owner_id and created_by are both stamped server-side rather than accepted
+// from the caller: the "checklist: board insert" policy in 0064 pins both to
+// auth.uid(), so a request naming anyone else is refused by the database too.
+// A rich-text field the member opened and left empty still comes back as markup
+// ("<p><br></p>"). Store '' for those, so a blank description doesn't reopen the
+// editor next time the step is edited and doesn't render an empty paragraph.
+function normalizeRichText(html: string): string {
+  const text = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+  return text ? html : '';
+}
+
+export async function addPersonalChecklistItem(
+  goalId: string,
+  label: string,
+  description = '',
+): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, userId } = await requireUser();
+  const text = label.trim();
+  if (!text) return { ok: false, error: 'Give the step a name first.' };
+  // Executives only. A Director or Manager assigned to the task edits its real
+  // checklist instead — giving them a second, private list would split the
+  // record of the same work in two. RLS is deliberately wider than this (it
+  // allows any participant), so this action is where the rule actually lives.
+  const actor = await taskActor(supabase, userId);
+  if (!actor.selfOnly) {
+    return {
+      ok: false,
+      error: 'Add this step to the task checklist itself — you can edit it directly.',
+    };
+  }
+
+  // Sort new personal items after everything already on the task, so the
+  // Board's own checklist keeps the order it was written in.
+  const { data: last } = await supabase
+    .from('goal_checklist_items')
+    .select('sort_order')
+    .eq('goal_id', goalId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+  const nextOrder = (last?.[0]?.sort_order ?? -1) + 1;
+
+  const { error } = await supabase.from('goal_checklist_items').insert({
+    goal_id: goalId,
+    label: text,
+    description: normalizeRichText(description),
+    sort_order: nextOrder,
+    // A member's own step is a plain one-off: cadences and the Report Work gate
+    // stay the Board's tools for the work they hand out.
+    recurrence: 'once',
+    recur_days: [],
+    report_required: false,
+    owner_id: userId,
+    created_by: userId,
+  });
+  if (error) {
+    return {
+      ok: false,
+      error: error.message.includes('row-level security')
+        ? 'You can only add steps to a task you are assigned to.'
+        : error.message,
+    };
+  }
+  revalidatePath('/goals');
+  revalidatePath('/dashboard');
+  return { ok: true };
+}
+
+// Fix a typo in your own step. Scoped to owner_id = the caller in both the
+// query and the RLS policy, so this can only ever reach an item the member
+// added themselves — never a Board-assigned one, and never a teammate's.
+export async function updatePersonalChecklistItem(
+  itemId: string,
+  label: string,
+  description = '',
+): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, userId } = await requireUser();
+  const text = label.trim();
+  if (!text) return { ok: false, error: 'Give the step a name first.' };
+  const { error } = await supabase
+    .from('goal_checklist_items')
+    .update({ label: text, description: normalizeRichText(description) })
+    .eq('id', itemId)
+    .eq('owner_id', userId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/goals');
+  revalidatePath('/dashboard');
+  return { ok: true };
 }
 
 // ---- work reports (Report Work) ----

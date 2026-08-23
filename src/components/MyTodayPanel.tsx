@@ -10,6 +10,7 @@ import { useToast } from './Toast';
 import { BottomSparkle, CardConfetti } from './ChecklistCelebration';
 import { toggleChecklistItem } from '@/lib/actions';
 import { isDueToday, isCompletionCurrent, recurrenceLabel } from '@/lib/recurrence';
+import { itemBelongsTo } from '@/lib/goal-progress';
 import { fmtDate } from '@/lib/dates';
 import type { Goal, GoalChecklistItem, GoalChecklistCompletion } from '@/lib/types';
 
@@ -64,6 +65,9 @@ export function MyTodayPanel({
       const mine = aids.includes(currentUserId) || aids.length === 0;
       if (!mine) continue;
       for (const it of checklistsByGoal[g.id] ?? []) {
+        // A teammate's personal item (migration 0064) is on their list, not
+        // mine — my own ones belong here exactly like an assigned step does.
+        if (!itemBelongsTo(it, currentUserId)) continue;
         if (!isDueToday(it)) continue;
         if (isCompletionCurrent(it.recurrence, myCompletion(it.id))) continue;
         out.push({ goalId: g.id, goalTitle: g.title, item: it });
