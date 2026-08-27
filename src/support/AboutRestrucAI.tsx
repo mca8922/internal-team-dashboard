@@ -22,6 +22,18 @@ const WEBSITE_URL = 'https://www.restrucai.com';
 const WEBSITE_LABEL = 'www.restrucai.com';
 const FOUNDER_URL = 'https://www.linkedin.com/in/nishit-rathod/';
 const FOUNDER_NAME = 'Nishit Rathod';
+const REFERRAL_URL = 'https://www.restrucai.com/referral';
+// A prompt, not an address. The other two rows show an identifier because that
+// IS the useful information — which site, which person. Repeating the domain a
+// third time tells nobody anything, and a bare URL asks the reader to work out
+// why they would click it. A question does the asking instead: the reader
+// pictures an actual business while they read the line, which is the whole job
+// this row has to do.
+//
+// Deliberately promises nothing specific. reStrucAI's terms are theirs to state
+// on the page itself, and copy here that invented a reward would be a promise
+// the client's dashboard made on their behalf.
+const REFERRAL_LABEL = 'Know a business we could help?';
 
 export function AboutRestrucAI() {
   const [open, setOpen] = React.useState(false);
@@ -119,6 +131,27 @@ function AboutModal({ onClose }: { onClose: () => void }) {
               <ArrowIcon />
             </span>
           </a>
+
+          {/* Last of the three deliberately: who we are and how to reach us is
+              what someone opened this for; passing us on is the thing you offer
+              after that, not before it. */}
+          <a
+            className="sup-about-link"
+            href={REFERRAL_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            <span className="sup-about-link-icon" aria-hidden="true">
+              <GiftIcon />
+            </span>
+            <span className="sup-about-link-body">
+              <span className="sup-about-link-label">Refer</span>
+              <span className="sup-about-link-value">{REFERRAL_LABEL}</span>
+            </span>
+            <span className="sup-about-link-go" aria-hidden="true">
+              <ArrowIcon />
+            </span>
+          </a>
         </div>
 
         <p className="sup-about-foot">
@@ -143,6 +176,19 @@ function LinkedInIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M6.94 5.5a1.94 1.94 0 1 1-3.88 0a1.94 1.94 0 0 1 3.88 0ZM3.25 8.94h3.4V21h-3.4V8.94Zm5.53 0h3.26v1.65h.05c.45-.86 1.56-1.76 3.22-1.76c3.44 0 4.08 2.27 4.08 5.22V21h-3.4v-5.29c0-1.26-.02-2.89-1.76-2.89c-1.76 0-2.03 1.37-2.03 2.8V21h-3.4V8.94Z" />
+    </svg>
+  );
+}
+
+// Stroked to match GlobeIcon's weight, so the three rows read as one set even
+// though LinkedIn's mark has to be a filled path.
+function GiftIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M20 12v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8" strokeLinecap="round" />
+      <path d="M3 8h18v4H3z" strokeLinejoin="round" />
+      <path d="M12 8v13" />
+      <path d="M12 8H7.5a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8Zm0 0h4.5a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8Z" strokeLinejoin="round" />
     </svg>
   );
 }

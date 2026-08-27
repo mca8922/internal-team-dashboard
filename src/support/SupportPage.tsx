@@ -18,16 +18,102 @@
 // two places to look is how a reply gets missed.
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { STATUS_LABEL, STATUS_TONE, SLA_HOURS, timeAgo } from './support-shared';
+import { STATUS_LABEL, STATUS_TONE, SLA_HOURS, timeAgo, type TicketDraft } from './support-shared';
 import { openMyTicket, resolveTicket } from './support-actions';
 import { SupportReportModal } from './SupportReportModal';
 import { AboutRestrucAI } from './AboutRestrucAI';
 import type { RemoteTicket, RemoteTicketDetail } from './support-api';
 
-export function SupportPage({ tickets }: { tickets: RemoteTicket[] }) {
+// What the page hands DOWN to an assistant pane, so the pane can send someone
+// into the ticket flow without knowing anything about how this page works.
+export interface SupportAssistantApi {
+  // Switch to the ticket tab and open the report form, optionally pre-filled.
+  // Opens the form; never sends it — the person still reviews and submits.
+  raiseTicket: (draft?: TicketDraft) => void;
+}
+
+// Delivered by context rather than as a prop on the slot, because the slot has
+// to cross the server/client boundary: the fork's route is a Server Component,
+// and a function prop there fails with "Functions cannot be passed directly to
+// Client Components". An element serializes fine; a callback does not. Context
+// resolves on the client at render time, so the pane still gets its API.
+const AssistantContext = React.createContext<SupportAssistantApi | null>(null);
+
+// The two sides of the switch, in render order. Kept as data so the markup,
+// the roving tabindex and the arrow-key handler can never disagree about how
+// many options there are or which one sits on the left.
+const SEG_TABS = [
+  { id: 'assistant', label: 'Ask the assistant' },
+  { id: 'ticket', label: 'Raise a ticket' },
+] as const;
+
+// For use inside the node passed as `assistant`. Throws rather than returning
+// null so a pane rendered outside the slot fails loudly in development instead
+// of silently losing its handoff to the ticket form.
+export function useSupportAssistant(): SupportAssistantApi {
+  const api = React.useContext(AssistantContext);
+  if (!api) {
+    throw new Error('useSupportAssistant must be used inside SupportPage\'s `assistant` slot.');
+  }
+  return api;
+}
+
+export function SupportPage({
+  tickets,
+  assistant,
+}: {
+  tickets: RemoteTicket[];
+  // Optional. A fork with no assistant passes nothing and gets the page exactly
+  // as it has always been — no tabs, no wrapper, no second code path to keep
+  // working. A plain node, so a Server Component route can pass it; the pane
+  // reads its handoff API from useSupportAssistant() rather than a prop.
+  assistant?: React.ReactNode;
+}) {
   const router = useRouter();
   const [reporting, setReporting] = React.useState(false);
   const [openRef, setOpenRef] = React.useState<string | null>(null);
+  const [draft, setDraft] = React.useState<TicketDraft | undefined>(undefined);
+  // The assistant answers questions; the ticket desk is where you go when it
+  // could not. Defaulting to the assistant is what makes that the cheaper of
+  // the two to try first.
+  const [tab, setTab] = React.useState<'assistant' | 'ticket'>('assistant');
+  const hasAssistant = !!assistant;
+
+  // Stable across renders so the pane can register widget event handlers once
+  // in an effect rather than tearing them down on every parent render.
+  const api = React.useMemo<SupportAssistantApi>(
+    () => ({
+      raiseTicket: (d) => {
+        setDraft(d);
+        setTab('ticket');
+        setReporting(true);
+      },
+    }),
+    [],
+  );
+
+  // Arrow / Home / End move between tabs, as a tablist is expected to. Focus
+  // follows the selection so the next Tab press leaves the control rather than
+  // landing on the option that was just moved away from.
+  const segRef = React.useRef<HTMLDivElement>(null);
+  const onSegKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const back = e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'Home';
+    const forward = e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'End';
+    if (!back && !forward) return;
+    e.preventDefault();
+    const next = back ? 'assistant' : 'ticket';
+    setTab(next);
+    segRef.current
+      ?.querySelectorAll<HTMLButtonElement>('.sup-seg-btn')
+      [next === 'assistant' ? 0 : 1]?.focus();
+  };
+
+  const closeReport = () => {
+    setReporting(false);
+    // Drop the draft with the modal, so re-opening the form by hand later
+    // starts blank rather than resurrecting a question from an hour ago.
+    setDraft(undefined);
+  };
 
   return (
     <div>
@@ -35,7 +121,9 @@ export function SupportPage({ tickets }: { tickets: RemoteTicket[] }) {
         <div>
           <h1 className="page-title">Support</h1>
           <div className="page-subtitle">
-            Raise anything with the reStrucAI team. We reply within {SLA_HOURS} working hours.
+            {hasAssistant
+              ? `Ask the assistant, or raise it with the reStrucAI team — we reply within ${SLA_HOURS} working hours.`
+              : `Raise anything with the reStrucAI team. We reply within ${SLA_HOURS} working hours.`}
           </div>
         </div>
         <div className="page-header-actions">
@@ -48,6 +136,71 @@ export function SupportPage({ tickets }: { tickets: RemoteTicket[] }) {
         </div>
       </div>
 
+      {hasAssistant ? (
+        <div
+          ref={segRef}
+          className="sup-seg"
+          role="tablist"
+          aria-label="How would you like help?"
+          // Drives the highlight's position in CSS, so there is one source of
+          // truth for which side is active rather than a class on each button.
+          data-pane={tab}
+        >
+          {/* The moving highlight. Purely decorative — the buttons above it
+              carry all the state and all the semantics. */}
+          <span className="sup-seg-thumb" aria-hidden="true" />
+          {SEG_TABS.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`sup-tab-${id}`}
+              aria-controls={`sup-panel-${id}`}
+              aria-selected={tab === id}
+              // Roving tabindex: one stop for the whole control, then the
+              // arrow keys move within it — what a tablist is expected to do.
+              tabIndex={tab === id ? 0 : -1}
+              className="sup-seg-btn"
+              onClick={() => setTab(id)}
+              onKeyDown={onSegKey}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Both panes stay mounted and cross-fade; the inactive one is lifted out
+          of flow rather than display:none'd. Two reasons, and neither is
+          decoration:
+            - The widget mounts into a real DOM node. Unmounting the pane would
+              destroy the panel and lose the conversation someone is mid-way
+              through — which is exactly when we hand them to the ticket form.
+            - display:none cannot transition, and it forces a full relayout of a
+              520px panel on every switch, which is what makes a tab feel like a
+              page load. Fading opacity keeps the switch on the compositor. */}
+      <div className={hasAssistant ? 'sup-panes' : undefined}>
+        {assistant ? (
+          <AssistantContext.Provider value={api}>
+            <div
+              className="sup-pane"
+              data-active={tab === 'assistant'}
+              role="tabpanel"
+              id="sup-panel-assistant"
+              aria-labelledby="sup-tab-assistant"
+            >
+              {assistant}
+            </div>
+          </AssistantContext.Provider>
+        ) : null}
+
+        <div
+          className={hasAssistant ? 'sup-pane' : undefined}
+          data-active={hasAssistant ? tab === 'ticket' : undefined}
+          role={hasAssistant ? 'tabpanel' : undefined}
+          id={hasAssistant ? 'sup-panel-ticket' : undefined}
+          aria-labelledby={hasAssistant ? 'sup-tab-ticket' : undefined}
+        >
       {tickets.length === 0 ? (
         <div className="sup-empty">
           <h3>You have not raised anything yet</h3>
@@ -83,9 +236,13 @@ export function SupportPage({ tickets }: { tickets: RemoteTicket[] }) {
         </div>
       )}
 
+        </div>
+      </div>
+
       {reporting ? (
         <SupportReportModal
-          onClose={() => setReporting(false)}
+          draft={draft}
+          onClose={closeReport}
           // The list is server-rendered, so a new ticket only appears after the
           // route re-runs. Refreshing on send means the person sees their
           // request land in the list they are already looking at.

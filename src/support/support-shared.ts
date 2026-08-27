@@ -65,6 +65,17 @@ export const STATUS_TONE: Record<SupportStatus, string> = {
 export const SUBJECT_MAX = 160;
 export const BODY_MAX = 4000;
 
+// A pre-filled starting point for the report form, handed in by whatever sent
+// the person here — today, an AI assistant that could not answer their
+// question. Every field is optional and every one only ever seeds the form's
+// INITIAL state: the person still edits and sends it themselves. Nothing in
+// this module submits a draft on anyone's behalf.
+export interface TicketDraft {
+  category?: SupportCategory;
+  subject?: string;
+  body?: string;
+}
+
 export function validateTicketInput(input: { subject: string; body: string }): string | null {
   if (input.subject.trim().length < 3) return 'Please add a short subject.';
   if (input.subject.length > SUBJECT_MAX) return `Subject must be under ${SUBJECT_MAX} characters.`;

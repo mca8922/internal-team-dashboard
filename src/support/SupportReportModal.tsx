@@ -31,20 +31,29 @@ import {
   SUBJECT_MAX,
   validateTicketInput,
   type SupportCategory,
+  type TicketDraft,
 } from './support-shared';
 import { raiseTicket } from './support-actions';
 
 export function SupportReportModal({
   onClose,
   onSent,
+  draft,
 }: {
   onClose: () => void;
   // Fired after a successful submit so the page can refresh its ticket list.
   onSent: () => void;
+  // Optional starting values (see TicketDraft). Omitted, the form opens blank
+  // on "bug" exactly as it always has — which is what every fork without an
+  // assistant gets, with no code path of its own.
+  draft?: TicketDraft;
 }) {
-  const [category, setCategory] = React.useState<SupportCategory>('bug');
-  const [subject, setSubject] = React.useState('');
-  const [body, setBody] = React.useState('');
+  // Seeds only. Deliberately NOT synced to `draft` afterwards: once the modal
+  // is open the person is typing, and a late prop change overwriting their
+  // words would be the worst possible moment to do it.
+  const [category, setCategory] = React.useState<SupportCategory>(draft?.category ?? 'bug');
+  const [subject, setSubject] = React.useState(draft?.subject ?? '');
+  const [body, setBody] = React.useState(draft?.body ?? '');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [sentRef, setSentRef] = React.useState<string | null>(null);

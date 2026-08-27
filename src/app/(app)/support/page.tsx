@@ -11,6 +11,7 @@ import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { AboutRestrucAI } from '@/support/AboutRestrucAI';
 import { SupportPage } from '@/support/SupportPage';
 import { listMyTickets } from '@/support/support-actions';
+import { AssistantPanel } from './AssistantPanel';
 
 export const metadata = { title: 'Support · Mahesh Chandra & Associates' };
 
@@ -21,7 +22,11 @@ export default async function Page() {
   if (!FEATURE_FLAGS.support) return <SupportLocked />;
 
   const tickets = await listMyTickets();
-  return <SupportPage tickets={tickets} />;
+  // The assistant is passed IN rather than imported by the support module:
+  // src/support/ stays portable and assistant-unaware, and this fork decides
+  // both that it has one and which one. Deliberately below the Phase-1 lock
+  // above — while the desk is locked, nothing here loads at all.
+  return <SupportPage tickets={tickets} assistant={<AssistantPanel />} />;
 }
 
 // Matches the locked state used for notification history, so "not yet" reads

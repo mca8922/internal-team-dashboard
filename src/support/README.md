@@ -66,6 +66,48 @@ export default async function Page() {
 That is the whole route. `SupportPage` renders its own header, the "Report an issue" button,
 the ticket list, and both modals.
 
+### 5b. Optional: an assistant beside the ticket desk
+
+`SupportPage` takes one optional prop, `assistant`. Pass nothing and the page is exactly what
+is described above — no tabs, no wrapper, no second code path. Pass a node and the page grows
+a segmented switch, **Ask the assistant** / **Raise a ticket**, defaulting to the assistant:
+
+```tsx
+// The route is a Server Component — this is an element, not a callback.
+<SupportPage tickets={tickets} assistant={<AssistantPanel />} />
+```
+
+The module stays assistant-agnostic: it never imports one, and knows only that something
+renders in that slot. What it hands *down* is `api.raiseTicket(draft?)`, which switches to the
+ticket tab and opens the report form pre-filled from an optional `TicketDraft`
+(`{ category?, subject?, body? }`). The pane reads it from context:
+
+```tsx
+'use client';
+import { useSupportAssistant } from '@/support/SupportPage';
+
+export function AssistantPanel() {
+  const api = useSupportAssistant();
+  // …api.raiseTicket({ subject, body }) when the assistant cannot help
+}
+```
+
+Context, not a prop on the slot — **this is load-bearing**. The fork's route is a Server
+Component, and `assistant={(api) => …}` there fails at runtime with *"Functions cannot be
+passed directly to Client Components"*. An element serializes across the boundary; a callback
+does not.
+
+Two further rules the module enforces so this cannot go wrong:
+
+- **The draft only seeds the form.** `SupportReportModal` reads it as initial state and never
+  syncs to it afterwards — a late prop change must not overwrite words someone is typing. The
+  person still reviews and sends it themselves; nothing here submits on their behalf.
+- **The assistant pane is hidden, never unmounted, on a tab switch.** A widget that mounts into
+  a real DOM node would be destroyed by an unmount, losing the conversation mid-flow.
+
+Keep the pane itself *outside* this folder — see this fork's
+`src/app/(app)/support/AssistantPanel.tsx` for the reference implementation.
+
 ### 6. Add the sidebar entry
 
 In the fork's `src/components/Shell.tsx`, inside `buildNavGroups`, add Support to the tools
