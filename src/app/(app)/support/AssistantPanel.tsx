@@ -42,6 +42,12 @@ const MOUNT_ID = 'assistant-panel';
 // built, which turned the whole conversation area white in dark mode. Relying
 // on any surface staying transparent is relying on their next deploy.
 const THEME_CSS = `
+/* The floating launcher bubble. data-target already suppresses it by putting
+   the host in embed mode at load; this is the belt to that pair of braces, so
+   a future change to their boot order can never park a bubble in the corner of
+   a page that already has the panel open inline. */
+.launcher { display: none !important; }
+
 :host {
   /* The widget sets --accent inline on the host, so a stylesheet needs
      !important to win. Ours tracks the theme instead of being a fixed hex. */
@@ -157,6 +163,12 @@ export function AssistantPanel() {
     if (!widget) return;
     startedRef.current = true;
 
+    // data-target has already mounted it into our container by now, so theme it
+    // before doing anything slow. Waiting until after the token round-trip
+    // showed the vendor's light palette for as long as that request took, and
+    // showed it indefinitely whenever the request failed.
+    applyWidgetTheme(panelRef.current);
+
     try {
       // Fetched on every page load rather than cached: the token expires after
       // an hour, and a stale one fails in a way the person cannot act on.
@@ -220,6 +232,13 @@ export function AssistantPanel() {
         src={WIDGET_SRC}
         data-key={PUBLIC_KEY}
         data-mode="embed"
+        // Makes the widget mount itself at load (its boot does
+        // `if (mode === "embed" && target) mount(target)`), which is what adds
+        // the `embed` class that hides its floating launcher. Without this it
+        // stays in bubble mode until our own mount() call lands — so the
+        // launcher sat in the corner during the token fetch, and stayed there
+        // for good whenever that fetch failed.
+        data-target={`#${MOUNT_ID}`}
         data-title="MCA Dashboard Assistant"
         strategy="afterInteractive"
         onReady={() => void start()}
