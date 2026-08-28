@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fmtDate, fmtFriendly, fmtDateDMY, parseDate, istDayStartMs } from '@/lib/dates';
 import { milestoneForToday, milestonePings, type Milestone, type MilestoneKind } from '@/lib/milestones';
-import { STALE_PUNCH_HOURS } from '@/lib/queries';
+import { STALE_PUNCH_HOURS, getCurrentProfile } from '@/lib/queries';
 import { FOUNDER_USER_IDS, belongsToDepartment } from '@/lib/roles';
 import { sendPush } from '@/lib/push';
 import { notifyByEmail } from '@/lib/notify-email';
@@ -142,18 +142,18 @@ async function callerDepartment(): Promise<string | null> {
 // (The login email is intentionally left untouched — the Founder may change
 // it freely; identity is the user id, not the email.)
 export async function ensureFounderIntegrity(): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user || !(FOUNDER_USER_IDS as readonly string[]).includes(user.id)) return;
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, is_active')
-    .eq('id', user.id)
-    .single();
-  if (!profile) return;
+  // Reuse the request-cached profile fetch (React.cache) rather than a second
+  // auth.getUser() + profiles round-trip. For every non-Founder navigation —
+  // the common case — this is now just an id check with zero added network
+  // cost, where it used to put a full auth-server round-trip on the critical
+  // path of first byte for every user on every page.
+  //
+  // Trade-off: on the single render right after a tampering edit, the layout
+  // reads this same cached (pre-heal) row, so the corrected values only show
+  // from the next request. The DB is still repaired immediately and the ban is
+  // still lifted here, so the owner is never actually locked out.
+  const profile = await getCurrentProfile();
+  if (!profile || !(FOUNDER_USER_IDS as readonly string[]).includes(profile.id)) return;
 
   const patch: Record<string, unknown> = {};
   if (profile.role !== 'board') patch.role = 'board';
@@ -167,10 +167,11 @@ export async function ensureFounderIntegrity(): Promise<void> {
   // lift any ban so sign-in works again. No revalidatePath here: this runs
   // during layout render (where revalidate is disallowed), and callers read
   // the profile *after* this heal, so they already see the restored values.
-  await supabase.from('profiles').update(patch).eq('id', user.id);
+  const supabase = await createClient();
+  await supabase.from('profiles').update(patch).eq('id', profile.id);
   if (patch.is_active) {
     const admin = createAdminClient();
-    await admin.auth.admin.updateUserById(user.id, { ban_duration: 'none' });
+    await admin.auth.admin.updateUserById(profile.id, { ban_duration: 'none' });
   }
 }
 
