@@ -138,35 +138,37 @@ export default async function DashboardPage() {
   // One parallel batch for everything - the member queries AND the
   // board-only roll-up queries fire together (board queries used to wait
   // for round 1 to finish even though they did not depend on it).
-  const [myPunches, myLogs, myAllLogs, allGoals, assignees, boardData] = await Promise.all([
-    getPunches(profile.id, punchFrom),
-    getRecentLogs(profile.id),
-    // The streak can run longer than getRecentLogs' window (it used to get
-    // silently cut short there once a streak passed 40 days) — logStreak
-    // needs the complete history to walk all the way back to where it broke.
-    getLogs(profile.id),
-    getGoals(),
-    getGoalAssignees(),
-    isBoard
-      ? Promise.all([
-          getAllProfiles(),
-          getAllPunches(today),
-          getLeaves(),
-          getDepartmentColors(),
-        ])
-      : Promise.resolve(null),
-  ]);
-  // Goals this member may see: assigned to them or their department
-  // (the Board sees all).
-  const goals = visibleGoals(allGoals, assignees, profile);
-
   // Birthday banner — gated behind notificationsFull, same tier as the rest
   // of the teammate-facing notification pipeline. Message privacy is enforced
   // server-side in getBirthdayCelebrants (see migration
-  // 0056_birthday_privacy.sql), not just hidden in the UI.
-  const celebrants = FEATURE_FLAGS.notificationsFull
-    ? await getBirthdayCelebrants(profile.id)
-    : [];
+  // 0056_birthday_privacy.sql), not just hidden in the UI. It depends on none of
+  // the other queries, so it rides the same parallel batch instead of running
+  // as a separate serial round-trip afterwards.
+  const [myPunches, myLogs, myAllLogs, allGoals, assignees, boardData, celebrants] =
+    await Promise.all([
+      getPunches(profile.id, punchFrom),
+      getRecentLogs(profile.id),
+      // The streak can run longer than getRecentLogs' window (it used to get
+      // silently cut short there once a streak passed 40 days) — logStreak
+      // needs the complete history to walk all the way back to where it broke.
+      getLogs(profile.id),
+      getGoals(),
+      getGoalAssignees(),
+      isBoard
+        ? Promise.all([
+            getAllProfiles(),
+            getAllPunches(today),
+            getLeaves(),
+            getDepartmentColors(),
+          ])
+        : Promise.resolve(null),
+      FEATURE_FLAGS.notificationsFull
+        ? getBirthdayCelebrants(profile.id)
+        : Promise.resolve([] as Awaited<ReturnType<typeof getBirthdayCelebrants>>),
+    ]);
+  // Goals this member may see: assigned to them or their department
+  // (the Board sees all).
+  const goals = visibleGoals(allGoals, assignees, profile);
 
   // Department-manager badge accent — getDepartmentColors is React.cache()d and
   // already fetched by the layout this request, so this is effectively free.

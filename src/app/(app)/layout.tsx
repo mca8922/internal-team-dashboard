@@ -34,8 +34,10 @@ let lastSweepAt = 0;
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Self-heal the Founder account before anything reads the profile, so a
-  // tampered email / role / active flag can never lock the owner out. This one
-  // must complete before getCurrentProfile below, so it stays awaited.
+  // tampered email / role / active flag can never lock the owner out. It shares
+  // the request-cached getCurrentProfile() fetch with the call below (and is a
+  // no-op with no network cost for non-Founders), so this is no longer an extra
+  // round-trip on the critical path — it just has to run first.
   await ensureFounderIntegrity();
 
   if (Date.now() - lastSweepAt > SWEEP_INTERVAL_MS) {

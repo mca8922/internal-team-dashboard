@@ -16,7 +16,6 @@ import {
   getReportTemplates,
   getGoalTemplates,
   getAllProfiles,
-  getAssigneeProfiles,
   getReviewerProfiles,
   getOnLeaveUserIdsToday,
   getGoalPins,
@@ -141,20 +140,6 @@ export default async function GoalsPage() {
     (assigneeIdsByGoal[a.goal_id] = assigneeIdsByGoal[a.goal_id] || []).push(a.user_id);
     if (visibleIds.has(a.goal_id) || archivedIds.has(a.goal_id)) neededAssigneeIds.push(a.user_id);
   }
-  const assigneeProfiles = await getAssigneeProfiles(neededAssigneeIds);
-  const profileById = new Map(assigneeProfiles.map((p) => [p.id, p]));
-
-  // goalId -> [assignee chip, ...]
-  const assigneesByGoal: Record<string, AssigneeChip[]> = {};
-  for (const a of assignees) {
-    const p = profileById.get(a.user_id);
-    if (!p) continue;
-    (assigneesByGoal[a.goal_id] = assigneesByGoal[a.goal_id] || []).push({
-      id: p.id,
-      name: p.name,
-      avatar_url: p.avatar_url,
-    });
-  }
 
   // reportId -> [review, ...] (Manager/Board ratings + comments on each report).
   const reviewsByReport: Record<string, WorkReportReview[]> = {};
@@ -202,9 +187,33 @@ export default async function GoalsPage() {
   for (const [goalId, isSelf] of Object.entries(allSelf)) {
     if (isSelf) selfAssignedGoals.add(goalId);
   }
-  const reviewerProfiles = await getReviewerProfiles(Array.from(peopleToResolve));
+
+  // ONE service-role identity lookup now covers both the assignee chips and the
+  // reviewer / assigner / author labels. getReviewerProfiles returns a superset
+  // of getAssigneeProfiles' columns, so a single round-trip through the admin
+  // client replaces the two sequential ones this page used to make.
+  const identityProfiles = await getReviewerProfiles(
+    Array.from(new Set<string>([...neededAssigneeIds, ...peopleToResolve])),
+  );
+  const profileById = new Map(identityProfiles.map((p) => [p.id, p]));
   const reviewerById: Record<string, ReviewerInfo> = {};
-  for (const p of reviewerProfiles) reviewerById[p.id] = p;
+  for (const p of identityProfiles) reviewerById[p.id] = p;
+
+  // goalId -> [assignee chip, ...]. profileById now also holds reviewers /
+  // authors / assigners (the one merged lookup above), so keep the original
+  // scope explicit: chips are only built for goals actually on screen or in the
+  // archived-cleanup export.
+  const assigneesByGoal: Record<string, AssigneeChip[]> = {};
+  for (const a of assignees) {
+    if (!visibleIds.has(a.goal_id) && !archivedIds.has(a.goal_id)) continue;
+    const p = profileById.get(a.user_id);
+    if (!p) continue;
+    (assigneesByGoal[a.goal_id] = assigneesByGoal[a.goal_id] || []).push({
+      id: p.id,
+      name: p.name,
+      avatar_url: p.avatar_url,
+    });
+  }
 
   // goalId -> who assigned it, for every visible task.
   const assignerByGoal: Record<string, AssignerInfo> = {};
