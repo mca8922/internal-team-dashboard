@@ -24,6 +24,9 @@ export interface GoalTemplate {
   title: string;
   description: string;
   checklist: TemplateChecklistRow[];
+  // Who saved this template — used to gate its "delete" control (the creator or
+  // the Board; see actions.deleteGoalTemplate + migration 0066).
+  createdBy: string | null;
 }
 
 // Normalises one stored checklist row (which may predate newer fields) into a
@@ -50,5 +53,6 @@ export function parseGoalTemplate(row: GoalTemplateRow): GoalTemplate {
     title: row.title,
     description: row.description,
     checklist: list.map(parseRow),
+    createdBy: row.created_by,
   };
 }
