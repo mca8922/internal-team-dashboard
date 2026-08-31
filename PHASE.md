@@ -404,6 +404,37 @@ If the two ever disagree, reStrucAI is right.
   the deliberate difference from reStrucAI's own dashboard. There is also no
   reply box: a ticket records state, and the conversation happens over email.
 
+### Support desk — formatting, table, spam notice (done)
+
+Three module changes, made here and to be carried upstream to `client-module/`
+so every fork gets them (`git pull` on the module folder):
+
+- **Rich-text bodies.** Ticket messages come back from reStrucAI as HTML; they
+  were rendered as raw text, so `<b>`/`<div>` tags showed literally. They now
+  render through the shared `RichText` (sanitized `dangerouslySetInnerHTML`).
+  "Tell us what happened" uses `RichTextEditor` instead of a plain `<textarea>`,
+  so the report is authored with the same bold/italic/list/highlight formatting
+  a reply uses. `validateTicketInput` flattens the HTML (`htmlToText` in
+  `support-shared.ts`) for its min-length / blank checks; the `BODY_MAX` cap
+  still runs against the stored markup. The module now depends on
+  `@/components/RichTextEditor` + `@/lib/sanitize` + `isomorphic-dompurify` —
+  see the README.
+- **Ticket list is a table.** `TicketTable` in `SupportPage.tsx`: sortable
+  columns (Reference / Subject / Status / Updated), a search box and a status
+  filter. Folds to stacked cards under 720px via `data-label` — no second DOM.
+- **Spam-folder notice.** The "Sent to reStrucAI" confirmation now carries an
+  amber advisory: check spam/junk if the confirmation email is missing, mark it
+  "Not spam", add reStrucAI to safe senders, and note that every reply comes to
+  that same address.
+
+- **Report form no longer closes on backdrop click or Escape.** It holds a
+  half-written report, so the ✕ in the corner is the only way out — a stray
+  click or keypress can't discard what someone typed. `TicketDetail` (a
+  read-only state record) still closes both ways.
+
+`support.css` was edited and **re-appended** to `globals.css` under its banner
+(lines were replaced in place, block boundaries unchanged).
+
 ## Executive task powers (done — `executiveTasks`, migration 0064)
 
 Creating a task used to be Board/Manager work. It no longer is: an

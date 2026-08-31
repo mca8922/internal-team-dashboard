@@ -9,9 +9,12 @@ Nothing here stores a ticket. Everything is posted to reStrucAI's support API an
 from it, so the ticket lives in exactly one database — reStrucAI's. There is no sync, no
 mirror, and nothing that can drift.
 
-The whole module is deliberately self-contained: it imports React, Next, and nothing from the
-host app except wherever you get the signed-in user. That is what makes onboarding client #3
-a copy of this folder rather than a re-integration.
+The module is close to self-contained: it imports React, Next, the signed-in user (step 4),
+and — since ticket bodies are now rich text — the shared `RichTextEditor` / `RichText`
+components (`@/components/RichTextEditor`, which pulls in `@/lib/sanitize` and
+`isomorphic-dompurify`). A fork that already ships goal/checklist descriptions has all three
+already. If yours does not, copy `RichTextEditor.tsx`, `sanitize.ts`, and the `.rte` / `.rich-text`
+blocks from `globals.css`, and add `isomorphic-dompurify` to the fork.
 
 ---
 
@@ -155,8 +158,12 @@ ticket reference.
 └─────────────────────────────────────────────────────────┘
 ```
 
+The list is a sortable, filterable table on a real screen (Reference / Subject / Status /
+Updated, with a search box and status filter) and folds to stacked cards under 720px.
+
 Clicking a row opens what they asked, the history of how it moved, and a **Mark as resolved**
-button.
+button. Report and reply bodies are rich text — authored in the shared editor, rendered
+sanitized — so a reply that quotes the report reads with the same formatting.
 
 **There is no reply box.** A ticket is a record of state; the conversation happens over email,
 because two places to look is how a reply gets missed.

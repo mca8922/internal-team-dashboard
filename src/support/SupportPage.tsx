@@ -23,6 +23,7 @@ import { openMyTicket, resolveTicket } from './support-actions';
 import { SupportReportModal } from './SupportReportModal';
 import { AboutRestrucAI } from './AboutRestrucAI';
 import type { RemoteTicket, RemoteTicketDetail } from './support-api';
+import { RichText } from '@/components/RichTextEditor';
 
 // What the page hands DOWN to an assistant pane, so the pane can send someone
 // into the ticket flow without knowing anything about how this page works.
@@ -213,27 +214,7 @@ export function SupportPage({
           </button>
         </div>
       ) : (
-        <div className="support-list">
-          {tickets.map((t) => (
-            <button
-              key={t.ref}
-              type="button"
-              className="support-row"
-              onClick={() => setOpenRef(t.ref)}
-            >
-              <span className="support-row-main">
-                <span className="support-row-top">
-                  <span className="support-ref">{t.ref}</span>
-                  <span className="support-row-subject">{t.subject}</span>
-                </span>
-                <span className="support-row-sub">Updated {timeAgo(t.updated_at)}</span>
-              </span>
-              <span className="support-row-meta">
-                <span className={`badge ${STATUS_TONE[t.status]}`}>{STATUS_LABEL[t.status]}</span>
-              </span>
-            </button>
-          ))}
-        </div>
+        <TicketTable tickets={tickets} onOpen={setOpenRef} />
       )}
 
         </div>
@@ -260,6 +241,212 @@ export function SupportPage({
     </div>
   );
 }
+
+// Ticket message bodies come back from reStrucAI as HTML (an agent reply is
+// authored in a rich editor on their side, and the report itself now is too).
+// RichText sanitizes before injecting and keeps pre-wrap, so a legacy
+// plain-text body still reads line-by-line; it renders nothing for a blank
+// body, so guard that here.
+function TicketBody({ body }: { body: string }) {
+  if (!body || !body.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim()) {
+    return <span className="support-msg-empty">—</span>;
+  }
+  return <RichText value={body} />;
+}
+
+type SortKey = 'ref' | 'subject' | 'status' | 'updated';
+
+const COLUMNS: { key: SortKey; label: string; align?: 'end' }[] = [
+  { key: 'ref', label: 'Reference' },
+  { key: 'subject', label: 'Subject' },
+  { key: 'status', label: 'Status' },
+  { key: 'updated', label: 'Updated', align: 'end' },
+];
+
+// Order statuses sit in for the "Status" sort — lifecycle order, not
+// alphabetical, so sorting groups "still open" work together.
+const STATUS_RANK: Record<string, number> = {
+  open: 0,
+  in_progress: 1,
+  waiting_client: 2,
+  resolved: 3,
+  closed: 4,
+};
+
+function TicketTable({
+  tickets,
+  onOpen,
+}: {
+  tickets: RemoteTicket[];
+  onOpen: (ref: string) => void;
+}) {
+  const [query, setQuery] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState<string>('all');
+  const [sort, setSort] = React.useState<{ key: SortKey; dir: 'asc' | 'desc' }>({
+    key: 'updated',
+    dir: 'desc',
+  });
+
+  // Only the statuses actually present — no point offering "Resolved" as a
+  // filter when nothing is resolved.
+  const statuses = React.useMemo(() => {
+    const seen = new Set(tickets.map((t) => t.status));
+    return (Object.keys(STATUS_RANK) as SupportStatusKey[]).filter((s) => seen.has(s));
+  }, [tickets]);
+
+  const rows = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = tickets.filter((t) => {
+      if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        t.ref.toLowerCase().includes(q) || t.subject.toLowerCase().includes(q)
+      );
+    });
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      switch (sort.key) {
+        case 'ref':
+          return a.ref.localeCompare(b.ref, undefined, { numeric: true }) * dir;
+        case 'subject':
+          return a.subject.localeCompare(b.subject) * dir;
+        case 'status':
+          return ((STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9)) * dir;
+        case 'updated':
+        default:
+          return (
+            (new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()) * dir
+          );
+      }
+    });
+  }, [tickets, query, statusFilter, sort]);
+
+  const toggleSort = (key: SortKey) =>
+    setSort((cur) =>
+      cur.key === key
+        ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
+        : // A new column starts descending for dates (newest first) and
+          // ascending for text — the order people expect from each.
+          { key, dir: key === 'updated' ? 'desc' : 'asc' },
+    );
+
+  return (
+    <div className="support-table-wrap">
+      <div className="support-filters">
+        <input
+          type="search"
+          className="input support-filter-search"
+          placeholder="Search reference or subject"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search tickets"
+        />
+        <select
+          className="input support-filter-status"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Filter by status"
+        >
+          <option value="all">All statuses</option>
+          {statuses.map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABEL[s]}
+            </option>
+          ))}
+        </select>
+        {/* Column headers carry the sort on a real screen; this mirrors it for
+            the card view, where the header row is hidden. */}
+        <select
+          className="input support-filter-sort"
+          value={`${sort.key}:${sort.dir}`}
+          onChange={(e) => {
+            const [key, dir] = e.target.value.split(':') as [SortKey, 'asc' | 'desc'];
+            setSort({ key, dir });
+          }}
+          aria-label="Sort tickets"
+        >
+          <option value="updated:desc">Newest first</option>
+          <option value="updated:asc">Oldest first</option>
+          <option value="status:asc">Status</option>
+          <option value="subject:asc">Subject A–Z</option>
+          <option value="ref:asc">Reference</option>
+        </select>
+        <span className="support-filter-count">
+          {rows.length} of {tickets.length}
+        </span>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="support-table-empty">No tickets match those filters.</p>
+      ) : (
+        <table className="support-table">
+          <thead>
+            <tr>
+              {COLUMNS.map((c) => {
+                const isSorted = sort.key === c.key;
+                return (
+                  <th
+                    key={c.key}
+                    scope="col"
+                    className={c.align === 'end' ? 'support-th-end' : undefined}
+                    aria-sort={
+                      isSorted ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'
+                    }
+                  >
+                    <button
+                      type="button"
+                      className={`support-sort${isSorted ? ' active' : ''}`}
+                      onClick={() => toggleSort(c.key)}
+                    >
+                      {c.label}
+                      <span className="support-sort-caret" aria-hidden="true">
+                        {isSorted ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
+                      </span>
+                    </button>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((t) => (
+              <tr
+                key={t.ref}
+                className="support-tr"
+                tabIndex={0}
+                role="button"
+                onClick={() => onOpen(t.ref)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onOpen(t.ref);
+                  }
+                }}
+              >
+                <td data-label="Reference" className="support-td-ref">
+                  {t.ref}
+                </td>
+                <td data-label="Subject" className="support-td-subject">
+                  {t.subject}
+                </td>
+                <td data-label="Status">
+                  <span className={`badge ${STATUS_TONE[t.status]}`}>
+                    {STATUS_LABEL[t.status]}
+                  </span>
+                </td>
+                <td data-label="Updated" className="support-th-end support-td-updated">
+                  {timeAgo(t.updated_at)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+type SupportStatusKey = keyof typeof STATUS_LABEL;
 
 function TicketDetail({
   ticketRef,
@@ -345,7 +532,9 @@ function TicketDetail({
                   <span className="support-msg-author">You asked</span>
                   <span className="support-msg-time">{timeAgo(request.created_at)}</span>
                 </div>
-                <div className="support-msg-body">{request.body}</div>
+                <div className="support-msg-body">
+                  <TicketBody body={request.body} />
+                </div>
               </div>
             ) : null}
 
@@ -354,7 +543,9 @@ function TicketDetail({
                 history.map((m, i) => (
                   <div key={i} className="support-history-row">
                     <span className="support-history-dot" aria-hidden="true" />
-                    <span>{m.body}</span>
+                    <span className="support-history-body">
+                      <TicketBody body={m.body} />
+                    </span>
                     <span className="support-history-when">{timeAgo(m.created_at)}</span>
                   </div>
                 ))

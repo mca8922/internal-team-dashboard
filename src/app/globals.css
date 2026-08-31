@@ -11733,6 +11733,11 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
 .help-count { font-size: 11px; font-weight: 600; color: var(--color-grey-text); }
 .help-count.warn { color: var(--color-red); }
 .help-textarea { line-height: 1.6; resize: vertical; min-height: 108px; }
+/* The rich-text editor stands in for the old textarea in "Tell us what
+   happened" — give it a comparable resting height. The .rte / .rte-* rules it
+   uses are theme-token based and already shipped in globals.css. */
+.help-rte { width: 100%; }
+.help-rte .rte-input { min-height: 120px; }
 
 /* Six categories as cards. All visible at once, one tap to choose, and no
    native select sheet swallowing the screen on a phone. */
@@ -11841,6 +11846,24 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
 }
 .support-sent-actions { display: flex; gap: 8px; justify-content: center; }
 
+/* Spam-folder advisory on the confirmation screen. Amber-tinted so it reads as
+   "act on this" without alarming — uses the shared badge-amber tokens so it
+   tracks the theme. */
+.support-sent-spam {
+  margin: 0 auto 18px;
+  max-width: 380px;
+  padding: 11px 13px;
+  text-align: left;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--color-black);
+  background: var(--color-amber-bg, var(--color-bg));
+  border: 1px solid var(--color-amber-text, var(--color-border));
+  border-radius: var(--radius-md);
+}
+.support-sent-spam strong { font-weight: 700; }
+.support-sent-spam-ref { font-weight: 700; letter-spacing: 0.03em; white-space: nowrap; }
+
 /* ---- ticket list ---- */
 
 .support-list { display: flex; flex-direction: column; }
@@ -11889,6 +11912,108 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
 .support-row-meta { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 .support-age { font-size: 12px; color: var(--color-grey-text); min-width: 52px; text-align: right; }
 .support-stat-meta { font-size: 11px; font-weight: 600; color: var(--color-red); margin-top: 6px; }
+
+/* ---- ticket list: table + filters ----
+   A sortable, filterable table on a real screen; the same rows fold down to
+   stacked cards under 720px (see the media query at the foot of this section).
+   Theme tokens only, so it follows the fork's palette in light and dark. */
+
+.support-table-wrap { display: flex; flex-direction: column; gap: 14px; }
+
+.support-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.support-filter-search { flex: 1 1 220px; min-width: 0; }
+.support-filter-status,
+.support-filter-sort { flex: 0 0 auto; width: auto; }
+.support-filter-count {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-grey-text);
+}
+
+.support-table-empty {
+  padding: 28px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-grey-text);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.support-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.support-table thead th {
+  padding: 0;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+.support-table th.support-th-end { text-align: right; }
+
+.support-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-grey-text);
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.support-th-end .support-sort { justify-content: flex-end; }
+.support-sort:hover { color: var(--color-black); }
+.support-sort.active { color: var(--color-green-primary); }
+.support-sort-caret { font-size: 9px; opacity: 0.7; }
+.support-sort.active .support-sort-caret { opacity: 1; }
+
+.support-tr {
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.support-tr:last-child { border-bottom: 0; }
+.support-tr:hover { background: var(--color-bg); }
+.support-tr:focus-visible {
+  outline: 2px solid var(--color-green-primary);
+  outline-offset: -2px;
+}
+.support-table td { padding: 12px 10px; vertical-align: middle; }
+.support-td-ref {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--color-grey-text);
+  white-space: nowrap;
+}
+.support-td-subject {
+  font-weight: 600;
+  color: var(--color-black);
+  max-width: 0;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.support-td-updated {
+  text-align: right;
+  color: var(--color-grey-text);
+  white-space: nowrap;
+  font-size: 12.5px;
+}
 
 /* ---- ticket detail ---- */
 
@@ -11943,7 +12068,14 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
   transform: translateX(-50%);
   background: var(--color-border);
 }
-.support-history-when { margin-left: auto; font-size: 11.5px; }
+.support-history-when { margin-left: auto; font-size: 11.5px; flex: 0 0 auto; align-self: flex-start; }
+/* A status entry can now carry a formatted body (an agent's note), so the row
+   aligns to the top and the body is free to wrap and run to multiple lines. */
+.support-history-row { align-items: flex-start; }
+.support-history-dot { margin-top: 6px; }
+.support-history-body { min-width: 0; flex: 1; color: var(--color-black); }
+.support-history-body .rich-text { font-size: 12.5px; line-height: 1.6; }
+.support-msg-empty { color: var(--color-grey-text); }
 
 /* Status is the only action on a ticket, so it gets the whole footer. Rendered
    as a track rather than a dropdown: the lifecycle, and where this ticket sits
@@ -12063,6 +12195,32 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
   .support-track { display: grid; grid-template-columns: 1fr 1fr; overflow-x: visible; }
   .help-actions, .support-detail-actions { justify-content: stretch; }
   .help-actions .btn, .support-detail-actions .btn { flex: 1 1 140px; justify-content: center; }
+
+  /* Table folds to cards: the header row is hidden (sorting stays available
+     through the filter controls, which remain), and each row becomes a
+     bordered block with its column labels supplied by data-label. */
+  .support-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .support-table, .support-table tbody, .support-tr, .support-table td { display: block; width: auto; }
+  .support-tr {
+    margin-bottom: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  .support-tr:last-child { border-bottom: 1px solid var(--color-border); }
+  .support-table td { padding: 3px 0; }
+  .support-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-grey-text);
+  }
+  .support-td-subject { max-width: none; white-space: normal; }
+  .support-td-updated, .support-table td { text-align: left; }
+  .support-filter-count { margin-left: 0; width: 100%; }
 }
 
 /* ---- module-only: modal + empty state, since this module does not import the
@@ -12477,6 +12635,8 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
 @media (prefers-reduced-motion: reduce) {
   .sup-pane { transition: none; }
 }
+
+
 
 /* ── Tabbar — page-neutral pill tab switch ──────────────────────────────── */
 .tabbar {

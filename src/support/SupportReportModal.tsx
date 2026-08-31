@@ -29,11 +29,13 @@ import {
   CATEGORY_ORDER,
   SLA_HOURS,
   SUBJECT_MAX,
+  htmlToText,
   validateTicketInput,
   type SupportCategory,
   type TicketDraft,
 } from './support-shared';
 import { raiseTicket } from './support-actions';
+import { RichTextEditor } from '@/components/RichTextEditor';
 
 export function SupportReportModal({
   onClose,
@@ -59,15 +61,10 @@ export function SupportReportModal({
   const [sentRef, setSentRef] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
 
-  // Escape closes, and the backdrop click closes — the two things people try
-  // without being told.
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  // This form holds work in progress — a half-written report — so it does NOT
+  // close on a backdrop click or on Escape. The ✕ in the corner is the one
+  // deliberate way out, so a stray click or keypress can't drop what someone
+  // has typed.
 
   const page = typeof window === 'undefined' ? '' : window.location.pathname;
 
@@ -91,16 +88,17 @@ export function SupportReportModal({
     onSent();
   }
 
-  const bodyLeft = BODY_MAX - body.length;
+  // Counted against the text the person typed, not the HTML the editor stores —
+  // a markup-length counter ticks down while someone is only adding bold.
+  const bodyLeft = BODY_MAX - htmlToText(body).length;
 
   return (
-    <div className="sup-backdrop" onClick={onClose} role="presentation">
+    <div className="sup-backdrop" role="presentation">
       <div
         className="sup-modal"
         role="dialog"
         aria-modal="true"
         aria-label="Report an issue"
-        onClick={(e) => e.stopPropagation()}
       >
         {sentRef ? (
           <div className="support-sent">
@@ -124,6 +122,14 @@ export function SupportReportModal({
               We reply within {SLA_HOURS} working hours. You will get an email, and this request
               is now listed below.
             </p>
+            <div className="support-sent-spam" role="note">
+              <strong>Not seeing our email?</strong> A confirmation for{' '}
+              <span className="support-sent-spam-ref">{sentRef}</span> has been sent to your
+              registered address. If it is not in your inbox within a few minutes, please check
+              your spam or junk folder and mark the message as “Not spam” so future updates
+              arrive normally. Every reply to this request is sent to that same email address, so
+              it is worth adding reStrucAI to your safe senders.
+            </div>
             <div className="support-sent-actions">
               <button type="button" className="btn" onClick={onClose}>
                 Done
@@ -179,9 +185,7 @@ export function SupportReportModal({
 
               <div className="help-field">
                 <div className="help-label-row">
-                  <label className="help-label" htmlFor="sup-body">
-                    Tell us what happened
-                  </label>
+                  <span className="help-label">Tell us what happened</span>
                   {/* Only near the ceiling — a counter on an empty box reads as
                       a word limit, which discourages the detail we want. */}
                   {bodyLeft < 500 ? (
@@ -190,14 +194,18 @@ export function SupportReportModal({
                     </span>
                   ) : null}
                 </div>
-                <textarea
-                  id="sup-body"
-                  className="textarea help-textarea"
-                  rows={5}
+                {/* Rich text, stored as sanitized HTML — so a reply that quotes
+                    the report, and the report itself, read with the same
+                    formatting. The toolbar tints (never fills) and uses theme
+                    tokens, so it stays legible in light and dark. */}
+                <RichTextEditor
                   value={body}
-                  maxLength={BODY_MAX}
+                  onChange={(html) =>
+                    setBody(html.length <= BODY_MAX ? html : body)
+                  }
+                  className="help-rte"
+                  ariaLabel="Tell us what happened"
                   placeholder="What you expected, and what happened instead."
-                  onChange={(e) => setBody(e.target.value)}
                 />
               </div>
 

@@ -76,10 +76,30 @@ export interface TicketDraft {
   body?: string;
 }
 
+// The report body is now authored with basic formatting and stored as HTML, so
+// a length check on the raw markup would count tags. This flattens it back to
+// the text a person actually typed — block tags become line breaks, entities
+// resolve — for the min-length and "is it blank" checks. The raw-length cap
+// still runs against the markup, since that is what actually gets stored.
+export function htmlToText(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/<(br|\/div|\/p|\/li|\/h[1-6])\b[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+}
+
 export function validateTicketInput(input: { subject: string; body: string }): string | null {
   if (input.subject.trim().length < 3) return 'Please add a short subject.';
   if (input.subject.length > SUBJECT_MAX) return `Subject must be under ${SUBJECT_MAX} characters.`;
-  if (input.body.trim().length < 10) return 'Please describe what happened in a little more detail.';
+  if (htmlToText(input.body).length < 10) {
+    return 'Please describe what happened in a little more detail.';
+  }
   if (input.body.length > BODY_MAX) return `Description must be under ${BODY_MAX} characters.`;
   return null;
 }
