@@ -141,25 +141,27 @@ function GoalCardMenu({ goal, ctx }: { goal: Goal; ctx: CardCtx }) {
               </div>
             </>
           ) : null}
-          {ctx.canAdmin ? (
-            <>
-              <div className="gb-menu-divider" />
-              <button
-                type="button"
-                className="gb-menu-item"
-                onClick={() => {
-                  ctx.onSaveTemplate(goal);
-                  setOpen(false);
-                }}
-              >
-                <Icon name="copy" size={14} />
-                <span>Save as template</span>
-              </button>
-            </>
-          ) : null}
         </div>
       ) : null}
     </div>
+  );
+}
+
+// "Save as template" — a standalone action (not in the quick-actions menu,
+// which is Board-only) so anyone who manages a task can add it to the shared
+// template library: the Board, a Manager in scope, or an Executive over a task
+// they created.
+function SaveTemplateButton({ goal, ctx }: { goal: Goal; ctx: CardCtx }) {
+  return (
+    <button
+      type="button"
+      className="icon-btn"
+      onClick={() => ctx.onSaveTemplate(goal)}
+      aria-label="Save task as template"
+      title="Save as template"
+    >
+      <Icon name="copy" size={14} />
+    </button>
   );
 }
 
@@ -533,6 +535,9 @@ export function GoalCard({
             >
               <Icon name="edit" size={14} />
             </button>
+          ) : null}
+          {ctx.canUseTemplates && canManageCard(goal, ctx) ? (
+            <SaveTemplateButton goal={goal} ctx={ctx} />
           ) : null}
           {ctx.isBoard ? (
             <>

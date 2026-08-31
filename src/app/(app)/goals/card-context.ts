@@ -58,10 +58,14 @@ export interface CardCtx {
   currentUserId: string;
   // isBoard here means "can manage goals" — true for the Board AND for a
   // Department Manager over their own department. canDelete / canAdmin stay
-  // Board-only (delete a goal; edit mission/vision, templates).
+  // Board-only (delete a goal; edit mission/vision, report templates).
   isBoard: boolean;
   canDelete: boolean;
   canAdmin: boolean;
+  // Task templates (the shared blueprint library) are open to every member:
+  // anyone may save a task as a template and spin a task up from one. Deleting
+  // a template is still limited to its creator or the Board (see actions.ts).
+  canUseTemplates: boolean;
   // The viewer is an Executive (migration 0064): they manage no one else's
   // tasks, but they fully manage the ones they created — see canManageCard.
   selfManage: boolean;

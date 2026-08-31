@@ -127,6 +127,7 @@ export function GoalsView({
   isBoard,
   canDelete,
   canAdmin,
+  canUseTemplates,
   selfManage,
   viewerRole,
   tenureMonths,
@@ -155,6 +156,7 @@ export function GoalsView({
   isBoard: boolean;
   canDelete: boolean;
   canAdmin: boolean;
+  canUseTemplates: boolean;
   selfManage: boolean;
   viewerRole: UserRole;
   tenureMonths: number | null;
@@ -643,6 +645,7 @@ export function GoalsView({
     isBoard,
     canDelete,
     canAdmin,
+    canUseTemplates,
     selfManage,
     members,
     onLeave,
@@ -761,17 +764,19 @@ export function GoalsView({
       {isBoard || selfManage ? (
         <div className="page-header-actions">
           {canAdmin ? (
-            <>
-              <Button variant="secondary" icon="edit" onClick={() => setMvOpen(true)}>
-                Mission &amp; vision
-              </Button>
-              <Button variant="secondary" icon="copy" onClick={() => setTplOpen(true)}>
-                Templates
-              </Button>
-              <Button variant="secondary" icon="edit" onClick={() => setRtOpen(true)}>
-                Report templates
-              </Button>
-            </>
+            <Button variant="secondary" icon="edit" onClick={() => setMvOpen(true)}>
+              Mission &amp; vision
+            </Button>
+          ) : null}
+          {/* The task-template library is open to every member — anyone can
+              build up the shared blueprints and spin a task up from one. */}
+          <Button variant="secondary" icon="copy" onClick={() => setTplOpen(true)}>
+            Templates
+          </Button>
+          {canAdmin ? (
+            <Button variant="secondary" icon="edit" onClick={() => setRtOpen(true)}>
+              Report templates
+            </Button>
           ) : null}
           {FEATURE_FLAGS.goalsCleanup && canDelete ? (
             <Button variant="secondary" icon="archive" onClick={() => setCleanupOpen(true)}>
@@ -1033,21 +1038,23 @@ export function GoalsView({
                 >
                   Use
                 </Button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label="Delete template"
-                  title="Delete template"
-                  onClick={async () => {
-                    try {
-                      await deleteGoalTemplate(t.id);
-                    } catch (e) {
-                      toast((e as Error).message || 'Could not delete the template.', 'error');
-                    }
-                  }}
-                >
-                  <Icon name="trash" size={14} />
-                </button>
+                {canAdmin || t.createdBy === currentUserId ? (
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label="Delete template"
+                    title="Delete template"
+                    onClick={async () => {
+                      try {
+                        await deleteGoalTemplate(t.id);
+                      } catch (e) {
+                        toast((e as Error).message || 'Could not delete the template.', 'error');
+                      }
+                    }}
+                  >
+                    <Icon name="trash" size={14} />
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>

@@ -1484,10 +1484,10 @@ export async function saveReportTemplate(department: string, body: string) {
   revalidatePath('/goals');
 }
 
-// ---- goal templates (board only — shared library) ----
+// ---- goal templates (any member — shared library) ----
 
-// Board saves a goal blueprint to the shared DB library. `checklist` is stored
-// as JSONB (an array of TemplateChecklistRow shapes).
+// Any authenticated member saves a goal blueprint to the shared DB library.
+// `checklist` is stored as JSONB (an array of TemplateChecklistRow shapes).
 export async function createGoalTemplate(input: {
   name: string;
   level: GoalLevel;
@@ -1502,7 +1502,7 @@ export async function createGoalTemplate(input: {
     reportRequired: boolean;
   }[];
 }) {
-  const { supabase, userId } = await requireBoard();
+  const { supabase, userId } = await requireUser();
   const { error } = await supabase.from('goal_templates').insert({
     name: input.name,
     level: input.level,
@@ -1516,9 +1516,23 @@ export async function createGoalTemplate(input: {
   revalidatePath('/goals');
 }
 
-// Board removes a goal blueprint from the shared library.
+// Removes a goal blueprint from the shared library. Allowed for the template's
+// creator or any Board Member; RLS ("goal templates: creator or board delete")
+// enforces the same rule server-side.
 export async function deleteGoalTemplate(id: string) {
-  const { supabase } = await requireBoard();
+  const { supabase, userId } = await requireUser();
+  const { data: tpl } = await supabase
+    .from('goal_templates')
+    .select('created_by')
+    .eq('id', id)
+    .single();
+  const isBoard =
+    (FOUNDER_USER_IDS as readonly string[]).includes(userId) ||
+    (await supabase.from('profiles').select('role').eq('id', userId).single()).data?.role ===
+      'board';
+  if (!isBoard && tpl?.created_by !== userId) {
+    throw new Error('You can only delete templates you created.');
+  }
   const { error } = await supabase.from('goal_templates').delete().eq('id', id);
   if (error) throw new Error(error.message);
   revalidatePath('/goals');

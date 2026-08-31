@@ -648,6 +648,31 @@ assigned tasks, but it is looser than the UI. Tightening it to
 exactly and affects only the 9 tasks that currently have no assignee — not done
 here because the request was specifically about Directors.
 
+## Task templates opened to every member (done — migration 0066)
+
+The shared task-template library (`goal_templates`, migration 0032) was
+Board-only to create, edit and delete. It is now open: **any member** can save
+a task as a template and spin a task up from one, so the whole team builds the
+shared blueprints. **Deleting** a template is still limited — to the member who
+created it, or any Board Member — so nobody can wipe another team's blueprints.
+
+- **UI.** The "Templates" button on the Goals page (`GoalsView`) no longer sits
+  behind `canAdmin`; "Mission & vision" and "Report templates" still do. "Save
+  as template" moved out of the Board-only quick-actions menu into a standalone
+  card action gated by `canManageCard` — the Board, a Manager in scope, or an
+  Executive over a task they created. New `canUseTemplates` prop on `CardCtx`
+  (always true today) carries the gate. The delete control in the Templates
+  modal shows only to the template's creator or the Board.
+- **Server.** `createGoalTemplate` / `deleteGoalTemplate` dropped `requireBoard`
+  for `requireUser`; delete re-checks creator-or-board before the DELETE.
+  `GoalTemplate` gained `createdBy`.
+- **RLS.** 0066 replaces the three `is_board()` write policies with
+  `created_by = auth.uid() or public.is_board()` for update/delete, and an
+  `authenticated` insert that pins `created_by` to the caller. Read policy
+  (everyone authenticated) is unchanged.
+- Rides the `executiveTasks` flag by consequence: a non-manager only reaches the
+  Goals page header actions when that flag is on.
+
 ## Phase 2 — Backlog (historical: what each flag hid in Phase 1)
 
 All of these are now unlocked — see "Phase 2 — status" above. Table kept for
