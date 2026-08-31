@@ -290,6 +290,10 @@
   outline-offset: -2px;
 }
 .support-table td { padding: 12px 10px; vertical-align: middle; }
+/* The status badge is a single token — never let the column squeeze it onto
+   two lines. The subject cell (max-width:0 + ellipsis) absorbs the slack. */
+.support-table td .badge { white-space: nowrap; }
+.support-td-status { white-space: nowrap; width: 1%; }
 .support-td-ref {
   font-size: 11.5px;
   font-weight: 700;

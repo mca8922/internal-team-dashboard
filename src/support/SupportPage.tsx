@@ -429,7 +429,7 @@ function TicketTable({
                 <td data-label="Subject" className="support-td-subject">
                   {t.subject}
                 </td>
-                <td data-label="Status">
+                <td data-label="Status" className="support-td-status">
                   <span className={`badge ${STATUS_TONE[t.status]}`}>
                     {STATUS_LABEL[t.status]}
                   </span>
