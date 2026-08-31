@@ -223,6 +223,8 @@
   gap: 10px;
 }
 .support-filter-search { flex: 1 1 220px; min-width: 0; }
+/* Use the shared .select class (custom chevron + its own right gutter), just
+   sized to content rather than full width. */
 .support-filter-status,
 .support-filter-sort { flex: 0 0 auto; width: auto; }
 .support-filter-count {

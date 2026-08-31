@@ -123,7 +123,7 @@ export function SupportPage({
           <h1 className="page-title">Support</h1>
           <div className="page-subtitle">
             {hasAssistant
-              ? `Ask the assistant, or raise it with the reStrucAI team — we reply within ${SLA_HOURS} working hours.`
+              ? `Ask the assistant, or raise it with the reStrucAI team. We reply within ${SLA_HOURS} working hours.`
               : `Raise anything with the reStrucAI team. We reply within ${SLA_HOURS} working hours.`}
           </div>
         </div>
@@ -342,7 +342,7 @@ function TicketTable({
           aria-label="Search tickets"
         />
         <select
-          className="input support-filter-status"
+          className="select support-filter-status"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           aria-label="Filter by status"
@@ -357,7 +357,7 @@ function TicketTable({
         {/* Column headers carry the sort on a real screen; this mirrors it for
             the card view, where the header row is hidden. */}
         <select
-          className="input support-filter-sort"
+          className="select support-filter-sort"
           value={`${sort.key}:${sort.dir}`}
           onChange={(e) => {
             const [key, dir] = e.target.value.split(':') as [SortKey, 'asc' | 'desc'];
