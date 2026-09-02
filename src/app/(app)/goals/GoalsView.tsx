@@ -234,6 +234,24 @@ export function GoalsView({
     for (const g of goals) if (g.parent_id) withChildren.add(g.parent_id);
     return withChildren;
   });
+  // The Unlinked list and the no-yearly flat list render one full GoalCard per
+  // goal. When the cascade is flat — every task hung straight off nothing —
+  // that is hundreds of cards, and mounting them all is the slow path. Grow the
+  // list in pages instead; a jump-to-task / deep-link raises the ceiling itself.
+  const LIST_PAGE = 20;
+  const [listLimit, setListLimit] = React.useState(LIST_PAGE);
+  const showMoreBtn = (total: number) =>
+    total > listLimit ? (
+      <button
+        type="button"
+        className="gb-foldbtn"
+        style={{ margin: '10px auto 0', display: 'flex' }}
+        onClick={() => setListLimit((n) => n + 40)}
+      >
+        <Icon name="chevron-down" size={13} /> Show more · {total - listLimit} more task
+        {total - listLimit === 1 ? '' : 's'}
+      </button>
+    ) : null;
   // Pin card tapped → open a readable popup of the full goal.
   const [peek, setPeek] = React.useState<Goal | null>(null);
 
@@ -495,6 +513,9 @@ export function GoalsView({
       const root = path[0];
       chooseView('cascade');
       clearFilters();
+      // The target may sit past the paged list ceiling (Unlinked / flat views) —
+      // lift it so the card is actually mounted for scrollTo to find.
+      setListLimit(Number.MAX_SAFE_INTEGER);
       if (root?.level === 'yearly') setSelId(root.id);
       setCollapsed((c) => {
         const n = new Set(c);
@@ -1358,11 +1379,14 @@ export function GoalsView({
             ) : null}
             {!isBoard ? <MemberSearchBar query={query} setQuery={setQuery} /> : null}
             {flatShown.length > 0 ? (
+              <>
               <div className="grid gap-3">
-                {flatShown.map((g) => (
+                {flatShown.slice(0, listLimit).map((g) => (
                   <GoalCard key={g.id} goal={g} ctx={ctx} />
                 ))}
               </div>
+              {showMoreBtn(flatShown.length)}
+              </>
             ) : (
               <EmptyState
                 icon="search"
@@ -1695,7 +1719,7 @@ export function GoalsView({
                 its child tier — otherwise a deep-link to a child of an unlinked
                 parent (e.g. a monthly under a yearless quarterly) has nothing to
                 scroll to. */}
-            {unlinked.map((g) => (
+            {unlinked.slice(0, listLimit).map((g) => (
               <GoalNode
                 key={g.id}
                 goal={g}
@@ -1706,6 +1730,7 @@ export function GoalsView({
               />
             ))}
           </div>
+          {showMoreBtn(unlinked.length)}
         </div>
       ) : null}
 

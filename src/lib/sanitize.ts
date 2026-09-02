@@ -38,8 +38,23 @@ function ensureHook() {
   });
 }
 
+// Sanitizing is pure — the same stored HTML always yields the same clean HTML —
+// but it is not cheap: on the server `isomorphic-dompurify` runs under jsdom.
+// The Tasks page renders the same goal/checklist descriptions across many cards
+// and re-renders, so without a cache every card pays the full cost every time.
+// A process-wide Map keyed by the raw string collapses that to once per value.
+// Values here are short descriptions from a small table, so the map stays tiny;
+// a soft cap keeps a pathological input set from growing it without bound.
+const CACHE = new Map<string, string>();
+const CACHE_MAX = 2000;
+
 export function sanitizeHtml(dirty: string): string {
   if (!dirty) return '';
+  const hit = CACHE.get(dirty);
+  if (hit !== undefined) return hit;
   ensureHook();
-  return DOMPurify.sanitize(dirty, CONFIG);
+  const clean = DOMPurify.sanitize(dirty, CONFIG);
+  if (CACHE.size >= CACHE_MAX) CACHE.clear();
+  CACHE.set(dirty, clean);
+  return clean;
 }
