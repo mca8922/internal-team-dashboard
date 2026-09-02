@@ -33,3 +33,5 @@ scripts/_seed*.tmp.ts
 scripts/_seed_manifest.json
 
 *.pdf
+*.docx
+*.html

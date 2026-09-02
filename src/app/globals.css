@@ -9428,6 +9428,78 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
 .gb-foldbtn:hover:not(:disabled) { border-color: var(--color-green-primary); color: var(--color-black); }
 .gb-foldbtn:disabled { opacity: 0.45; cursor: default; }
 
+/* ── "Load more" bar — closes the paged Unlinked / flat task lists ──
+   A full-width panel rather than a bare link: on a flat data set these lists
+   run to hundreds of tasks, so the control has to say how many are loaded,
+   how many remain, and offer both a next page and a "show everything". */
+.gb-loadmore {
+  margin-top: 16px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+.gb-loadmore-info { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.gb-loadmore-count { font-size: 13px; color: var(--color-grey-text); white-space: nowrap; }
+.gb-loadmore-count strong { color: var(--color-black); font-weight: 700; }
+.gb-loadmore-track {
+  flex: 1;
+  min-width: 120px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-green-light);
+  overflow: hidden;
+}
+.gb-loadmore-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-green-primary);
+  transition: width 0.3s ease;
+}
+.gb-loadmore-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gb-loadmore-btn {
+  flex: 1;
+  min-width: 200px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-green-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.gb-loadmore-btn:hover { background: var(--color-green-darker); }
+.gb-loadmore-btn:active { transform: translateY(1px); }
+.gb-loadmore-btn svg { transition: transform 0.15s ease; }
+.gb-loadmore-btn:hover svg { transform: translateY(2px); }
+.gb-loadmore-all {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-green-primary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.gb-loadmore-all:hover { border-color: var(--color-green-primary); background: var(--color-green-light); }
+@media (max-width: 640px) {
+  .gb-loadmore-btn { min-width: 0; width: 100%; }
+  .gb-loadmore-all { width: 100%; text-align: center; }
+}
+
 /* ── One-Shot canvas — whole tree, one screen, pan + zoom ── */
 .gb-canvas-viewport {
   position: relative;

@@ -239,19 +239,46 @@ export function GoalsView({
   // that is hundreds of cards, and mounting them all is the slow path. Grow the
   // list in pages instead; a jump-to-task / deep-link raises the ceiling itself.
   const LIST_PAGE = 20;
+  const LIST_STEP = 40;
   const [listLimit, setListLimit] = React.useState(LIST_PAGE);
-  const showMoreBtn = (total: number) =>
-    total > listLimit ? (
-      <button
-        type="button"
-        className="gb-foldbtn"
-        style={{ margin: '10px auto 0', display: 'flex' }}
-        onClick={() => setListLimit((n) => n + 40)}
-      >
-        <Icon name="chevron-down" size={13} /> Show more · {total - listLimit} more task
-        {total - listLimit === 1 ? '' : 's'}
-      </button>
-    ) : null;
+  const showMoreBtn = (total: number) => {
+    if (total <= listLimit) return null;
+    const shown = Math.min(listLimit, total);
+    const remaining = total - shown;
+    const nextChunk = Math.min(LIST_STEP, remaining);
+    const pct = Math.round((shown / total) * 100);
+    return (
+      <div className="gb-loadmore">
+        <div className="gb-loadmore-info">
+          <span className="gb-loadmore-count">
+            Showing <strong>{shown}</strong> of <strong>{total}</strong> tasks
+          </span>
+          <span className="gb-loadmore-track">
+            <span className="gb-loadmore-fill" style={{ width: `${pct}%` }} />
+          </span>
+        </div>
+        <div className="gb-loadmore-actions">
+          <button
+            type="button"
+            className="gb-loadmore-btn"
+            onClick={() => setListLimit((n) => n + LIST_STEP)}
+          >
+            <Icon name="chevron-down" size={16} />
+            Show {nextChunk} more
+          </button>
+          {remaining > nextChunk ? (
+            <button
+              type="button"
+              className="gb-loadmore-all"
+              onClick={() => setListLimit(Number.MAX_SAFE_INTEGER)}
+            >
+              Show all {total}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
   // Pin card tapped → open a readable popup of the full goal.
   const [peek, setPeek] = React.useState<Goal | null>(null);
 
