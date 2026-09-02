@@ -10,8 +10,19 @@ import { useConfirm } from '@/components/ConfirmDialog';
 import { submitPunchChangeRequest, withdrawPunchChangeRequest } from '@/lib/actions';
 import { DateTimePicker } from '@/components/DateTimePicker';
 import { fmtDateDMY, parseDate } from '@/lib/dates';
-import { MONTHLY_REQUEST_LIMIT, monthKey, countsTowardMonthlyLimit } from '@/lib/punch-requests';
-import type { LeaveType, PunchChangeRequest } from '@/lib/types';
+import {
+  MONTHLY_REQUEST_LIMIT,
+  monthKey,
+  countsTowardMonthlyLimit,
+  isForcedCorrection,
+} from '@/lib/punch-requests';
+import type { LeaveType, PunchChangeRequest, PunchChangeRequestType } from '@/lib/types';
+
+const PUNCH_TYPE_LABEL: Record<PunchChangeRequestType, string> = {
+  missed_punch: 'Missed punch',
+  day_status: 'Day status',
+  forgot_punch_out: 'Forgot punch-out',
+};
 
 const LEAVE_OPTIONS: { id: LeaveType; label: string }[] = [
   { id: 'casual', label: 'Casual leave' },
@@ -189,7 +200,10 @@ export function PunchRequestsCard({
 
   const thisMonth = monthKey(today);
   const usedThisMonth = myRequests.filter(
-    (r) => countsTowardMonthlyLimit(r.status) && monthKey(r.created_at) === thisMonth,
+    (r) =>
+      !isForcedCorrection(r.request_type) &&
+      countsTowardMonthlyLimit(r.status) &&
+      monthKey(r.created_at) === thisMonth,
   ).length;
 
   const withdraw = async (id: string) => {
@@ -270,7 +284,7 @@ export function PunchRequestsCard({
               {myRequests.map((r) => (
                 <tr key={r.id}>
                   <td>{fmtDateDMY(parseDate(r.work_date))}</td>
-                  <td>{r.request_type === 'missed_punch' ? 'Missed punch' : 'Day status'}</td>
+                  <td>{PUNCH_TYPE_LABEL[r.request_type] ?? 'Punch change'}</td>
                   <td>
                     <StatusPill status={r.status} />
                     {r.status === 'rejected' && r.review_note ? (

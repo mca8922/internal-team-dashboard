@@ -4,6 +4,7 @@ import {
   monthKey,
   isWithinRequestWindow,
   countsTowardMonthlyLimit,
+  isForcedCorrection,
 } from './punch-requests';
 
 describe('MONTHLY_REQUEST_LIMIT', () => {
@@ -50,5 +51,13 @@ describe('countsTowardMonthlyLimit', () => {
 
   it('excludes withdrawn', () => {
     expect(countsTowardMonthlyLimit('withdrawn')).toBe(false);
+  });
+});
+
+describe('isForcedCorrection', () => {
+  it('is true only for forgot_punch_out', () => {
+    expect(isForcedCorrection('forgot_punch_out')).toBe(true);
+    expect(isForcedCorrection('missed_punch')).toBe(false);
+    expect(isForcedCorrection('day_status')).toBe(false);
   });
 });

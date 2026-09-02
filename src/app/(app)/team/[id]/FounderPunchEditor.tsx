@@ -12,7 +12,7 @@ import { useToast } from '@/components/Toast';
 import { useConfirm } from '@/components/ConfirmDialog';
 import { updatePunch, deletePunch } from '@/lib/actions';
 import { DateTimePicker } from '@/components/DateTimePicker';
-import { durationMs, fmtTime, fmtFriendly, parseDate } from '@/lib/dates';
+import { durationMs, fmtTime, fmtFriendly, parseDate, punchTotalMs } from '@/lib/dates';
 
 interface PunchRow {
   id: string;
@@ -92,9 +92,10 @@ function Row({ p }: { p: PunchRow }) {
     }
   };
 
-  const dur = p.punch_out
-    ? new Date(p.punch_out).getTime() - new Date(p.punch_in).getTime()
-    : Date.now() - new Date(p.punch_in).getTime();
+  // Capped at 24h from punch-in for an open session, same as every other
+  // punch total in the app (MAX_SESSION_MS) — a forgotten punch-out should
+  // read "24h 0m" here, not "29h 31m".
+  const dur = punchTotalMs([{ punch_in: p.punch_in, punch_out: p.punch_out }]);
 
   if (editing) {
     return (

@@ -75,7 +75,7 @@ export interface ChangeRequest {
 // (add a punch for a day with none recorded) or a day-status change
 // (reclassify the day as leave). The Founder approves (which applies the
 // change to `punches` or `leaves`) or rejects it with a required note.
-export type PunchChangeRequestType = 'missed_punch' | 'day_status';
+export type PunchChangeRequestType = 'missed_punch' | 'day_status' | 'forgot_punch_out';
 export type PunchChangeRequestStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
 
 export interface PunchChangeRequest {
@@ -87,6 +87,9 @@ export interface PunchChangeRequest {
   requested_punch_out: string | null;
   requested_leave_type: LeaveType | null;
   requested_is_half_day: boolean | null;
+  // Set only for request_type 'forgot_punch_out' — the dangling punch row
+  // this request closed and that the Founder adjusts on review.
+  punch_id: string | null;
   reason: string;
   status: PunchChangeRequestStatus;
   reviewed_by: string | null;
@@ -763,6 +766,7 @@ export interface Database {
           requested_punch_out?: string | null;
           requested_leave_type?: LeaveType | null;
           requested_is_half_day?: boolean | null;
+          punch_id?: string | null;
           reason: string;
           status?: PunchChangeRequestStatus;
           reviewed_by?: string | null;

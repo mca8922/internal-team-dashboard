@@ -4,9 +4,17 @@
 // testable directly (see punch-requests.test.ts). Consumed by both the
 // server actions (src/lib/actions.ts) and the client-side request card
 // (src/app/(app)/punch/PunchRequestsCard.tsx).
-import type { PunchChangeRequestStatus } from './types';
+import type { PunchChangeRequestStatus, PunchChangeRequestType } from './types';
 
 export const MONTHLY_REQUEST_LIMIT = 5;
+
+// A 'forgot_punch_out' request is a forced correction: the member cannot punch
+// in again until they file it, so it must not be blocked by the monthly cap or
+// the current/previous-month window that the two discretionary request types
+// obey. It records the member's own account of when they left, not a dispute.
+export function isForcedCorrection(type: PunchChangeRequestType): boolean {
+  return type === 'forgot_punch_out';
+}
 
 // YYYY-MM of a YYYY-MM-DD calendar date string.
 export function monthKey(dateStr: string): string {

@@ -3,6 +3,7 @@
 // Dashboard punch-status card. Punch in/out happens inline — the member
 // stays on the dashboard.
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { Button, Progress } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { punchIn, punchOut } from '@/lib/actions';
@@ -26,6 +27,7 @@ export function PunchWidget({
   lastPunchOut: string | null;
 }) {
   const toast = useToast();
+  const router = useRouter();
   const [pending, startTransition] = React.useTransition();
   // Optimistic punch state — the button and status flip the instant they are
   // clicked, before the server round-trip. It re-syncs from props once the
@@ -66,7 +68,13 @@ export function PunchWidget({
     }
     setStatus('in');
     startTransition(async () => {
-      await punchIn();
+      const res = await punchIn();
+      if (res?.forgotPunchOut) {
+        setStatus(initialStatus); // revert the optimistic flip
+        toast('You left a session open on an earlier day — close it on the Punch page first.', 'warning');
+        router.push('/punch');
+        return;
+      }
       toast('Punched in');
     });
   };

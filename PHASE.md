@@ -691,6 +691,49 @@ created it, or any Board Member — so nobody can wipe another team's blueprints
 - Rides the `executiveTasks` flag by consequence: a non-manager only reaches the
   Goals page header actions when that flag is on.
 
+## Forgot-to-punch-out forced correction (done — migration 0067)
+
+A session left open on an earlier day used to just sit there: `activeOpenSession`
+stopped treating it as "on the clock" after `STALE_PUNCH_HOURS` (18h), the old
+`sweepMissedPunchOuts` nagged once, and `punchIn` let a fresh session start on
+top — so a forgetful member ended up with two open rows and only a Founder could
+close either (screenshot in the wild: one member with Sep 1 11:02 AM *and* Sep 2
+11:19 AM both "in progress").
+
+Now, while `FEATURE_FLAGS.punchRequests` is on, `punchIn()` **blocks** when the
+member's most-recent open session began before today and is past the stale
+window. It returns `{ forgotPunchOut: {...} }` instead of starting a session;
+the UI (`ForgotPunchOutModal` on the Punch page, a redirect from the dashboard
+`PunchWidget`) makes the member enter when they actually left. `submitForgotPunchOut`:
+
+- writes `punch_out` onto the dangling row = that time, **capped at 24h from
+  punch-in** (`MAX_SESSION_MS`), so the session is closed immediately and the
+  member can punch in again — the block clears the moment this lands, not on
+  Founder approval;
+- raises a `punch_change_request` of the new type **`forgot_punch_out`**, linked
+  to the punch row via the new `punch_id` column, so the Founder adjusts the
+  exact in/out on review (`approvePunchChangeRequest` *updates* that row rather
+  than inserting a new punch; reject leaves the provisional close in place for
+  the Founder to fix in `FounderPunchEditor`).
+
+`forgot_punch_out` is a **forced correction** (`isForcedCorrection` in
+`punch-requests.ts`): it ignores the 5/month cap and the current/previous-month
+window, since the member has no other way to clear the block. With
+`punchRequests` **off** there is no correction path, so `punchIn` falls through
+to the old behavior (stale session doesn't block; a new row is inserted).
+
+**No cron sweep / notification was added** — this is entirely punch-in-time,
+by deliberate choice. An offboarded member with an open session is never forced
+to resolve it (they don't punch in again); a Founder still closes those by hand.
+
+Also fixed here: `FounderPunchEditor` showed an **uncapped** live duration
+("29h 31m") for an open session — it now uses `punchTotalMs`, matching every
+other punch total in the app.
+
+**Operational**: migration `0067_forgot_punch_out.sql` must be applied
+(`supabase db push` / the deploy pipeline) — it widens the `request_type` check
+constraint and adds the nullable `punch_id` column.
+
 ## Phase 2 — Backlog (historical: what each flag hid in Phase 1)
 
 All of these are now unlocked — see "Phase 2 — status" above. Table kept for

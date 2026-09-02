@@ -3,9 +3,10 @@
 // Punch console - the big circular punch button, live clock, session table,
 // and 14-day heatmap. Ported from page-punch.jsx.
 import * as React from 'react';
-import { Progress, EmptyState } from '@/components/ui';
+import { Progress, EmptyState, Modal } from '@/components/ui';
 import { useToast } from '@/components/Toast';
 import { punchIn, punchOut } from '@/lib/actions';
+import { ForgotPunchOutModal, type ForgotPunchOutSession } from './ForgotPunchOutModal';
 import {
   fmtTimeFull,
   fmtTime,
@@ -45,6 +46,9 @@ export function PunchConsole({
   // then re-syncs from the server once the action's revalidation lands.
   const [status, setStatus] = React.useState<Status>(serverStatus);
   React.useEffect(() => setStatus(serverStatus), [serverStatus]);
+  // Set when punch-in is blocked by a session left open on an earlier day —
+  // the member has to close it (ForgotPunchOutModal) before starting a new one.
+  const [forgot, setForgot] = React.useState<ForgotPunchOutSession | null>(null);
 
   React.useEffect(() => {
     setNow(new Date());
@@ -69,7 +73,28 @@ export function PunchConsole({
     }
     setStatus('in');
     startTransition(async () => {
-      await punchIn();
+      const res = await punchIn();
+      if (res?.forgotPunchOut) {
+        setStatus(serverStatus); // revert the optimistic flip
+        setForgot(res.forgotPunchOut);
+        return;
+      }
+      toast('Punched in');
+    });
+  };
+
+  // Called after the old session is closed — retry the punch-in that was blocked.
+  const retryPunchIn = () => {
+    setForgot(null);
+    setStatus('in');
+    startTransition(async () => {
+      const res = await punchIn();
+      if (res?.forgotPunchOut) {
+        // Another still-open earlier session — resolve that one too.
+        setStatus(serverStatus);
+        setForgot(res.forgotPunchOut);
+        return;
+      }
       toast('Punched in');
     });
   };
@@ -249,6 +274,21 @@ export function PunchConsole({
           </div>
         </div>
       </div>
+
+      <Modal
+        open={!!forgot}
+        onClose={() => setForgot(null)}
+        title="Close your open session"
+      >
+        {forgot ? (
+          <ForgotPunchOutModal
+            session={forgot}
+            expectedHrs={expectedHrs}
+            onResolved={retryPunchIn}
+            onClose={() => setForgot(null)}
+          />
+        ) : null}
+      </Modal>
     </div>
   );
 }

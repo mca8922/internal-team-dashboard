@@ -45,7 +45,11 @@ const FIELD_LABEL: Record<ChangeRequestField, string> = {
 const PUNCH_LABEL: Record<PunchChangeRequestType, string> = {
   missed_punch: 'Missed punch',
   day_status: 'Day status',
+  forgot_punch_out: 'Forgot punch-out',
 };
+
+// The two types that carry a proposed punch-in / punch-out pair.
+const PUNCH_TIME_TYPES: PunchChangeRequestType[] = ['missed_punch', 'forgot_punch_out'];
 
 const LEAVE_LABEL: Record<string, string> = {
   casual: 'Casual leave',
@@ -144,11 +148,11 @@ function buildRows(
     reviewNote: r.review_note ?? '',
     changeLabel: PUNCH_LABEL[r.request_type] ?? 'Punch change',
     from:
-      r.request_type === 'missed_punch' && r.requested_punch_in
+      PUNCH_TIME_TYPES.includes(r.request_type) && r.requested_punch_in
         ? fmtTime(r.requested_punch_in)
         : null,
     to:
-      r.request_type === 'missed_punch'
+      PUNCH_TIME_TYPES.includes(r.request_type)
         ? r.requested_punch_out
           ? fmtTime(r.requested_punch_out)
           : 'in progress'

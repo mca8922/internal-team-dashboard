@@ -10,7 +10,7 @@ import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { fmtDate, fmtFriendly, fmtDateDMY, parseDate, istDayStartMs } from '@/lib/dates';
+import { fmtDate, fmtFriendly, fmtDateDMY, fmtTime, parseDate, istDayStartMs, MAX_SESSION_MS } from '@/lib/dates';
 import { milestoneForToday, milestonePings, type Milestone, type MilestoneKind } from '@/lib/milestones';
 import { STALE_PUNCH_HOURS, getCurrentProfile } from '@/lib/queries';
 import { FOUNDER_USER_IDS, belongsToDepartment } from '@/lib/roles';
@@ -26,6 +26,8 @@ import type {
   GoalViewConfig,
   LeaveType,
   NotificationType,
+  PunchChangeRequestStatus,
+  PunchChangeRequestType,
   UserRole,
 } from '@/lib/types';
 import {
@@ -33,7 +35,9 @@ import {
   monthKey,
   isWithinRequestWindow,
   countsTowardMonthlyLimit,
+  isForcedCorrection,
 } from '@/lib/punch-requests';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
 async function requireUser() {
   const supabase = await createClient();
@@ -516,24 +520,58 @@ export async function sweepBirthdays(): Promise<void> {
 
 // ---- punch ----
 
-// Punch in.
-export async function punchIn(): Promise<void> {
+// Punch in. Returns `{ forgotPunchOut }` instead of starting a session when the
+// member has a dangling session from an earlier day that they must close first
+// (see submitForgotPunchOut) — the UI opens the correction modal on this.
+export async function punchIn(): Promise<{
+  forgotPunchOut?: { punchId: string; workDate: string; punchInAt: string };
+}> {
   const { supabase, userId } = await requireUser();
   const today = fmtDate(new Date());
 
   // Already on the clock? Any open session counts — including one that began
   // late last night and is still running — so we don't create a duplicate.
-  // A stale (forgotten) open punch doesn't block a fresh punch-in.
   const activeCutoffMs = Date.now() - STALE_PUNCH_HOURS * 60 * 60 * 1000;
   const { data: open } = await supabase
     .from('punches')
-    .select('id, punch_in')
+    .select('id, punch_in, work_date')
     .eq('user_id', userId)
     .is('punch_out', null)
     .order('punch_in', { ascending: false })
     .limit(1);
   if (open && open.length && new Date(open[0].punch_in).getTime() >= activeCutoffMs) {
-    return; // already punched in
+    return {}; // already punched in
+  }
+  // A stale open punch from an earlier day is a forgotten punch-out. While the
+  // punch-requests feature is on, the member has to tell us when they actually
+  // left (which closes it) before they can start a new session — otherwise the
+  // dangling row just piles up a second open session. With the feature off
+  // there is no correction path, so fall through and let them punch in.
+  if (
+    FEATURE_FLAGS.punchRequests &&
+    open &&
+    open.length &&
+    open[0].work_date < today &&
+    new Date(open[0].punch_in).getTime() < activeCutoffMs
+  ) {
+    // Skip the block if they've already filed the correction and it's still
+    // pending — the session is closed by then, so this path won't be hit, but
+    // guard anyway against a race where two tabs both try to punch in.
+    const { count } = await supabase
+      .from('punch_change_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('punch_id', open[0].id)
+      .eq('status', 'pending');
+    if (!count) {
+      return {
+        forgotPunchOut: {
+          punchId: open[0].id,
+          workDate: open[0].work_date,
+          punchInAt: open[0].punch_in,
+        },
+      };
+    }
   }
   await supabase.from('punches').insert({
     user_id: userId,
@@ -559,6 +597,7 @@ export async function punchIn(): Promise<void> {
 
   revalidatePath('/punch');
   revalidatePath('/dashboard');
+  return {};
 }
 
 // Punch out.
@@ -3295,11 +3334,13 @@ export async function submitPunchChangeRequest(input: {
   const monthStartIso = new Date(istDayStartMs(`${monthKey(today)}-01`)).toISOString();
   const { data: monthRows } = await supabase
     .from('punch_change_requests')
-    .select('status')
+    .select('status, request_type')
     .eq('user_id', userId)
     .gte('created_at', monthStartIso);
-  const usedThisMonth = (monthRows ?? []).filter((r) =>
-    countsTowardMonthlyLimit(r.status as 'pending' | 'approved' | 'rejected' | 'withdrawn'),
+  const usedThisMonth = (monthRows ?? []).filter(
+    (r) =>
+      !isForcedCorrection(r.request_type as PunchChangeRequestType) &&
+      countsTowardMonthlyLimit(r.status as PunchChangeRequestStatus),
   ).length;
   if (usedThisMonth >= MONTHLY_REQUEST_LIMIT) {
     return { error: `You've used all ${MONTHLY_REQUEST_LIMIT} punch requests for this month.` };
@@ -3353,6 +3394,105 @@ export async function submitPunchChangeRequest(input: {
   return {};
 }
 
+// A member closes a session they forgot to punch out of on an earlier day.
+// This is a FORCED correction — punchIn() blocks a new session until it's
+// filed — so it ignores the monthly cap and the current/previous-month window
+// (see isForcedCorrection). It does two things atomically-ish:
+//   1. writes punch_out on the dangling row = the time they say they left
+//      (provisional — capped at 24h from punch-in so a wild value can't book a
+//      multi-day session even before the Founder looks),
+//   2. raises a 'forgot_punch_out' punch_change_request linked to that row, so
+//      the Founder can adjust the exact in/out on review.
+// The outcome of the request doesn't gate anything: the moment step 1 lands
+// the session is closed and the member can punch in again.
+export async function submitForgotPunchOut(input: {
+  punchId: string;
+  punchOut: string; // ISO
+  reason: string;
+}): Promise<{ error?: string }> {
+  const { supabase, userId } = await requireUser();
+
+  const reason = input.reason.trim();
+  if (!reason) return { error: 'Tell us briefly what happened.' };
+
+  const { data: punch } = await supabase
+    .from('punches')
+    .select('id, user_id, work_date, punch_in, punch_out')
+    .eq('id', input.punchId)
+    .maybeSingle();
+  if (!punch || punch.user_id !== userId) return { error: 'Session not found.' };
+  if (punch.punch_out) return { error: 'That session is already closed.' };
+
+  const inMs = new Date(punch.punch_in).getTime();
+  const outMs = new Date(input.punchOut).getTime();
+  if (!Number.isFinite(outMs) || outMs <= inMs) {
+    return { error: 'Punch-out must be after punch-in.' };
+  }
+  if (outMs > Date.now() + 60_000) {
+    return { error: "Punch-out can't be in the future." };
+  }
+  // Cap the provisional close at 24h from punch-in — matches MAX_SESSION_MS
+  // everywhere else, so an accidental wrong day can't credit 30h+.
+  const cappedOutIso = new Date(Math.min(outMs, inMs + MAX_SESSION_MS)).toISOString();
+
+  // Guard against a double-file (two tabs): if a pending forgot_punch_out
+  // already exists for this row, treat it as done.
+  const { count: existing } = await supabase
+    .from('punch_change_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('punch_id', punch.id)
+    .eq('status', 'pending');
+  if (existing) {
+    return { error: 'You already filed this correction — it is with the Founder.' };
+  }
+
+  const { error: closeErr } = await supabase
+    .from('punches')
+    .update({ punch_out: cappedOutIso })
+    .eq('id', punch.id)
+    .is('punch_out', null);
+  if (closeErr) return { error: closeErr.message };
+
+  const { error: reqErr } = await supabase.from('punch_change_requests').insert({
+    user_id: userId,
+    work_date: punch.work_date,
+    request_type: 'forgot_punch_out',
+    requested_punch_in: punch.punch_in,
+    requested_punch_out: cappedOutIso,
+    punch_id: punch.id,
+    reason,
+  });
+  if (reqErr) return { error: reqErr.message };
+
+  const admin = createAdminClient();
+  const { data: me } = await admin.from('profiles').select('name').eq('id', userId).single();
+  const title = `${me?.name ?? 'A teammate'} forgot to punch out`;
+  const body = `${fmtDateDMY(parseDate(punch.work_date))} - session closed at ${fmtTime(cappedOutIso)}, please review`;
+  const href = '/team/requests';
+  const founderReviewers = (FOUNDER_USER_IDS as readonly string[]).filter((id) => id !== userId);
+  if (founderReviewers.length) {
+    await admin.from('notifications').insert(
+      founderReviewers.map((id) => ({
+        user_id: id,
+        type: 'punch_change_requested' as const,
+        title,
+        body,
+        href,
+      })),
+    );
+    after(() => sendPush(founderReviewers, { title, body, url: href }, 'punch_change_requested'));
+    after(() =>
+      notifyByEmail(founderReviewers, { eventType: 'punch_change_requested', title, body, href }),
+    );
+  }
+
+  revalidatePath('/team/requests');
+  revalidatePath('/punch');
+  revalidatePath('/dashboard');
+  return {};
+}
+
 // A member withdraws their own still-pending request, freeing up their
 // monthly slot. No-op notification (nobody needs telling).
 export async function withdrawPunchChangeRequest(id: string): Promise<{ error?: string }> {
@@ -3393,7 +3533,22 @@ export async function approvePunchChangeRequest(id: string): Promise<{ error?: s
   if (req.user_id === userId) return { error: 'You cannot review your own punch request.' };
   if (req.status !== 'pending') return { error: 'This request was already reviewed.' };
 
-  if (req.request_type === 'missed_punch') {
+  if (req.request_type === 'forgot_punch_out') {
+    // The dangling session was already closed provisionally when the member
+    // filed this. Approving just writes the (possibly Founder-adjusted)
+    // in/out onto that same row — no new punch. If the row is gone (Founder
+    // deleted it), there's nothing to apply; the request still resolves.
+    if (req.punch_id) {
+      const { error } = await admin
+        .from('punches')
+        .update({
+          punch_in: (req.requested_punch_in as string) ?? undefined,
+          punch_out: req.requested_punch_out,
+        })
+        .eq('id', req.punch_id);
+      if (error) return { error: error.message };
+    }
+  } else if (req.request_type === 'missed_punch') {
     const { error } = await admin.from('punches').insert({
       user_id: req.user_id,
       work_date: req.work_date,
