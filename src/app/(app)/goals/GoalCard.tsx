@@ -771,10 +771,13 @@ function BoardChecklistPanel({
       (reportsByItem?.[item.id] ?? []).filter((r) => r.user_id === userId),
       item,
     );
-  // Track which assignee sections are expanded. Default: all expanded.
-  const [expanded, setExpanded] = React.useState<Set<string>>(
-    () => new Set(assigneeChips.map((a) => a.id)),
-  );
+  // Track which assignee sections are expanded. Default: all collapsed — each
+  // open section renders every one of that member's checklist items (with
+  // rich-text task descriptions, work-report bodies and a review control), and
+  // on a founder's cascade that is a large amount of DOM to build up front. The
+  // collapsed header still shows each member's done/due count and percentage,
+  // so the at-a-glance read is intact; click a name to see the detail.
+  const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set());
   // Preview mode: simulate what the assigned member sees (lock boxes on
   // custom-recurrence descriptions). Board/manager only — read-only overlay.
   const [previewMode, setPreviewMode] = React.useState(false);
@@ -999,20 +1002,20 @@ function BoardChecklistPanel({
 // A goal plus its descendant tier(s), with a collapse toggle.
 export function GoalNode({
   goal,
-  goals,
+  childrenByParent,
   ctx,
   collapsed,
   toggle,
 }: {
   goal: Goal;
-  goals: Goal[];
+  childrenByParent: Map<string, Goal[]>;
   ctx: CardCtx;
   collapsed: Set<string>;
   toggle: (id: string) => void;
 }) {
   const childLevel = LEVEL_META[goal.level].child;
   const children = childLevel
-    ? goals.filter((g) => g.level === childLevel && g.parent_id === goal.id)
+    ? (childrenByParent.get(goal.id) ?? []).filter((g) => g.level === childLevel)
     : [];
   const isOpen = !collapsed.has(goal.id);
   const childWord = childLevel ? LEVEL_WORD[childLevel] : '';
@@ -1042,7 +1045,7 @@ export function GoalNode({
             <GoalNode
               key={c.id}
               goal={c}
-              goals={goals}
+              childrenByParent={childrenByParent}
               ctx={ctx}
               collapsed={collapsed}
               toggle={toggle}

@@ -222,7 +222,18 @@ export function GoalsView({
   }, [goals]);
 
   const [selId, setSelId] = React.useState(yearly[0]?.id ?? '');
-  const [collapsed, setCollapsed] = React.useState<Set<string>>(new Set());
+  // Start with the whole cascade folded. A founder's tree can run to hundreds
+  // of nodes, and GoalNode mounts a branch's descendant cards only once it's
+  // open — so an all-expanded default was mounting every GoalCard (each with
+  // its progress math, rich-text bodies and per-member checklist panel) on the
+  // first paint, which is what made this page take minutes to load. Drilling in
+  // still works: toggle, Expand-all, jump-to-task and the ?goal= deep-link all
+  // open nodes on demand.
+  const [collapsed, setCollapsed] = React.useState<Set<string>>(() => {
+    const withChildren = new Set<string>();
+    for (const g of goals) if (g.parent_id) withChildren.add(g.parent_id);
+    return withChildren;
+  });
   // Pin card tapped → open a readable popup of the full goal.
   const [peek, setPeek] = React.useState<Goal | null>(null);
 
@@ -458,6 +469,20 @@ export function GoalsView({
     const withChildren = new Set<string>();
     for (const g of goals) if (g.parent_id) withChildren.add(g.parent_id);
     return [...withChildren];
+  }, [goals]);
+
+  // parent id -> its direct children, built once. GoalNode used to re-scan the
+  // full goals array on every render to find its children (O(n) per node); with
+  // this map each lookup is O(1).
+  const childrenByParent = React.useMemo(() => {
+    const m = new Map<string, Goal[]>();
+    for (const g of goals) {
+      if (!g.parent_id) continue;
+      const arr = m.get(g.parent_id);
+      if (arr) arr.push(g);
+      else m.set(g.parent_id, [g]);
+    }
+    return m;
   }, [goals]);
   const expandAll = () => setCollapsed(new Set());
   const collapseAll = () => setCollapsed(new Set(parentIds));
@@ -1636,7 +1661,7 @@ export function GoalsView({
                 <GoalNode
                   key={m.id}
                   goal={m}
-                  goals={goals}
+                  childrenByParent={childrenByParent}
                   ctx={ctx}
                   collapsed={collapsed}
                   toggle={toggle}
@@ -1674,7 +1699,7 @@ export function GoalsView({
               <GoalNode
                 key={g.id}
                 goal={g}
-                goals={goals}
+                childrenByParent={childrenByParent}
                 ctx={ctx}
                 collapsed={collapsed}
                 toggle={toggle}

@@ -49,6 +49,24 @@ tools from the page itself now that it's reachable.
 See "Phase 2 — Backlog" below for the per-flag detail table this replaces,
 kept for the historical "what each flag hides" reference.
 
+## Phase 3 — Tasks performance
+
+The Tasks (Goals) cascade was mounting every descendant `GoalCard` on the
+first paint. For a founder (399 live goals, ~970 checklist items) that meant
+a 4–5 minute load. Fixes, no data-model change:
+- The cascade now starts **fully collapsed** (`collapsed` state seeded with
+  every parent id in `GoalsView`). `GoalNode` already mounts a branch's
+  children only when it's open, so this caps first-paint card mounts to the
+  visible tier. Expand-all / jump-to-task / `?goal=` deep-link still work.
+- `BoardChecklistPanel` per-member sections **start collapsed** — the header
+  still shows each member's done/due count and %.
+- `GoalNode` looks up children via a prebuilt `childrenByParent` map instead
+  of re-scanning the full goals array per node.
+
+Still open (not done): DB-side `auth_rls_initplan` warnings + unindexed FKs
+on the goal tables (see Supabase performance advisor), column-narrowing the
+work-report/completion queries, and `next/image` for avatars.
+
 ## Phase 1 — Scope down to 6 core features (done)
 
 Removed the `graphify` knowledge-graph tooling entirely (it was config-only,
