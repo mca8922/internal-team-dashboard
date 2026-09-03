@@ -563,6 +563,12 @@ export function GoalForm({
             <div className="field-hint">{periodLabel(form.level, form.dueDate)}</div>
           ) : null}
         </Field>
+        {/* With a checklist, Completed and Not met are FACTS about that
+            checklist — 100% ticked, or past due and short of it — so they are
+            derived (deriveGoalStatus in goal-ui.ts) and cannot be set by hand.
+            The two options stay in the list, disabled, so a task that already
+            carries one still shows it. Not-Active stays manual either way:
+            pausing a task is a decision, not a measurement. */}
         <Field label="Status">
           <select
             className="select"
@@ -573,9 +579,19 @@ export function GoalForm({
           >
             <option value="inactive">Not-Active</option>
             <option value="active">Active</option>
-            <option value="achieved">Completed</option>
-            <option value="not_met">Not met</option>
+            <option value="achieved" disabled={hasChecklist}>
+              Completed{hasChecklist ? ' — set by the checklist' : ''}
+            </option>
+            <option value="not_met" disabled={hasChecklist}>
+              Not met{hasChecklist ? ' — set by the checklist' : ''}
+            </option>
           </select>
+          {hasChecklist ? (
+            <div className="field-hint">
+              Completed and Not met come from the checklist below: Completed once every
+              step is ticked by everyone assigned, Not met if the due date passes first.
+            </div>
+          ) : null}
         </Field>
       </div>
 

@@ -10,7 +10,7 @@ import { useToast } from './Toast';
 import { BottomSparkle, CardConfetti } from './ChecklistCelebration';
 import { toggleChecklistItem } from '@/lib/actions';
 import { isDueToday, isCompletionCurrent, recurrenceLabel } from '@/lib/recurrence';
-import { itemBelongsTo } from '@/lib/goal-progress';
+import { itemBelongsTo, deriveGoalStatus } from '@/lib/goal-progress';
 import { fmtDate } from '@/lib/dates';
 import type { Goal, GoalChecklistItem, GoalChecklistCompletion } from '@/lib/types';
 
@@ -58,6 +58,10 @@ export function MyTodayPanel({
     const today = fmtDate(new Date());
     const out: { goalId: string; goalTitle: string; item: GoalChecklistItem }[] = [];
     for (const g of goals) {
+      // Paused by the Board (Not-Active) — the task is on hold, so nothing it
+      // owes belongs in today's list. deriveGoalStatus is the same one rule the
+      // badges and filters read.
+      if (deriveGoalStatus(g) === 'inactive') continue;
       // Past its due date the goal is closed — its checklist no longer recurs,
       // so nothing from it belongs in today's list. (ISO date string compare.)
       if (g.due_date && g.due_date < today) continue;

@@ -15,13 +15,13 @@ import {
 } from '@/components/WorkReportReview';
 import { CardConfetti } from '@/components/ChecklistCelebration';
 import { RichText } from '@/components/RichTextEditor';
+import { isDueToday, isCarriedOverDone, currentReport } from '@/lib/recurrence';
 import {
-  isDueToday,
-  isCompletionCurrent,
-  isCarriedOverDone,
-  currentReport,
-} from '@/lib/recurrence';
-import { computeGoalProgress, itemBelongsTo } from '@/lib/goal-progress';
+  computeGoalProgress,
+  itemBelongsTo,
+  itemCounts,
+  completionCounts,
+} from '@/lib/goal-progress';
 import { fmtDate, fmtShort, fmtDateDMY, fmtTime } from '@/lib/dates';
 import {
   STATUS,
@@ -30,6 +30,7 @@ import {
   plainText,
   isOverdue,
   isPastDue,
+  deriveGoalStatus,
   dueUrgency,
   dueLine,
   goalDepts,
@@ -68,6 +69,12 @@ function GoalCardMenu({ goal, ctx }: { goal: Goal; ctx: CardCtx }) {
   }, [open]);
 
   const statuses: GoalStatus[] = ['active', 'inactive', 'achieved', 'not_met'];
+  // With a checklist, Completed / Not met are FACTS about that checklist, not a
+  // choice — the badge reads them off the ticks (deriveGoalStatus). They stay
+  // listed so an existing value is still legible, but they can't be picked.
+  const hasChecklist = (ctx.checklistsByGoal[goal.id] ?? []).length > 0;
+  const derivable = (s: GoalStatus) => hasChecklist && (s === 'achieved' || s === 'not_met');
+  const current = deriveGoalStatus(goal);
   const dirty =
     sel.length !== currentIds.length || sel.some((id) => !currentIds.includes(id));
 
@@ -91,13 +98,20 @@ function GoalCardMenu({ goal, ctx }: { goal: Goal; ctx: CardCtx }) {
               key={s}
               type="button"
               className="gb-menu-item"
+              disabled={derivable(s)}
+              title={
+                derivable(s)
+                  ? `${STATUS[s].label} is set by the checklist, not by hand`
+                  : undefined
+              }
               onClick={() => {
+                if (derivable(s)) return;
                 if (s !== goal.status) ctx.onSetStatus(goal, s);
                 setOpen(false);
               }}
             >
               <span className={`badge ${STATUS[s].cls}`}>{STATUS[s].label}</span>
-              {goal.status === s ? (
+              {current === s ? (
                 <Icon name="check" size={13} style={{ marginLeft: 'auto', color: 'var(--color-green-primary)' }} />
               ) : null}
             </button>
@@ -379,20 +393,7 @@ export function GoalCard({
   extra?: React.ReactNode;
 }) {
   const meta = LEVEL_META[goal.level];
-  const st = STATUS[goal.status] ?? STATUS.active;
-  // Card lifecycle state drives both the freeze and the card styling:
-  //   • completed  → status achieved (green, settled look)
-  //   • overdue    → past due & not achieved (red emphasis)
-  // Either way, past the due date the checklist is "closed" (frozen).
-  const completed = goal.status === 'achieved';
-  // Worked on but fell short — a settled outcome with its own muted styling
-  // (never the red "Overdue" emphasis, which isOverdue already suppresses).
-  const notMet = goal.status === 'not_met';
-  const overdue = isOverdue(goal);
   const closed = isPastDue(goal);
-  // Graduated deadline-proximity look: approaching (4-7d) → urgent (1-3d) →
-  // today (spotlight) → overdue (red, handled by gb-overdue above).
-  const urgency = dueUrgency(goal);
   // Stable references so the progress useMemo below only recomputes on real
   // data changes (a bare `?? []` would make a new array every render).
   const items = React.useMemo(
@@ -409,9 +410,11 @@ export function GoalCard({
   );
   const hasChecklist = items.length > 0;
 
-  // Combined progress (items × assignees) + a per-person breakdown. The math
-  // lives in one shared, tested helper that mirrors the DB progress trigger.
-  const { pct, perPerson, dueCount } = React.useMemo(() => {
+  // Combined progress + a per-person breakdown. The math lives in one shared,
+  // tested helper that mirrors the DB progress trigger. `pct` is the completion
+  // tally (the whole checklist), `perPerson`/`dueCount` are today's work — or,
+  // past the due date, the same frozen record as `pct`.
+  const { pct, completionPct, perPerson, dueCount } = React.useMemo(() => {
     const chipById = new Map(assigneeChips.map((c) => [c.id, c]));
     const base = computeGoalProgress({
       items,
@@ -428,8 +431,32 @@ export function GoalCard({
       total: p.total,
       onLeave: p.onLeave,
     }));
-    return { pct: base.pct, perPerson, dueCount: base.dueCount };
+    return {
+      pct: base.pct,
+      completionPct: base.completionPct,
+      perPerson,
+      dueCount: base.dueCount,
+    };
   }, [items, ctx.completionsByItem, ctx.onLeave, assigneeIds, assigneeChips, goal.progress, closed]);
+
+  // The badge is derived from that completion tally, never from the stored
+  // status (only "Not-Active" is still a manual state). Passing the LIVE pct
+  // means a tick re-badges the card without waiting for the trigger to write
+  // goals.progress back.
+  const derivedStatus = deriveGoalStatus(goal, completionPct);
+  const st = STATUS[derivedStatus] ?? STATUS.active;
+  // Card lifecycle state drives the card styling:
+  //   • completed  → 100% of the checklist done (green, settled look)
+  //   • overdue    → past due & not settled (red emphasis)
+  // Either way, past the due date the checklist is "closed" (frozen).
+  const completed = derivedStatus === 'achieved';
+  // Worked on but fell short — a settled outcome with its own muted styling
+  // (never the red "Overdue" emphasis, which isOverdue already suppresses).
+  const notMet = derivedStatus === 'not_met';
+  const overdue = isOverdue(goal, derivedStatus);
+  // Graduated deadline-proximity look: approaching (4-7d) → urgent (1-3d) →
+  // today (spotlight) → overdue (red, handled by gb-overdue above).
+  const urgency = dueUrgency(goal, derivedStatus);
 
   const amAssignee = assigneeIds.includes(ctx.currentUserId);
   // A participant ticks/reports on this goal: a named assignee, or — for a
@@ -590,12 +617,17 @@ export function GoalCard({
 
       {assigneeChips.length > 0 ? <AssigneeRow assignees={assigneeChips} /> : null}
 
-      {/* Per-person breakdown — each assignee's own progress today. */}
+      {/* Per-person breakdown — each assignee's own progress today, or the
+          frozen final record once the due date has passed. Rendering it when
+          closed is the point: the panel used to disappear on exactly the tasks
+          people go back to read. */}
       {hasChecklist && perPerson.length > 0 && dueCount > 0 ? (
         <div className="gb-perperson">
           <span className="gb-perperson-head">
             <Icon name="users" size={13} />
-            Per person · {dueCount} due today
+            {closed
+              ? `Per person · final tally of ${dueCount} step${dueCount === 1 ? '' : 's'}`
+              : `Per person · ${dueCount} due today`}
           </span>
           {perPerson.map((p) =>
             p.onLeave ? (
@@ -792,12 +824,15 @@ function BoardChecklistPanel({
 
   if (assigneeChips.length === 0 || items.length === 0) return null;
 
-  // Pre-compute: for each item, which user IDs have a current completion?
+  // Pre-compute: for each item, which user IDs count as done? Past the due date
+  // the checklist is FROZEN, so any completion ever recorded counts — the same
+  // rule computeGoalProgress uses, which is what keeps this header's tally and
+  // the rows underneath it (and the card's %) telling one story.
   const doneByItem = new Map<string, Set<string>>();
   for (const it of items) {
     const set = new Set(
       (completionsByItem[it.id] ?? [])
-        .filter((c) => isCompletionCurrent(it.recurrence, c.done_at))
+        .filter((c) => completionCounts(it, c.done_at, !!closed))
         .map((c) => c.user_id),
     );
     doneByItem.set(it.id, set);
@@ -808,8 +843,9 @@ function BoardChecklistPanel({
   // belongs in that teammate's section and nowhere else — which is also why the
   // counts below are per member rather than against one shared total.
   const itemsFor = (uid: string) => items.filter((it) => itemBelongsTo(it, uid));
-  const dueFor = (uid: string) =>
-    closed ? [] : itemsFor(uid).filter((it) => isDueToday(it));
+  // Counted for this member: today's due steps, or — once closed — every step
+  // they owed. Never the empty list that used to make every header read 0/0.
+  const dueFor = (uid: string) => itemsFor(uid).filter((it) => itemCounts(it, !!closed));
 
   return (
     <div className="board-checklist-panel">
@@ -877,7 +913,12 @@ function BoardChecklistPanel({
                       (completionsByItem[it.id] ?? []).find((c) => c.user_id === chip.id)?.done_at ??
                         null,
                     );
-                  const isDone = (done && (it.recurrence === 'once' ? true : due)) || carried;
+                  // Frozen: the completion IS the record, so it reads Done
+                  // whatever period it landed in. Live: only a current-period
+                  // tick on a due day (or one carried over from its last).
+                  const isDone = closed
+                    ? done
+                    : (done && (it.recurrence === 'once' ? true : due)) || carried;
                   const doneAt = (completionsByItem[it.id] ?? []).find(
                     (c) => c.user_id === chip.id,
                   )?.done_at;

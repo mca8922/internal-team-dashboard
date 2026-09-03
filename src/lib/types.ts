@@ -155,8 +155,21 @@ export interface Goal {
   // Every department the goal spans (multi-department goals). The primary is
   // element 0. Legacy rows backfilled to [department] by migration 0038.
   departments: string[];
+  // The status the Board *stored*. Only 'inactive' (paused by hand) is taken at
+  // face value — everything else is derived from the checklist by
+  // deriveGoalStatus() in goals/goal-ui.ts, which is what every badge, filter
+  // and count reads. A task with no checklist keeps its stored status.
   status: GoalStatus;
+  // Completion %, maintained by recompute_goal_progress() (migration 0068):
+  // the share of the whole checklist that its assignees have actually
+  // completed. On a task with no checklist (checklist_units = 0) it is the
+  // manual slider instead.
   progress: number;
+  // How many units of work the checklist is worth — (shared items × assignees)
+  // + personal items, or the shared item count on a task with no assignees.
+  // 0 means "nothing to measure", i.e. progress/status are manual. Written by
+  // the same trigger as progress (migration 0068).
+  checklist_units: number;
   sort_order: number;
   parent_id: string | null;
   created_by: string | null;

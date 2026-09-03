@@ -4241,16 +4241,20 @@ body { font-size: 15px; }
    so the two are edited together; every swatch reads the same custom
    properties as the real cards, so it can never describe a color the
    cascade no longer uses. */
+/* A labelled pill, sized and spaced to match "Jump to task" beside it — the
+   colour guide is worth opening, and a bare "?" at the far edge of the toolbar
+   never got clicked. */
 .tcg-trigger {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: var(--color-card);
   color: var(--color-grey-text);
+  font-size: 13px;
+  cursor: pointer;
   flex-shrink: 0;
   align-self: center;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease,
@@ -4266,12 +4270,8 @@ body { font-size: 15px; }
   outline: 2px solid var(--color-green-primary);
   outline-offset: 2px;
 }
-/* In the tasks toolbar the "?" takes over the auto margin that used to park
-   Views on the right, so the two sit together as a pair at that edge. Without
-   the override the row would hold two auto margins and split the free space
-   between them, stranding the "?" mid-row. */
-.gb-nav-controls .tcg-trigger { margin-left: auto; }
-.gb-nav-controls .tcg-trigger + .gb-views-wrap { margin-left: 0; }
+/* No auto margin here any more: the button sits with "Jump to task" on the
+   left, and Views keeps its own margin-left:auto to park alone at the right. */
 
 .tcg { display: grid; gap: 22px; }
 

@@ -69,10 +69,9 @@ export function TaskCardGuide() {
         type="button"
         className="tcg-trigger"
         onClick={() => setOpen(true)}
-        aria-label="What do the task card colours mean?"
-        title="What do the card colours mean?"
+        title="Every colour a task card can take, and what it is telling you"
       >
-        <Icon name="help-circle" size={15} />
+        <Icon name="help-circle" size={14} /> Colour Guide
       </button>
 
       <Modal

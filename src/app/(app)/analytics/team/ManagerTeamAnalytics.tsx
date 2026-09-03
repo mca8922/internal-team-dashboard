@@ -14,6 +14,7 @@ import { fmtDate, addDays, startOfWeek, fmtShort, isWeekend } from '@/lib/dates'
 import { Avatar, Donut, Progress } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { LineChart } from '@/components/charts';
+import { deriveGoalStatus } from '@/app/(app)/goals/goal-ui';
 
 export async function ManagerTeamAnalytics({
   managerId,
@@ -79,17 +80,24 @@ export async function ManagerTeamAnalytics({
   // Goals (this department).
   const todayStr = fmtDate(today);
   const gTotal = deptGoals.length;
+  // Status is DERIVED from the checklist (deriveGoalStatus), never read off
+  // the stored dropdown — otherwise these totals disagree with the badge on
+  // the task itself.
+  const gStatus = new Map(deptGoals.map((g) => [g.id, deriveGoalStatus(g)]));
   const gByStatus = { active: 0, inactive: 0, achieved: 0, not_met: 0 } as Record<string, number>;
-  for (const g of deptGoals) gByStatus[g.status] = (gByStatus[g.status] ?? 0) + 1;
+  for (const g of deptGoals) {
+    const s = gStatus.get(g.id)!;
+    gByStatus[s] = (gByStatus[s] ?? 0) + 1;
+  }
   const gOverdue = deptGoals.filter(
     (g) =>
-      g.status !== 'achieved' &&
-      g.status !== 'not_met' &&
+      gStatus.get(g.id) !== 'achieved' &&
+      gStatus.get(g.id) !== 'not_met' &&
       g.due_date &&
       g.due_date < todayStr,
   ).length;
   const gCompletionRate = gTotal ? Math.round((gByStatus.achieved / gTotal) * 100) : 0;
-  const gActive = deptGoals.filter((g) => g.status === 'active');
+  const gActive = deptGoals.filter((g) => gStatus.get(g.id) === 'active');
   const gAvgProgress = gActive.length
     ? Math.round(gActive.reduce((s, g) => s + (g.progress || 0), 0) / gActive.length)
     : 0;
@@ -134,7 +142,11 @@ export async function ManagerTeamAnalytics({
         <div className="card">
           <div className="card-subtitle">Open tasks</div>
           <div className="text-3xl fw-bold mt-1">
-            {deptGoals.filter((g) => g.status !== 'achieved' && g.status !== 'not_met').length}
+            {
+              deptGoals.filter(
+                (g) => gStatus.get(g.id) !== 'achieved' && gStatus.get(g.id) !== 'not_met',
+              ).length
+            }
           </div>
           <div className="text-xs text-grey mt-1">In {department}</div>
         </div>

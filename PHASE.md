@@ -734,6 +734,82 @@ other punch total in the app.
 (`supabase db push` / the deploy pipeline) — it widens the `request_type` check
 constraint and adds the nullable `punch_id` column.
 
+## Task status is derived, and a closed checklist is frozen (done — migration 0068)
+
+Three reports, one root cause: **two uncoordinated definitions of "done"** on the
+same card.
+
+- A past-due task showed every member `0/0 0%` in the Board panel while the rows
+  underneath read **Done**, and the card header still showed the stored `33% ·
+  combined of 3 team members`. `BoardChecklistPanel` and `GoalChecklist` treated
+  "closed" as *empty* (`closed ? [] : items.filter(isDueToday)`), while
+  `computeGoalProgress` treated it as *frozen at the stored number*.
+- A task with 3 of 4 steps ticked read **100% complete**. On a task with no
+  assignees the trigger took `greatest(count(*), 1)` as the person multiplier and
+  counted raw completion ROWS, so two people ticking one step counted twice.
+- `status` was a free-standing dropdown (`<option value="achieved">Completed`)
+  that nothing ever checked against the checklist.
+
+**Past due now means FROZEN, not emptied.** `src/lib/goal-progress.ts` owns two
+rules — `itemCounts()` and `completionCounts()` — and every surface asks them
+instead of re-deriving `isDueToday` / `isCompletionCurrent` for itself: the
+card's %, its per-person breakdown, `BoardChecklistPanel`'s member headers and
+rows, and `GoalChecklist`'s "Your checklist" header. Closed, they all report the
+same final record of what was actually completed; the per-person block now
+*renders* on a closed task (`Per person · final tally of N steps`) instead of
+vanishing.
+
+`computeGoalProgress` returns two numbers from one core:
+
+| | Counts | Used by |
+|---|---|---|
+| `completionPct` / `pct` | the WHOLE checklist, any completion ever recorded | card headline %, `goals.progress`, the derived status |
+| `perPerson` / `dueCount` | only what is due today, this period (frozen → same as above) | the per-person rows, "N due today" |
+
+**Status is derived.** `deriveGoalStatus(goal, completionPct?)` lives in
+`goal-progress.ts` and is re-exported from `goals/goal-ui.ts` (as is
+`isPastDue`, which moved beside it so there is one past-due test):
+
+- **Not-Active** — paused by the Board. The only manual state left, and it wins.
+- **Completed** — completion is 100%.
+- **Not met** — past due and short of 100%.
+- **Active** — open and unfinished.
+- A task with **no checklist** keeps its stored status and its manual progress
+  slider — unchanged, deliberately.
+
+Everything that showed or filtered a status now calls it: the cards, the All /
+Active / Not-Active / Completed / Not met chips and the health strip
+(`GoalsView`), `GoalsTable`, `BoardGoalsResults`, `GoalsCanvas`, `GoalsCleanup`,
+the dashboard's "this week's tasks", and both team-analytics pages. `isOverdue` /
+`dueWithin` / `dueUrgency` take the derived status too. **134 of 410 live tasks
+change badge** — 54 stored "Active" are actually finished, 55 stored "Active" are
+Not met, and 24 stored "Completed" (including *WELLKNOWN POLYSETERS LTD*, 33% at
+its due date) become Not met.
+
+Completed / Not met are therefore **no longer settable by hand on a task with a
+checklist**: disabled in the `GoalForm` status select (with a hint) and in the
+card's quick-actions menu. They stay listed so an existing value is still
+legible.
+
+**Migration 0068** rewrites `recompute_goal_progress` — per-item dedup,
+assignee-scoped counting when `goal_assignees` exist, any-teammate-but-deduped
+when there are none — and makes `goals.progress` the *completion* tally rather
+than a snapshot of today. New column **`goals.checklist_units`** carries the
+denominator; `0` is the signal that a task has no checklist, which is what lets
+the status be derived on the dashboard and in analytics without loading every
+checklist. Backfilled over all 410 rows (avg progress 71.3 → 71.8, 254 → 256 at
+100%). Two server queries that filtered on the stored status (the
+deadline-approaching nudge and the offboarding handoff list) gained
+`or(checklist_units.eq.0,progress.lt.100)` so a finished task drops out of both.
+
+**Known limits, deliberate:** the completion tally counts a recurring step as
+done once it has *ever* been completed, so a task made only of daily steps reads
+Completed after its first full day (968 of 998 checklist items in the database
+are one-time, so this is a corner). And a task with no assignees still counts a
+step done if **any** teammate ticked it — so a member who ticked 3 of 4 can see
+"100%" when a colleague did the fourth; that is the rule the client asked for,
+not a bug.
+
 ## Phase 2 — Backlog (historical: what each flag hid in Phase 1)
 
 All of these are now unlocked — see "Phase 2 — status" above. Table kept for

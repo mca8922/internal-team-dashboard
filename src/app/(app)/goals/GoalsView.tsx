@@ -51,6 +51,7 @@ import {
   dueWithin,
   dueLine,
   goalInDept,
+  deriveGoalStatus,
 } from './goal-ui';
 import { goalPath } from '@/lib/goal-buckets';
 import { SavedViewsMenu } from './SavedViewsMenu';
@@ -421,7 +422,9 @@ export function GoalsView({
     (g: Goal) => {
       const q = query.trim().toLowerCase();
       if (deptFilter !== 'all' && !goalInDept(g, deptFilter)) return false;
-      if (statusFilter !== 'all' && g.status !== statusFilter) return false;
+      // The chips filter on the DERIVED status, so All / Active / Not-Active /
+      // Completed / Not met always agree with the badge on the card.
+      if (statusFilter !== 'all' && deriveGoalStatus(g) !== statusFilter) return false;
       if (dueFilter === 'overdue' && !isOverdue(g)) return false;
       if (dueFilter === 'week' && !dueWithin(g, 6)) return false;
       if (assigneeFilter !== 'all' && !(assigneeIdsByGoal[g.id] ?? []).includes(assigneeFilter))
@@ -456,11 +459,11 @@ export function GoalsView({
   const healthCounts = React.useMemo(
     () => ({
       total: goals.length,
-      active: goals.filter((g) => g.status === 'active').length,
-      inactive: goals.filter((g) => g.status === 'inactive').length,
-      achieved: goals.filter((g) => g.status === 'achieved').length,
-      notMet: goals.filter((g) => g.status === 'not_met').length,
-      overdue: goals.filter(isOverdue).length,
+      active: goals.filter((g) => deriveGoalStatus(g) === 'active').length,
+      inactive: goals.filter((g) => deriveGoalStatus(g) === 'inactive').length,
+      achieved: goals.filter((g) => deriveGoalStatus(g) === 'achieved').length,
+      notMet: goals.filter((g) => deriveGoalStatus(g) === 'not_met').length,
+      overdue: goals.filter((g) => isOverdue(g)).length,
     }),
     [goals],
   );
@@ -939,10 +942,10 @@ export function GoalsView({
         <Icon name="search" size={14} /> Jump to task
         <kbd className="gb-kbd">Ctrl K</kbd>
       </button>
-      {/* Sits immediately left of Views, and is deliberately outside the
-          isBoard check below — a member reading the cascade is exactly who
-          needs to know why a card turned orange. With no Views button (a
-          member), its own auto margin parks it at the same right edge. */}
+      {/* Sits beside "Jump to task" rather than off at the right edge: it reads
+          as a labelled thing to open, not a "?" nobody clicks. Deliberately
+          outside the isBoard check below — a member reading the cascade is
+          exactly who needs to know why a card turned orange. */}
       <TaskCardGuide />
       {isBoard ? (
         <SavedViewsMenu
@@ -1179,8 +1182,11 @@ export function GoalsView({
       >
         {peek ? (
           <div className="gb-peek">
-            <span className={`badge ${STATUS[peek.status].cls}`} style={{ alignSelf: 'flex-start' }}>
-              {STATUS[peek.status].label}
+            <span
+              className={`badge ${STATUS[deriveGoalStatus(peek)].cls}`}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              {STATUS[deriveGoalStatus(peek)].label}
             </span>
             {peek.description ? (
               <div className="gb-peek-desc">
@@ -1445,7 +1451,7 @@ export function GoalsView({
   };
   const subtree = sel ? subtreeOf(sel) : [];
   const branches = sel ? halfYearly.filter((h) => h.parent_id === sel.id) : [];
-  const achievedUnder = subtree.filter((g) => g.status === 'achieved').length;
+  const achievedUnder = subtree.filter((g) => deriveGoalStatus(g) === 'achieved').length;
 
   return (
     <div>
@@ -1586,14 +1592,19 @@ export function GoalsView({
                 <button
                   key={y.id}
                   type="button"
-                  className={`gb-pin-card gb-pin-status-${y.status}${isSelected ? ' gb-pin-selected' : ''}`}
+                  className={`gb-pin-card gb-pin-status-${deriveGoalStatus(y)}${
+                    isSelected ? ' gb-pin-selected' : ''
+                  }`}
                   style={{ transform: isSelected ? 'rotate(0deg)' : `rotate(${rot}deg)` }}
                   onClick={() => setSelId(y.id)}
                 >
                   <div className="gb-pin-head" />
                   <div className="gb-pin-title">{y.title}</div>
-                  <span className={`badge ${STATUS[y.status].cls}`} style={{ alignSelf: 'flex-start' }}>
-                    {STATUS[y.status].label}
+                  <span
+                    className={`badge ${STATUS[deriveGoalStatus(y)].cls}`}
+                    style={{ alignSelf: 'flex-start' }}
+                  >
+                    {STATUS[deriveGoalStatus(y)].label}
                   </span>
                   {y.description ? (
                     <div className="gb-pin-desc">

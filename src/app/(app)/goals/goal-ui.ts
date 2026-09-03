@@ -3,6 +3,7 @@
 // friends reuse the exact same status labels, tier metadata and due-date logic
 // instead of duplicating (or risking an import cycle with GoalsView).
 import { fmtShort, parseDate, daysBetween } from '@/lib/dates';
+import { deriveGoalStatus } from '@/lib/goal-progress';
 import type { Goal, GoalLevel, GoalStatus } from '@/lib/types';
 
 export const STATUS: Record<GoalStatus, { label: string; cls: string }> = {
@@ -63,27 +64,28 @@ export const PARENT_LEVEL: Record<GoalLevel, GoalLevel | null> = {
 export const daysToDue = (g: Goal): number | null =>
   g.due_date ? daysBetween(new Date(), parseDate(g.due_date)) : null;
 
-// Overdue = past due and not yet settled. A goal marked "Completed" OR
-// "Not met" is a closed outcome, so it never nags as overdue.
-export const isOverdue = (g: Goal): boolean => {
-  const d = daysToDue(g);
-  return d !== null && d < 0 && g.status !== 'achieved' && g.status !== 'not_met';
-};
+// The status derivation and the past-due test live in @/lib/goal-progress
+// beside the completion tally they read — one rule, one place, and unit-testable
+// without this module. Re-exported here so every Goals view keeps importing its
+// display helpers from goal-ui.
+export { deriveGoalStatus, isGoalPastDue as isPastDue } from '@/lib/goal-progress';
 
-// Past its due date (whatever the status). The whole due day still counts as
-// open; from the next day on the goal's checklist is "closed" (frozen).
-export const isPastDue = (g: Goal): boolean => {
+// Overdue = past due and not yet settled. A goal that reads "Completed" OR
+// "Not met" is a closed outcome, so it never nags as overdue.
+export const isOverdue = (g: Goal, status: GoalStatus = deriveGoalStatus(g)): boolean => {
   const d = daysToDue(g);
-  return d !== null && d < 0;
+  return d !== null && d < 0 && status !== 'achieved' && status !== 'not_met';
 };
 
 // Due within the next `days` days (today counts as 0). Settled goals
 // (Completed / Not met) are excluded — they need no more attention.
-export const dueWithin = (g: Goal, days: number): boolean => {
+export const dueWithin = (
+  g: Goal,
+  days: number,
+  status: GoalStatus = deriveGoalStatus(g),
+): boolean => {
   const d = daysToDue(g);
-  return (
-    d !== null && d >= 0 && d <= days && g.status !== 'achieved' && g.status !== 'not_met'
-  );
+  return d !== null && d >= 0 && d <= days && status !== 'achieved' && status !== 'not_met';
 };
 
 // Graduated deadline-proximity state for card styling. Settled goals
@@ -92,8 +94,8 @@ export const dueWithin = (g: Goal, days: number): boolean => {
 // rather than blending into it.
 export type DueUrgency = 'normal' | 'approaching' | 'urgent' | 'today' | 'overdue';
 
-export const dueUrgency = (g: Goal): DueUrgency => {
-  if (g.status === 'achieved' || g.status === 'not_met') return 'normal';
+export const dueUrgency = (g: Goal, status: GoalStatus = deriveGoalStatus(g)): DueUrgency => {
+  if (status === 'achieved' || status === 'not_met') return 'normal';
   const d = daysToDue(g);
   if (d === null) return 'normal';
   if (d < 0) return 'overdue';

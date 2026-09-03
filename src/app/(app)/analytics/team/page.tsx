@@ -26,6 +26,7 @@ import { ManagerTeamAnalytics } from './ManagerTeamAnalytics';
 import { type RangeMode } from './TeamRangeControl';
 import { TeamAnalyticsShell } from './TeamAnalyticsShell';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
+import { deriveGoalStatus } from '@/app/(app)/goals/goal-ui';
 
 export const metadata = { title: 'Team analytics · Mahesh Chandra & Associates' };
 
@@ -235,17 +236,24 @@ export default async function TeamAnalyticsPage({
   // Goals are an evergreen snapshot (status/progress right now), not a
   // period roll-up — intentionally NOT affected by the range control above.
   const gTotal = goals.length;
+  // Status is DERIVED from the checklist (deriveGoalStatus), never read off
+  // the stored dropdown — otherwise these totals disagree with the badge on
+  // the task itself.
+  const gStatus = new Map(goals.map((g) => [g.id, deriveGoalStatus(g)]));
   const gByStatus = { active: 0, inactive: 0, achieved: 0, not_met: 0 } as Record<string, number>;
-  for (const g of goals) gByStatus[g.status] = (gByStatus[g.status] ?? 0) + 1;
+  for (const g of goals) {
+    const s = gStatus.get(g.id)!;
+    gByStatus[s] = (gByStatus[s] ?? 0) + 1;
+  }
   const gOverdue = goals.filter(
     (g) =>
-      g.status !== 'achieved' &&
-      g.status !== 'not_met' &&
+      gStatus.get(g.id) !== 'achieved' &&
+      gStatus.get(g.id) !== 'not_met' &&
       g.due_date &&
       g.due_date < todayStr,
   ).length;
   const gCompletionRate = gTotal ? Math.round((gByStatus.achieved / gTotal) * 100) : 0;
-  const gActive = goals.filter((g) => g.status === 'active');
+  const gActive = goals.filter((g) => gStatus.get(g.id) === 'active');
   const gAvgProgress = gActive.length
     ? Math.round(gActive.reduce((s, g) => s + (g.progress || 0), 0) / gActive.length)
     : 0;
@@ -267,8 +275,13 @@ export default async function TeamAnalyticsPage({
     const k = g.department || 'No department';
     const e = (gDept[k] ??= { total: 0, achieved: 0, overdue: 0, progressSum: 0 });
     e.total += 1;
-    if (g.status === 'achieved') e.achieved += 1;
-    if (g.status !== 'achieved' && g.status !== 'not_met' && g.due_date && g.due_date < todayStr)
+    if (gStatus.get(g.id) === 'achieved') e.achieved += 1;
+    if (
+      gStatus.get(g.id) !== 'achieved' &&
+      gStatus.get(g.id) !== 'not_met' &&
+      g.due_date &&
+      g.due_date < todayStr
+    )
       e.overdue += 1;
     e.progressSum += g.progress || 0;
   }
@@ -372,7 +385,11 @@ export default async function TeamAnalyticsPage({
         <div className="card">
           <div className="card-subtitle">Open tasks</div>
           <div className="text-3xl fw-bold mt-1">
-            {goals.filter((g) => g.status !== 'achieved' && g.status !== 'not_met').length}
+            {
+              goals.filter(
+                (g) => gStatus.get(g.id) !== 'achieved' && gStatus.get(g.id) !== 'not_met',
+              ).length
+            }
           </div>
           <div className="text-xs text-grey mt-1">Active &amp; not-active, all tiers</div>
         </div>

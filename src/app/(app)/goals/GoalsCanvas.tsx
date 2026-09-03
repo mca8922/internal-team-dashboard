@@ -16,7 +16,7 @@
 import * as React from 'react';
 import { Icon } from '@/components/Icon';
 import { EmptyState } from '@/components/ui';
-import { STATUS } from './goal-ui';
+import { STATUS, deriveGoalStatus } from './goal-ui';
 import type { Goal, GoalLevel, GoalStatus } from '@/lib/types';
 
 const NODE_W = 190;
@@ -327,7 +327,7 @@ export function GoalsCanvas({
               <path
                 key={to.goal.id}
                 d={edgePath(from, to)}
-                className={`gb-canvas-edge gb-canvas-edge-${to.goal.status}`}
+                className={`gb-canvas-edge gb-canvas-edge-${deriveGoalStatus(to.goal)}`}
               />
             ))}
           </svg>
@@ -339,7 +339,7 @@ export function GoalsCanvas({
                 key={n.goal.id}
                 role="button"
                 tabIndex={0}
-                className={`gb-canvas-node gb-canvas-node-${n.goal.status}${dim ? ' gb-canvas-node-dim' : ''}`}
+                className={`gb-canvas-node gb-canvas-node-${deriveGoalStatus(n.goal)}${dim ? ' gb-canvas-node-dim' : ''}`}
                 style={{ left: n.x, top: n.y, width: NODE_W, height: NODE_H }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => onOpen(n.goal)}
@@ -353,8 +353,10 @@ export function GoalsCanvas({
               >
                 <span className="gb-canvas-node-tier">{TIER_TAG[n.goal.level]}</span>
                 <span className="gb-canvas-node-title">{n.goal.title}</span>
-                <span className={`gb-canvas-node-badge badge ${STATUS[n.goal.status].cls}`}>
-                  {STATUS[n.goal.status].label}
+                <span
+                  className={`gb-canvas-node-badge badge ${STATUS[deriveGoalStatus(n.goal)].cls}`}
+                >
+                  {STATUS[deriveGoalStatus(n.goal)].label}
                 </span>
                 {hidden > 0 ? (
                   <button

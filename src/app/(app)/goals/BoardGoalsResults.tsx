@@ -5,7 +5,7 @@
 // Extracted verbatim from GoalsView. No behaviour change.
 import { EmptyState } from '@/components/ui';
 import { Icon } from '@/components/Icon';
-import { STATUS } from './goal-ui';
+import { STATUS, deriveGoalStatus } from './goal-ui';
 import { GoalCard } from './GoalCard';
 import type { CardCtx } from './card-context';
 import type { Goal } from '@/lib/types';
@@ -43,10 +43,14 @@ export function BoardGoalsResults({
         </button>
       </div>
       {groups.map(([dept, gs]) => {
-        const active = gs.filter((g) => g.status === 'active').length;
-        const achieved = gs.filter((g) => g.status === 'achieved').length;
-        const inactive = gs.filter((g) => g.status === 'inactive').length;
-        const notMet = gs.filter((g) => g.status === 'not_met').length;
+        // Counted on the DERIVED status (deriveGoalStatus), the same one the
+        // cards below show — a stored "Completed" that the checklist doesn't
+        // back up must not inflate this tally.
+        const st = gs.map(deriveGoalStatus);
+        const active = st.filter((s) => s === 'active').length;
+        const achieved = st.filter((s) => s === 'achieved').length;
+        const inactive = st.filter((s) => s === 'inactive').length;
+        const notMet = st.filter((s) => s === 'not_met').length;
         return (
           <div key={dept} className="gb-dept-group">
             <div className="gb-dept-head">

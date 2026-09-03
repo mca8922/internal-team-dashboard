@@ -27,7 +27,7 @@ import {
   addPersonalChecklistItem,
   updatePersonalChecklistItem,
 } from '@/lib/actions';
-import { itemBelongsTo } from '@/lib/goal-progress';
+import { itemBelongsTo, itemCounts, completionCounts } from '@/lib/goal-progress';
 import { BottomSparkle, CardConfetti } from './ChecklistCelebration';
 import { isDueToday, isCompletionCurrent, isCarriedOverDone, currentReport, recurrenceLabel } from '@/lib/recurrence';
 import { fmtDateDMY, fmtTime } from '@/lib/dates';
@@ -301,8 +301,15 @@ export function GoalChecklist({
   const isChecked = (it: GoalChecklistItem) =>
     isDueToday(it) && isCompletionCurrent(it.recurrence, mine[it.id]);
 
-  const dueItems = closed ? [] : items.filter((it) => isDueToday(it));
-  const done = dueItems.filter(isChecked).length;
+  // Past the due date the checklist is FROZEN, not emptied: every step counts
+  // and any completion the member ever recorded still reads as done, so this
+  // header shows the same final tally the Board's per-member panel and the
+  // card's % do. (itemCounts / completionCounts are that shared rule; `mine`
+  // is this component's optimistic copy of the member's own completions.)
+  const countedItems = items.filter((it) => itemCounts(it, closed));
+  const done = countedItems.filter((it) =>
+    closed ? completionCounts(it, mine[it.id], true) : isChecked(it),
+  ).length;
 
   // Apply the tick/untick: optimistic update + the server round-trip.
   const commit = (it: GoalChecklistItem, next: boolean) => {
@@ -373,8 +380,8 @@ export function GoalChecklist({
         <Icon name={closed ? 'lock' : 'check'} size={13} />
         <span>
           {closed
-            ? 'Checklist closed. The due date has passed.'
-            : `Your checklist · ${done}/${dueItems.length} today`}
+            ? `Checklist closed · ${done}/${countedItems.length} completed`
+            : `Your checklist · ${done}/${countedItems.length} today`}
         </span>
       </div>
       {items.map((it) => {
@@ -385,7 +392,7 @@ export function GoalChecklist({
         // done on its most recent due day (display only — today's tally above is
         // unaffected).
         const checked = closed
-          ? !!mine[it.id]
+          ? completionCounts(it, mine[it.id], true)
           : due
             ? isChecked(it)
             : isCarriedOverDone(it, mine[it.id]);

@@ -33,7 +33,7 @@ import {
   startOfWeek,
 } from '@/lib/dates';
 import { targetHours, roleLabel, isFounder, isManager } from '@/lib/roles';
-import { LEVEL_META } from '@/app/(app)/goals/goal-ui';
+import { LEVEL_META, deriveGoalStatus } from '@/app/(app)/goals/goal-ui';
 import { Donut } from '@/components/ui';
 import { ManagerBadge } from '@/components/ManagerBadge';
 import { PunchWidget } from './PunchWidget';
@@ -199,8 +199,10 @@ export default async function DashboardPage() {
       !!g.due_date &&
       g.due_date >= weekStart &&
       g.due_date <= weekEnd &&
-      g.status !== 'achieved' &&
-      g.status !== 'not_met',
+      // Settled is a fact about the checklist, not the stored dropdown —
+      // deriveGoalStatus is the one rule the cards and filters use too.
+      deriveGoalStatus(g) !== 'achieved' &&
+      deriveGoalStatus(g) !== 'not_met',
   );
   // Most recent logs that actually have content, newest first.
   const recentLogs = [...myLogs]

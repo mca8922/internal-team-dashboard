@@ -19,6 +19,7 @@ import {
   plainText,
   goalDepts,
   goalInDept,
+  deriveGoalStatus,
 } from './goal-ui';
 import { dueBucket, BUCKET_META } from '@/lib/goal-buckets';
 import type { AssigneeChip } from './GoalsView';
@@ -52,7 +53,7 @@ function groupKey(g: Goal, grouping: GoalGrouping): string {
     case 'department':
       return g.department?.trim() || 'Unassigned';
     case 'status':
-      return g.status;
+      return deriveGoalStatus(g);
     case 'level':
       return g.level;
     default:
@@ -87,7 +88,9 @@ function cmp(a: Goal, b: Goal, key: GoalSortKey): number {
     case 'title':
       return a.title.localeCompare(b.title);
     case 'status':
-      return STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+      return (
+        STATUS_ORDER.indexOf(deriveGoalStatus(a)) - STATUS_ORDER.indexOf(deriveGoalStatus(b))
+      );
     case 'progress':
       return (a.progress ?? 0) - (b.progress ?? 0);
     case 'due': {
@@ -137,7 +140,7 @@ export function GoalsTable({
     const q = query.trim().toLowerCase();
     return goals.filter((g) => {
       if (dept !== 'all' && !goalInDept(g, dept)) return false;
-      if (status !== 'all' && g.status !== status) return false;
+      if (status !== 'all' && deriveGoalStatus(g) !== status) return false;
       if (due === 'overdue' && !isOverdue(g)) return false;
       if (due === 'week' && !dueWithin(g, 6)) return false;
       if (assignee !== 'all' && !(assigneesByGoal[g.id] ?? []).some((a) => a.id === assignee))
@@ -245,7 +248,9 @@ export function GoalsTable({
           ) : null}
         </span>
         <span className="gb-td gb-td-status">
-          <span className={`badge ${STATUS[g.status].cls}`}>{STATUS[g.status].label}</span>
+          <span className={`badge ${STATUS[deriveGoalStatus(g)].cls}`}>
+            {STATUS[deriveGoalStatus(g)].label}
+          </span>
           {over ? <span className="badge badge-red">Overdue</span> : null}
         </span>
         <span className="gb-td gb-td-team">

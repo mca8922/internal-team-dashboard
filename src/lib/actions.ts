@@ -319,6 +319,10 @@ export async function sweepGoalDeadlines(): Promise<void> {
     .select('id, title, due_date, department')
     .neq('status', 'achieved')
     .neq('status', 'not_met') // settled — no "deadline approaching" nudge
+    // ...and settled is a fact about the checklist now (deriveGoalStatus): a
+    // task whose steps are all ticked gets no nudge either, whatever its stored
+    // status says. checklist_units = 0 means there is no checklist to ask.
+    .or('checklist_units.eq.0,progress.lt.100')
     .in('due_date', [tomorrow, dayAfter]);
   if (!goals || goals.length === 0) return;
 
@@ -1650,7 +1654,9 @@ export async function loadMemberGoalsForHandoff(memberId: string): Promise<{
     .select('id, title, level, department, status')
     .in('id', goalIds)
     .neq('status', 'achieved')
-    .neq('status', 'not_met'); // settled outcomes drop out of the live handoff
+    .neq('status', 'not_met') // settled outcomes drop out of the live handoff
+    // A finished checklist is settled too, however the status was left.
+    .or('checklist_units.eq.0,progress.lt.100');
   const liveIds = (goals ?? []).map((g) => g.id);
 
   const { data: asg } = liveIds.length

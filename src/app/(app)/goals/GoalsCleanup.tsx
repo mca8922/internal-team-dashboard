@@ -16,7 +16,7 @@ import { useConfirm } from '@/components/ConfirmDialog';
 import { downloadCsv, downloadJson } from '@/lib/csv';
 import { fmtDate, fmtShort } from '@/lib/dates';
 import { archiveGoals, restoreGoals, deleteGoals } from '@/lib/actions';
-import { STATUS, LEVEL_META, plainText, goalDepts } from './goal-ui';
+import { STATUS, LEVEL_META, plainText, goalDepts, deriveGoalStatus } from './goal-ui';
 import type { AssigneeChip } from './GoalsView';
 import type { Goal, GoalChecklistItem } from '@/lib/types';
 
@@ -50,7 +50,7 @@ function csvColumns(
     { header: 'Level', value: (g: Goal) => LEVEL_META[g.level].label },
     { header: 'Title', value: (g: Goal) => g.title },
     { header: 'Departments', value: (g: Goal) => goalDepts(g).join(' · ') },
-    { header: 'Status', value: (g: Goal) => STATUS[g.status]?.label ?? g.status },
+    { header: 'Status', value: (g: Goal) => STATUS[deriveGoalStatus(g)]?.label ?? g.status },
     { header: 'Progress %', value: (g: Goal) => g.progress },
     { header: 'Due date', value: (g: Goal) => g.due_date ?? '' },
     { header: 'Created', value: (g: Goal) => g.created_at.slice(0, 10) },
@@ -77,8 +77,8 @@ function toJsonRecord(
     id: g.id,
     level: g.level,
     title: g.title,
-    status: g.status,
-    statusLabel: STATUS[g.status]?.label ?? g.status,
+    status: deriveGoalStatus(g),
+    statusLabel: STATUS[deriveGoalStatus(g)]?.label ?? g.status,
     progress: g.progress,
     departments: goalDepts(g),
     due_date: g.due_date,
@@ -112,8 +112,8 @@ function GoalRow({
       <input type="checkbox" checked={checked} onChange={onToggle} />
       <span style={{ minWidth: 0, flex: 1 }}>
         <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span className={`badge ${STATUS[goal.status]?.cls ?? ''}`}>
-            {STATUS[goal.status]?.label ?? goal.status}
+          <span className={`badge ${STATUS[deriveGoalStatus(goal)]?.cls ?? ''}`}>
+            {STATUS[deriveGoalStatus(goal)]?.label ?? goal.status}
           </span>
           <span className="text-grey" style={{ fontSize: 12 }}>
             {LEVEL_META[goal.level].label}

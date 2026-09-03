@@ -1,6 +1,6 @@
 // Single source of truth for a goal's *combined* checklist progress on the
 // client. This deliberately mirrors the database trigger
-// `recompute_goal_progress()` (supabase/migrations/0013) so the live card bar
+// `recompute_goal_progress()` (supabase/migrations/0068) so the live card bar
 // and the stored `goals.progress` agree — with ONE intentional difference:
 //
 //   • The DB value (`goals.progress`, shown on the pinboard, dashboard and
@@ -9,14 +9,29 @@
 //     additionally exclude members on approved leave today, so their untouched
 //     items neither count as pending nor drag the %.
 //
-// The formula (matching the DB): progress = round(doneUnits * 100 / totalUnits),
-// where a completion only counts while it sits in the item's current period (a
-// one-time item stays done forever; a daily item resets each day; weekly each
-// week; etc.) and totalUnits sums, over the active assignees, the items each
-// one actually owes:
+// TWO tallies come out of the same core, and every surface must use the one
+// that matches what it is showing:
 //
-//   totalUnits = (shared items due today) × (active assignees)
-//              + (personal items due today whose owner is an active assignee)
+//   • COMPLETION (`completionPct`, the card's headline % and the DB's
+//     `goals.progress`) counts EVERY checklist item and any completion the
+//     owed member has ever recorded. It is what "is this task done?" means, so
+//     it is also what the derived status reads (see deriveGoalStatus in
+//     goal-ui.ts). It never resets when a recurring item rolls into a new
+//     period, and it never empties when the due date passes.
+//   • TODAY (`perPerson` / `dueCount` while the goal is open) counts only the
+//     items due today and only completions inside the item's current period —
+//     the day's work, which is what the per-person rows are about.
+//
+// PAST DUE the checklist is FROZEN, not emptied: `closed` switches the today
+// tally over to the completion one, so the member header, the Board's
+// per-member panel and the card all report the same final record of what was
+// actually completed instead of 0/0.
+//
+// The formula: progress = round(doneUnits * 100 / totalUnits), where totalUnits
+// sums, over the active assignees, the items each one actually owes:
+//
+//   totalUnits = (counted shared items) × (active assignees)
+//              + (counted personal items whose owner is an active assignee)
 //
 // A PERSONAL item (owner_id set — migration 0064) is one a member added to
 // their own list. It belongs to that member alone, so it lengthens their row
@@ -26,7 +41,8 @@
 //
 // `now` is injectable so this is fully unit-testable (see goal-progress.test.ts).
 import { isDueToday, isCompletionCurrent } from './recurrence';
-import type { GoalChecklistItem, GoalChecklistCompletion } from './types';
+import { parseDate, daysBetween } from './dates';
+import type { Goal, GoalStatus, GoalChecklistItem, GoalChecklistCompletion } from './types';
 
 export interface PersonProgress {
   id: string;
@@ -36,9 +52,18 @@ export interface PersonProgress {
 }
 
 export interface GoalProgress {
+  // Headline %: the completion tally, or the manual slider on a task with no
+  // checklist.
   pct: number;
+  // The completion tally on its own — null when the task has no checklist to
+  // measure, which is the signal that its status stays manual.
+  completionPct: number | null;
+  // How many items the current tally covers: due today while the goal is open,
+  // the whole checklist once it is frozen.
   dueCount: number;
   perPerson: PersonProgress[];
+  // Is this the frozen (past-due) tally rather than today's?
+  frozen: boolean;
 }
 
 export interface GoalProgressInput {
@@ -53,9 +78,9 @@ export interface GoalProgressInput {
   onLeave?: ReadonlySet<string>;
   // Used only when the goal has no checklist (the manual progress slider).
   manualProgress?: number;
-  // Goal is past its due date: recurring items stop restarting, nothing is
-  // "due today", and progress freezes at its last value (the stored snapshot
-  // passed via manualProgress). See isPastDue in GoalsView.
+  // Goal is past its due date: the checklist is frozen, so nothing new is due
+  // and every surface reports the final record of what was completed. See
+  // isPastDue in goal-ui.ts.
   closed?: boolean;
   now?: Date;
 }
@@ -72,42 +97,59 @@ export function itemBelongsTo(
   return !item.owner_id || item.owner_id === userId;
 }
 
-export function computeGoalProgress({
-  items,
-  completionsByItem,
-  assigneeIds,
-  perPersonIds,
-  onLeave,
-  manualProgress = 0,
-  closed = false,
-  now = new Date(),
-}: GoalProgressInput): GoalProgress {
-  // Past the due date the checklist is frozen: no new period starts, nothing is
-  // due, and the bar holds the goal's final stored progress instead of resetting
-  // to 0 (which a recompute against the now-empty current period would give).
-  if (closed) {
-    const ids = perPersonIds ?? assigneeIds;
-    return {
-      pct: clampPct(manualProgress || 0),
-      dueCount: 0,
-      perPerson: ids.map((id) => ({ id, onLeave: !!onLeave?.has(id), done: 0, total: 0 })),
-    };
-  }
-  if (items.length === 0) {
-    return { pct: clampPct(manualProgress || 0), dueCount: 0, perPerson: [] };
-  }
+// ── The two rules every checklist surface shares ───────────────────────────
+// Keeping these here (rather than re-deriving `isDueToday` / `isCompletionCurrent`
+// per panel) is what stops a header saying 0/0 while the rows beneath it read
+// "Done": the header and the rows ask the same two questions.
 
-  const dueItems = items.filter((it) => isDueToday(it, now));
+// Is this item part of the tally? Frozen (past due, or the completion tally):
+// the whole checklist counts. Live: only what is due today.
+export function itemCounts(
+  item: Pick<GoalChecklistItem, 'recurrence' | 'recur_days'>,
+  frozen: boolean,
+  now: Date = new Date(),
+): boolean {
+  return frozen || isDueToday(item, now);
+}
 
-  // itemId -> set of users with a CURRENT (period-aware) completion.
+// Does this completion count towards the tally? Frozen: any completion ever
+// recorded is the final record. Live: only one stamped inside the item's
+// current period (a one-time item stays done forever; a daily item resets).
+export function completionCounts(
+  item: Pick<GoalChecklistItem, 'recurrence'>,
+  doneAt: string | null | undefined,
+  frozen: boolean,
+  now: Date = new Date(),
+): boolean {
+  if (!doneAt) return false;
+  return frozen || isCompletionCurrent(item.recurrence, doneAt, now);
+}
+
+interface Tally {
+  // null when there is nothing to measure (no counted units at all).
+  pct: number | null;
+  counted: number;
+  perPerson: PersonProgress[];
+}
+
+function runTally(
+  { items, completionsByItem, assigneeIds, perPersonIds, onLeave }: GoalProgressInput,
+  frozen: boolean,
+  now: Date,
+): Tally {
+  const counted = items.filter((it) => itemCounts(it, frozen, now));
+
+  // itemId -> set of users whose completion counts.
   const done = new Map<string, Set<string>>();
-  for (const it of items) {
-    const set = new Set(
-      (completionsByItem[it.id] ?? [])
-        .filter((c) => isCompletionCurrent(it.recurrence, c.done_at, now))
-        .map((c) => c.user_id),
+  for (const it of counted) {
+    done.set(
+      it.id,
+      new Set(
+        (completionsByItem[it.id] ?? [])
+          .filter((c) => completionCounts(it, c.done_at, frozen, now))
+          .map((c) => c.user_id),
+      ),
     );
-    done.set(it.id, set);
   }
 
   // Members on leave today don't owe work — drop them from the denominator.
@@ -121,27 +163,28 @@ export function computeGoalProgress({
     // Each assignee owes the shared items plus their OWN personal ones, so the
     // denominator is summed per person rather than multiplied across everyone.
     for (const uid of activeAssigneeIds) {
-      for (const it of dueItems) {
+      for (const it of counted) {
         if (!itemBelongsTo(it, uid)) continue;
         totalUnits++;
         if (done.get(it.id)!.has(uid)) doneUnits++;
       }
     }
   } else {
-    // No explicit assignees (a department goal): one shared completion per item.
-    // Personal items have no assignee to attribute them to here, so — exactly as
-    // recompute_goal_progress does — they sit this calculation out.
-    const shared = dueItems.filter((it) => !it.owner_id);
+    // No explicit assignees (a department goal): the item counts once, done if
+    // ANY teammate completed it — deduplicated per item, so two people ticking
+    // the same step is still one unit of work. Personal items have no assignee
+    // to attribute them to here, so — exactly as recompute_goal_progress does —
+    // they sit this calculation out.
+    const shared = counted.filter((it) => !it.owner_id);
     totalUnits = shared.length;
     for (const it of shared) if ((done.get(it.id)?.size ?? 0) > 0) doneUnits++;
   }
-  const pct = totalUnits > 0 ? Math.round((doneUnits * 100) / totalUnits) : 0;
 
   const ids = perPersonIds ?? assigneeIds;
   const perPerson: PersonProgress[] = ids.map((id) => {
     // Someone's row counts only the items on THEIR list — a teammate's personal
     // item is neither owed nor shown as outstanding here.
-    const owed = dueItems.filter((it) => itemBelongsTo(it, id));
+    const owed = counted.filter((it) => itemBelongsTo(it, id));
     return {
       id,
       onLeave: !!onLeave?.has(id),
@@ -150,5 +193,75 @@ export function computeGoalProgress({
     };
   });
 
-  return { pct, dueCount: dueItems.length, perPerson };
+  return {
+    pct: totalUnits > 0 ? Math.round((doneUnits * 100) / totalUnits) : null,
+    counted: counted.length,
+    perPerson,
+  };
+}
+
+export function computeGoalProgress(input: GoalProgressInput): GoalProgress {
+  const { items, manualProgress = 0, closed = false, now = new Date() } = input;
+  if (items.length === 0) {
+    return {
+      pct: clampPct(manualProgress || 0),
+      completionPct: null,
+      dueCount: 0,
+      perPerson: [],
+      frozen: closed,
+    };
+  }
+
+  // What the task is worth overall — the whole checklist, every completion
+  // ever recorded. Drives the headline % and the derived status.
+  const completion = runTally(input, true, now);
+  // What is owed right now. Past the due date that IS the completion tally:
+  // the checklist is frozen, not emptied.
+  const live = closed ? completion : runTally(input, false, now);
+
+  return {
+    pct: completion.pct === null ? clampPct(manualProgress || 0) : clampPct(completion.pct),
+    completionPct: completion.pct,
+    dueCount: live.counted,
+    perPerson: live.perPerson,
+    frozen: closed,
+  };
+}
+
+// ── The one status derivation ──────────────────────────────────────────────
+// Re-exported from goals/goal-ui.ts, which is where the rest of the Goals
+// display helpers live; it sits HERE because it reads the completion tally
+// above and belongs to the same rule.
+
+// Past its due date (whatever the status). The whole due day still counts as
+// open; from the next day on the goal's checklist is "closed" (frozen).
+export const isGoalPastDue = (g: Pick<Goal, 'due_date'>): boolean => {
+  if (!g.due_date) return false;
+  return daysBetween(new Date(), parseDate(g.due_date)) < 0;
+};
+
+// A task's status is a FACT about its checklist, not a dropdown someone
+// remembered to update:
+//
+//   Not-Active — paused by the Board. The only manual state left, so it wins.
+//   Completed  — every unit of the checklist is done (completion = 100%).
+//   Not met    — past the due date and still short of 100%.
+//   Active     — open and not yet complete.
+//
+// A task with NO checklist has nothing to measure, so it keeps the status the
+// Board set by hand alongside the manual progress slider — that is the
+// pre-existing behaviour and it is deliberately preserved.
+//
+// `completionPct` defaults to the stored `goals.progress`, which
+// recompute_goal_progress keeps as exactly this tally (migration 0068).
+// Surfaces holding live checklist data (GoalCard) pass computeGoalProgress()'s
+// `completionPct` instead, so a tick re-badges the card immediately.
+export function deriveGoalStatus(g: Goal, completionPct?: number | null): GoalStatus {
+  if (g.status === 'inactive') return 'inactive';
+  const pct =
+    completionPct === undefined ? ((g.checklist_units ?? 0) > 0 ? g.progress : null) : completionPct;
+  if (pct === null) return g.status; // no checklist → the Board's own call stands
+  if (pct >= 100) return 'achieved';
+  if (isGoalPastDue(g)) return 'not_met';
+  return 'active';
 }
