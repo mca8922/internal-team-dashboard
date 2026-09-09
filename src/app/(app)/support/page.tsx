@@ -6,32 +6,48 @@
 // The desk itself is src/support/, a module shared byte-identical across every
 // client fork. The Phase-1 gate below is deliberately OUTSIDE it: the module
 // knows nothing about this app's flags, which is what keeps it portable.
+import { after } from 'next/server';
 import { Icon } from '@/components/Icon';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
-import { AboutRestrucAI } from '@/support/AboutRestrucAI';
+import { AboutRestrucAI, type AboutRestrucAIEvent } from '@/support/AboutRestrucAI';
 import { SupportPage } from '@/support/SupportPage';
 import { listMyTickets } from '@/support/support-actions';
 import { AssistantPanel } from './AssistantPanel';
+import { logAboutEngagement, logSupportPageView } from './engagement';
 
 export const metadata = { title: 'Support · Mahesh Chandra & Associates' };
 
 export default async function Page() {
+  // Invisible engagement log — written after the response streams so it never
+  // adds latency to the page. Records both the locked and unlocked visit.
+  after(logSupportPageView);
+
   // Returns BEFORE listMyTickets(). While locked the desk must be inert: no
   // call to reStrucAI, no reporter email leaving this app, and no mirror rows
   // written. A gate that still talked to the API would be a flag in name only.
-  if (!FEATURE_FLAGS.support) return <SupportLocked />;
+  if (!FEATURE_FLAGS.support) return <SupportLocked onAboutEvent={logAboutEngagement} />;
 
   const tickets = await listMyTickets();
   // The assistant is passed IN rather than imported by the support module:
   // src/support/ stays portable and assistant-unaware, and this fork decides
   // both that it has one and which one. Deliberately below the Phase-1 lock
   // above — while the desk is locked, nothing here loads at all.
-  return <SupportPage tickets={tickets} assistant={<AssistantPanel />} />;
+  return (
+    <SupportPage
+      tickets={tickets}
+      assistant={<AssistantPanel />}
+      aboutOnEvent={logAboutEngagement}
+    />
+  );
 }
 
 // Matches the locked state used for notification history, so "not yet" reads
 // the same wherever someone meets it.
-function SupportLocked() {
+function SupportLocked({
+  onAboutEvent,
+}: {
+  onAboutEvent?: (event: AboutRestrucAIEvent) => void;
+}) {
   return (
     <div>
       <div className="page-header">
@@ -43,7 +59,7 @@ function SupportLocked() {
             how to reach them is exactly what someone wants when the thing they
             came for is not open yet. */}
         <div className="page-header-actions">
-          <AboutRestrucAI />
+          <AboutRestrucAI onEvent={onAboutEvent} />
         </div>
       </div>
 

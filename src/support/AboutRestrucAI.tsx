@@ -18,6 +18,14 @@
 // support.css.
 import * as React from 'react';
 
+// Optional analytics hook. The module itself stays storage-agnostic: a fork
+// that wants to know when this panel is used passes `onEvent` and does whatever
+// it likes with it (log a row, ping an endpoint, nothing). A fork that doesn't
+// passes nothing and the panel behaves exactly as before.
+export type AboutRestrucAIEvent =
+  | { kind: 'modal_open' }
+  | { kind: 'link_click'; link: 'website' | 'founder' | 'referral'; url: string };
+
 const WEBSITE_URL = 'https://www.restrucai.com';
 const WEBSITE_LABEL = 'www.restrucai.com';
 const FOUNDER_URL = 'https://www.linkedin.com/in/nishit-rathod/';
@@ -35,15 +43,26 @@ const REFERRAL_URL = 'https://www.restrucai.com/referral';
 // the client's dashboard made on their behalf.
 const REFERRAL_LABEL = 'Know a business we could help?';
 
-export function AboutRestrucAI() {
+export function AboutRestrucAI({
+  onEvent,
+}: {
+  onEvent?: (event: AboutRestrucAIEvent) => void;
+} = {}) {
   const [open, setOpen] = React.useState(false);
 
   return (
     <>
-      <button type="button" className="sup-about-trigger" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="sup-about-trigger"
+        onClick={() => {
+          onEvent?.({ kind: 'modal_open' });
+          setOpen(true);
+        }}
+      >
         About reStrucAI
       </button>
-      {open ? <AboutModal onClose={() => setOpen(false)} /> : null}
+      {open ? <AboutModal onClose={() => setOpen(false)} onEvent={onEvent} /> : null}
     </>
   );
 }
@@ -61,7 +80,13 @@ function RestrucMark() {
   );
 }
 
-function AboutModal({ onClose }: { onClose: () => void }) {
+function AboutModal({
+  onClose,
+  onEvent,
+}: {
+  onClose: () => void;
+  onEvent?: (event: AboutRestrucAIEvent) => void;
+}) {
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -101,6 +126,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             href={WEBSITE_URL}
             target="_blank"
             rel="noreferrer noopener"
+            onClick={() => onEvent?.({ kind: 'link_click', link: 'website', url: WEBSITE_URL })}
           >
             <span className="sup-about-link-icon" aria-hidden="true">
               <GlobeIcon />
@@ -119,6 +145,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             href={FOUNDER_URL}
             target="_blank"
             rel="noreferrer noopener"
+            onClick={() => onEvent?.({ kind: 'link_click', link: 'founder', url: FOUNDER_URL })}
           >
             <span className="sup-about-link-icon" aria-hidden="true">
               <LinkedInIcon />
@@ -140,6 +167,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             href={REFERRAL_URL}
             target="_blank"
             rel="noreferrer noopener"
+            onClick={() => onEvent?.({ kind: 'link_click', link: 'referral', url: REFERRAL_URL })}
           >
             <span className="sup-about-link-icon" aria-hidden="true">
               <GiftIcon />

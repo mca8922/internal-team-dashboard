@@ -798,6 +798,20 @@ export interface Database {
         Insert: { id?: string; app_id: string; user_id: string; clicked_at?: string };
         Update: Record<string, never>;
       };
+      support_engagement_events: {
+        Row: SupportEngagementEvent;
+        Insert: {
+          id?: number;
+          occurred_at?: string;
+          member_name: string;
+          member_email: string;
+          user_id: string;
+          action: SupportEngagementAction;
+          link?: SupportEngagementLink | null;
+          link_url?: string | null;
+        };
+        Update: Record<string, never>;
+      };
       goal_templates: {
         Row: GoalTemplateRow;
         Insert: {
@@ -828,6 +842,28 @@ export interface DepartmentAppClick {
   app_id: string;
   user_id: string;
   clicked_at: string;
+}
+
+export type SupportEngagementAction =
+  | 'Viewed Support page'
+  | 'Opened About reStrucAI'
+  | 'Clicked a link';
+export type SupportEngagementLink = 'Website' | 'Nishit Rathod – LinkedIn' | 'Referral';
+
+// One row per Support-surface interaction. Read manually from the Supabase
+// Table Editor — see migration 0069. `event_date` / `event_time_ist` are
+// IST-local, trigger-filled from `occurred_at`.
+export interface SupportEngagementEvent {
+  id: number;
+  occurred_at: string;
+  event_date: string | null;
+  event_time_ist: string | null;
+  member_name: string;
+  member_email: string;
+  user_id: string;
+  action: SupportEngagementAction;
+  link: SupportEngagementLink | null;
+  link_url: string | null;
 }
 
 // an array of TemplateChecklistRow (see lib/goal-templates.ts).

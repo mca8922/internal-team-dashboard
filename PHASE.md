@@ -453,6 +453,29 @@ so every fork gets them (`git pull` on the module folder):
 `support.css` was edited and **re-appended** to `globals.css` under its banner
 (lines were replaced in place, block boundaries unchanged).
 
+### Support engagement log (done — migration 0069)
+
+Requested by the operator: a plain, manually-readable record of who uses the
+Support surface. **No UI change** — invisible fire-and-forget handlers write
+one row per event to **`public.support_engagement_events`**, read straight from
+the Supabase Table Editor. Three actions, in words: `Viewed Support page`,
+`Opened About reStrucAI`, `Clicked a link` (Website / Nishit Rathod – LinkedIn
+/ Referral, with `link_url`). Each row snapshots `member_name` + `member_email`
+and links `user_id`; a `before insert` trigger fills `event_date` +
+`event_time_ist` (IST) alongside the full `occurred_at`. RLS: insert-your-own,
+read is `is_board()` only (Table Editor / service role always sees all).
+
+- **Fork wiring** lives in `src/app/(app)/support/engagement.ts` (Server
+  Actions `logSupportPageView` + `logAboutEngagement`) and `support/page.tsx`
+  (`after(logSupportPageView)` on load; the About handler passed to
+  `SupportPage` / `SupportLocked`).
+- **Two shared-module changes, to be carried upstream to `client-module/`:**
+  `AboutRestrucAI` gained an optional storage-agnostic `onEvent?` prop
+  (`AboutRestrucAIEvent` = `modal_open` | `link_click`), and `SupportPage`
+  forwards an optional `aboutOnEvent?` straight through to it. A fork that
+  passes nothing gets the panel exactly as before. A Server Action satisfies
+  the prop across the RSC boundary.
+
 ## Executive task powers (done — `executiveTasks`, migration 0064)
 
 Creating a task used to be Board/Manager work. It no longer is: an

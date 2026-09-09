@@ -21,7 +21,7 @@ import { useRouter } from 'next/navigation';
 import { STATUS_LABEL, STATUS_TONE, SLA_HOURS, timeAgo, type TicketDraft } from './support-shared';
 import { openMyTicket, resolveTicket } from './support-actions';
 import { SupportReportModal } from './SupportReportModal';
-import { AboutRestrucAI } from './AboutRestrucAI';
+import { AboutRestrucAI, type AboutRestrucAIEvent } from './AboutRestrucAI';
 import type { RemoteTicket, RemoteTicketDetail } from './support-api';
 import { RichText } from '@/components/RichTextEditor';
 
@@ -62,6 +62,7 @@ export function useSupportAssistant(): SupportAssistantApi {
 export function SupportPage({
   tickets,
   assistant,
+  aboutOnEvent,
 }: {
   tickets: RemoteTicket[];
   // Optional. A fork with no assistant passes nothing and gets the page exactly
@@ -69,6 +70,9 @@ export function SupportPage({
   // working. A plain node, so a Server Component route can pass it; the pane
   // reads its handoff API from useSupportAssistant() rather than a prop.
   assistant?: React.ReactNode;
+  // Optional analytics hook for the "About reStrucAI" panel — forwarded straight
+  // to <AboutRestrucAI>. A Server Action satisfies this across the RSC boundary.
+  aboutOnEvent?: (event: AboutRestrucAIEvent) => void;
 }) {
   const router = useRouter();
   const [reporting, setReporting] = React.useState(false);
@@ -130,7 +134,7 @@ export function SupportPage({
         <div className="page-header-actions">
           {/* Secondary to "Report an issue" on purpose: this page exists to get
               a request raised, and who we are is context, not the task. */}
-          <AboutRestrucAI />
+          <AboutRestrucAI onEvent={aboutOnEvent} />
           <button type="button" className="btn" onClick={() => setReporting(true)}>
             Report an issue
           </button>
