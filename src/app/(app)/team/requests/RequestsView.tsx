@@ -25,7 +25,8 @@ import {
   rejectPunchChangeRequest,
 } from '@/lib/actions';
 import { roleLabel } from '@/lib/roles';
-import { fmtDateDMY, fmtTime, parseDate } from '@/lib/dates';
+import { fmtDate, fmtDateDMY, fmtTime, parseDate } from '@/lib/dates';
+import { DatePicker } from '@/components/DatePicker';
 import type {
   ChangeRequest,
   ChangeRequestField,
@@ -437,6 +438,12 @@ export function RequestsView({
   const router = useRouter();
   const [scope, setScope] = React.useState<'pending' | 'all'>('pending');
   const [kind, setKind] = React.useState<Kind | 'all'>('all');
+  const [statusFilter, setStatusFilter] = React.useState<'all' | 'approved' | 'rejected' | 'withdrawn'>(
+    'all',
+  );
+  const [personQuery, setPersonQuery] = React.useState('');
+  const [dateFrom, setDateFrom] = React.useState('');
+  const [dateTo, setDateTo] = React.useState('');
 
   // Ages are computed against a clock held in state rather than Date.now() at
   // render: the server pass and the client hydration would otherwise disagree
@@ -460,9 +467,30 @@ export function RequestsView({
     account: rows.filter((r) => r.kind === 'account').length,
   };
 
-  const shown = rows
+  const scopedRows = rows
     .filter((r) => (scope === 'pending' ? r.status === 'pending' : true))
     .filter((r) => (kind === 'all' ? true : r.kind === kind));
+
+  const personNeedle = personQuery.trim().toLowerCase();
+  const shown = scopedRows
+    .filter((r) => (scope === 'all' && statusFilter !== 'all' ? r.status === statusFilter : true))
+    .filter((r) => (personNeedle ? r.personName.toLowerCase().includes(personNeedle) : true))
+    .filter((r) => (dateFrom ? fmtDate(new Date(r.createdAt)) >= dateFrom : true))
+    .filter((r) => (dateTo ? fmtDate(new Date(r.createdAt)) <= dateTo : true));
+
+  const hasActiveFilters =
+    (scope === 'all' && statusFilter !== 'all') ||
+    kind !== 'all' ||
+    !!personQuery ||
+    !!dateFrom ||
+    !!dateTo;
+  const clearFilters = () => {
+    setKind('all');
+    setStatusFilter('all');
+    setPersonQuery('');
+    setDateFrom('');
+    setDateTo('');
+  };
 
   const oldest = pending.length && now ? waitedFor(pending[0].createdAt, now) : null;
 
@@ -526,28 +554,66 @@ export function RequestsView({
         </div>
       ) : null}
 
-      {showKindFilter ? (
-        <div className="req-filters">
-          {(
-            [
-              { id: 'all' as const, label: 'All', n: counts.all },
-              { id: 'punch' as const, label: 'Punch corrections', n: counts.punch },
-              { id: 'account' as const, label: 'Account changes', n: counts.account },
-            ]
-          ).map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              className={`req-filter${kind === f.id ? ' on' : ''}`}
-              onClick={() => setKind(f.id)}
-              aria-pressed={kind === f.id}
-            >
-              {f.label}
-              <span className="req-filter-n">{f.n}</span>
-            </button>
-          ))}
+      <div className="filter-bar">
+        <input
+          className="input filter-bar-search"
+          value={personQuery}
+          onChange={(e) => setPersonQuery(e.target.value)}
+          placeholder="Search by member name"
+          aria-label="Search by member name"
+        />
+        {showKindFilter ? (
+          <select
+            className="select filter-bar-select"
+            value={kind}
+            onChange={(e) => setKind(e.target.value as Kind | 'all')}
+            aria-label="Filter by request type"
+          >
+            <option value="all">All types</option>
+            <option value="punch">Punch corrections</option>
+            <option value="account">Account changes</option>
+          </select>
+        ) : null}
+        {scope === 'all' ? (
+          <select
+            className="select filter-bar-select"
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value as 'all' | 'approved' | 'rejected' | 'withdrawn')
+            }
+            aria-label="Filter by status"
+          >
+            <option value="all">Any status</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="withdrawn">Withdrawn</option>
+          </select>
+        ) : null}
+        <div className="filter-bar-dates">
+          <DatePicker
+            value={dateFrom}
+            onChange={setDateFrom}
+            max={dateTo || undefined}
+            placeholder="From"
+            ariaLabel="From date"
+          />
+          <span className="filter-bar-sep" aria-hidden>
+            –
+          </span>
+          <DatePicker
+            value={dateTo}
+            onChange={setDateTo}
+            min={dateFrom || undefined}
+            placeholder="To"
+            ariaLabel="To date"
+          />
         </div>
-      ) : null}
+        {hasActiveFilters ? (
+          <button type="button" className="filter-bar-clear" onClick={clearFilters}>
+            Clear
+          </button>
+        ) : null}
+      </div>
 
       {shown.length === 0 ? (
         <div className="empty-state">

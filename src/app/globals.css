@@ -646,6 +646,11 @@ p { margin: 0; }
   /* Reserve the chevron's lane so a long option never runs underneath it. */
   padding-right: 34px;
 }
+/* The closed control follows our own CSS, but the open option list is drawn
+   by the OS/browser and ignores it entirely — without this it always popped
+   up in light mode (white panel, default blue highlight) no matter the
+   theme. `color-scheme` is the one lever that reaches that native popup. */
+[data-theme="dark"] .select { color-scheme: dark; }
 .input:focus, .select:focus, .textarea:focus {
   border-color: var(--color-green-primary);
   box-shadow: 0 0 0 3px rgba(31,92,62,0.15);
@@ -12839,6 +12844,58 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
   background: var(--color-green-light);
 }
 .req-filter-n { font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 700; opacity: 0.75; }
+
+/* Minimal single-row filter toolbar (Leaves, Requests): a search box, a
+   couple of compact selects, and a date range, all quiet by default so the
+   table underneath stays the visual focus. One row of pills reads as a
+   filter; three stacked rows read as clutter, which is why this is a single
+   bordered strip instead. */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+}
+.filter-bar-search { flex: 1 1 200px; min-width: 160px; }
+.filter-bar-select {
+  flex: 0 1 160px;
+  min-width: 130px;
+}
+.filter-bar-dates {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 260px;
+}
+.filter-bar-dates > div { flex: 1 1 0; min-width: 0; }
+.filter-bar-sep { color: var(--color-grey-text); font-size: 12px; flex: 0 0 auto; }
+.filter-bar-clear {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 6px 4px;
+  border: none;
+  background: none;
+  color: var(--color-grey-text);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: color 150ms ease, text-decoration-color 150ms ease;
+}
+.filter-bar-clear:hover { color: var(--color-black); text-decoration-color: currentColor; }
+@media (max-width: 640px) {
+  .filter-bar { padding: 12px; }
+  .filter-bar-search,
+  .filter-bar-select { flex-basis: 100%; }
+  .filter-bar-dates { flex-basis: 100%; }
+  .filter-bar-clear { margin-left: 0; }
+}
 
 .req-count {
   display: inline-flex;

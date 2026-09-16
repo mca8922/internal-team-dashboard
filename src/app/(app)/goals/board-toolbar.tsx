@@ -164,6 +164,8 @@ export function BoardGoalsToolbar({
   setStatus,
   due,
   setDue,
+  selfAssigned,
+  setSelfAssigned,
   assignee,
   setAssignee,
   departments,
@@ -179,6 +181,8 @@ export function BoardGoalsToolbar({
   setStatus: (s: 'all' | GoalStatus) => void;
   due: 'all' | 'overdue' | 'week';
   setDue: (s: 'all' | 'overdue' | 'week') => void;
+  selfAssigned: 'all' | 'self' | 'others';
+  setSelfAssigned: (s: 'all' | 'self' | 'others') => void;
   assignee: string;
   setAssignee: (s: string) => void;
   departments: string[];
@@ -236,6 +240,16 @@ export function BoardGoalsToolbar({
         <option value="all">Any due date</option>
         <option value="overdue">Overdue</option>
         <option value="week">Due this week</option>
+      </select>
+      <select
+        className="select gb-toolbar-due"
+        value={selfAssigned}
+        onChange={(e) => setSelfAssigned(e.target.value as 'all' | 'self' | 'others')}
+        aria-label="Filter by who assigned the task"
+      >
+        <option value="all">Self or team-assigned</option>
+        <option value="self">Self-assigned</option>
+        <option value="others">Assigned by others</option>
       </select>
       <AssigneeFilterPicker members={members} value={assignee} onChange={setAssignee} />
       <div className="gb-status-filter" role="group" aria-label="Filter by status">

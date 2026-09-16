@@ -31,7 +31,7 @@ import {
   deriveGoalStatus,
 } from './goal-ui';
 import { dueBucket, BUCKET_META } from '@/lib/goal-buckets';
-import type { AssigneeChip } from './GoalsView';
+import type { AssigneeChip, AssignerInfo } from './GoalsView';
 import type { Goal, GoalStatus, GoalGrouping, GoalSortKey } from '@/lib/types';
 
 // Rows shown per group before the "show more" bar, and how many each press
@@ -194,10 +194,12 @@ const TableRow = React.memo(function TableRow({
 export function GoalsTable({
   goals,
   assigneesByGoal,
+  assignerByGoal,
   query,
   dept,
   status,
   due,
+  selfAssigned,
   assignee,
   grouping,
   setGrouping,
@@ -209,10 +211,12 @@ export function GoalsTable({
 }: {
   goals: Goal[];
   assigneesByGoal: Record<string, AssigneeChip[]>;
+  assignerByGoal: Record<string, AssignerInfo>;
   query: string;
   dept: string;
   status: 'all' | GoalStatus;
   due: 'all' | 'overdue' | 'week';
+  selfAssigned: 'all' | 'self' | 'others';
   assignee: string;
   grouping: GoalGrouping;
   setGrouping: (g: GoalGrouping) => void;
@@ -283,12 +287,20 @@ export function GoalsTable({
       // "This week" excludes settled work, exactly as dueWithin does.
       if (due === 'week' && !(r.days >= 0 && r.days <= 6 && r.status !== 'achieved' && r.status !== 'not_met'))
         return false;
+      // Same "self" flag the card's violet badge reads — a task whose assigner
+      // couldn't be resolved matches neither side of the split.
+      if (selfAssigned === 'self' && !assignerByGoal[r.g.id]?.selfAssigned) return false;
+      if (
+        selfAssigned === 'others' &&
+        !(assignerByGoal[r.g.id] && !assignerByGoal[r.g.id].selfAssigned)
+      )
+        return false;
       if (assignee !== 'all' && !(assigneesByGoal[r.g.id] ?? []).some((a) => a.id === assignee))
         return false;
       if (q && !r.search.includes(q)) return false;
       return true;
     });
-  }, [rows, query, dept, status, due, assignee, assigneesByGoal]);
+  }, [rows, query, dept, status, due, selfAssigned, assignee, assigneesByGoal, assignerByGoal]);
 
   const dir = sort.dir === 'asc' ? 1 : -1;
   const sortRows = React.useCallback(
@@ -323,7 +335,7 @@ export function GoalsTable({
   // A new filter/sort/grouping means a new list — start it back at one page.
   React.useEffect(
     () => setLimits((l) => (Object.keys(l).length ? {} : l)),
-    [query, dept, status, due, assignee, grouping, sort.key, sort.dir],
+    [query, dept, status, due, selfAssigned, assignee, grouping, sort.key, sort.dir],
   );
 
   const toggleSort = (key: GoalSortKey) =>

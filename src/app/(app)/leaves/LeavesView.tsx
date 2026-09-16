@@ -436,7 +436,32 @@ export function LeavesView({
   React.useEffect(() => setLeaves(baseLeaves), [baseLeaves]);
 
   const pendingLeaves = leaves.filter((l) => l.status === 'pending');
-  const listForTable = leaves;
+
+  const [typeFilter, setTypeFilter] = React.useState<LeaveType | 'all'>('all');
+  const [statusFilter, setStatusFilter] = React.useState<'all' | 'pending' | 'approved' | 'rejected'>(
+    'all',
+  );
+  const [personQuery, setPersonQuery] = React.useState('');
+  const [dateFrom, setDateFrom] = React.useState('');
+  const [dateTo, setDateTo] = React.useState('');
+
+  const personNeedle = personQuery.trim().toLowerCase();
+  const listForTable = leaves
+    .filter((l) => (typeFilter === 'all' ? true : l.type === typeFilter))
+    .filter((l) => (statusFilter === 'all' ? true : l.status === statusFilter))
+    .filter((l) => (personNeedle ? l.userName.toLowerCase().includes(personNeedle) : true))
+    .filter((l) => (dateFrom ? l.end_date >= dateFrom : true))
+    .filter((l) => (dateTo ? l.start_date <= dateTo : true));
+
+  const hasActiveFilters =
+    typeFilter !== 'all' || statusFilter !== 'all' || !!personQuery || !!dateFrom || !!dateTo;
+  const clearFilters = () => {
+    setTypeFilter('all');
+    setStatusFilter('all');
+    setPersonQuery('');
+    setDateFrom('');
+    setDateTo('');
+  };
 
   // Deep-link from a leave notification: `/leaves?leave=<id>` scrolls to that
   // leave's row and gives it the premium highlight so the user sees exactly
@@ -726,6 +751,69 @@ export function LeavesView({
         </div>
       )}
 
+      {leaves.length > 0 ? (
+        <div className="filter-bar">
+          {isBoard ? (
+            <input
+              className="input filter-bar-search"
+              value={personQuery}
+              onChange={(e) => setPersonQuery(e.target.value)}
+              placeholder="Search by member name"
+              aria-label="Search by member name"
+            />
+          ) : null}
+          <select
+            className="select filter-bar-select"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as LeaveType | 'all')}
+            aria-label="Filter by leave type"
+          >
+            <option value="all">All types</option>
+            <option value="casual">Casual</option>
+            <option value="sick">Sick</option>
+            <option value="emergency">Emergency</option>
+            <option value="wfh">WFH</option>
+          </select>
+          <select
+            className="select filter-bar-select"
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value as 'all' | 'pending' | 'approved' | 'rejected')
+            }
+            aria-label="Filter by status"
+          >
+            <option value="all">Any status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <div className="filter-bar-dates">
+            <DatePicker
+              value={dateFrom}
+              onChange={setDateFrom}
+              max={dateTo || undefined}
+              placeholder="From"
+              ariaLabel="From date"
+            />
+            <span className="filter-bar-sep" aria-hidden>
+              –
+            </span>
+            <DatePicker
+              value={dateTo}
+              onChange={setDateTo}
+              min={dateFrom || undefined}
+              placeholder="To"
+              ariaLabel="To date"
+            />
+          </div>
+          {hasActiveFilters ? (
+            <button type="button" className="filter-bar-clear" onClick={clearFilters}>
+              Clear
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="card">
         <div className="card-header">
           <div className="card-subtitle">{isBoard ? 'All leaves' : 'Your leaves'}</div>
@@ -756,7 +844,10 @@ export function LeavesView({
           ) : null}
         </div>
         {listForTable.length === 0 ? (
-          <EmptyState icon="plane" title="No leave history yet" />
+          <EmptyState
+            icon="plane"
+            title={leaves.length === 0 ? 'No leave history yet' : 'No leaves match these filters'}
+          />
         ) : (
           <table className="data-table">
             <thead>

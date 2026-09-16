@@ -142,6 +142,7 @@ export function GoalsCanvas({
   dept,
   status,
   due,
+  selfAssigned,
   assignee,
   isMatch,
 }: {
@@ -151,6 +152,7 @@ export function GoalsCanvas({
   dept: string;
   status: 'all' | GoalStatus;
   due: 'all' | 'overdue' | 'week';
+  selfAssigned: 'all' | 'self' | 'others';
   assignee: string;
   isMatch: (g: Goal) => boolean;
 }) {
@@ -162,7 +164,12 @@ export function GoalsCanvas({
     [goals, expanded],
   );
   const filtersActive =
-    query.trim() !== '' || dept !== 'all' || status !== 'all' || due !== 'all' || assignee !== 'all';
+    query.trim() !== '' ||
+    dept !== 'all' ||
+    status !== 'all' ||
+    due !== 'all' ||
+    selfAssigned !== 'all' ||
+    assignee !== 'all';
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {

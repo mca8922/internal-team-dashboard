@@ -399,12 +399,16 @@ export function GoalsView({
   const [deptFilter, setDeptFilter] = React.useState<string>('all');
   const [statusFilter, setStatusFilter] = React.useState<'all' | GoalStatus>('all');
   const [dueFilter, setDueFilter] = React.useState<'all' | 'overdue' | 'week'>('all');
+  const [selfAssignedFilter, setSelfAssignedFilter] = React.useState<'all' | 'self' | 'others'>(
+    'all',
+  );
   const [assigneeFilter, setAssigneeFilter] = React.useState<string>('all');
   const filtersActive =
     query.trim() !== '' ||
     deptFilter !== 'all' ||
     statusFilter !== 'all' ||
     dueFilter !== 'all' ||
+    selfAssignedFilter !== 'all' ||
     assigneeFilter !== 'all';
   const filtering = isBoard && filtersActive;
   const clearFilters = () => {
@@ -412,6 +416,7 @@ export function GoalsView({
     setDeptFilter('all');
     setStatusFilter('all');
     setDueFilter('all');
+    setSelfAssignedFilter('all');
     setAssigneeFilter('all');
   };
 
@@ -427,6 +432,14 @@ export function GoalsView({
       if (statusFilter !== 'all' && deriveGoalStatus(g) !== statusFilter) return false;
       if (dueFilter === 'overdue' && !isOverdue(g)) return false;
       if (dueFilter === 'week' && !dueWithin(g, 6)) return false;
+      // "Self-assigned" / "Assigned by others" reads the same flag the card's
+      // violet badge uses — a task with no resolved assigner matches neither.
+      if (selfAssignedFilter === 'self' && !assignerByGoal[g.id]?.selfAssigned) return false;
+      if (
+        selfAssignedFilter === 'others' &&
+        !(assignerByGoal[g.id] && !assignerByGoal[g.id].selfAssigned)
+      )
+        return false;
       if (assigneeFilter !== 'all' && !(assigneeIdsByGoal[g.id] ?? []).includes(assigneeFilter))
         return false;
       if (q) {
@@ -435,7 +448,16 @@ export function GoalsView({
       }
       return true;
     },
-    [query, deptFilter, statusFilter, dueFilter, assigneeFilter, assigneeIdsByGoal],
+    [
+      query,
+      deptFilter,
+      statusFilter,
+      dueFilter,
+      selfAssignedFilter,
+      assigneeFilter,
+      assigneeIdsByGoal,
+      assignerByGoal,
+    ],
   );
 
   const results = React.useMemo(() => {
@@ -1350,6 +1372,8 @@ export function GoalsView({
             setStatus={setStatusFilter}
             due={dueFilter}
             setDue={setDueFilter}
+            selfAssigned={selfAssignedFilter}
+            setSelfAssigned={setSelfAssignedFilter}
             assignee={assigneeFilter}
             setAssignee={setAssigneeFilter}
             departments={departments}
@@ -1471,6 +1495,8 @@ export function GoalsView({
           setStatus={setStatusFilter}
           due={dueFilter}
           setDue={setDueFilter}
+          selfAssigned={selfAssignedFilter}
+          setSelfAssigned={setSelfAssignedFilter}
           assignee={assigneeFilter}
           setAssignee={setAssigneeFilter}
           departments={departments}
@@ -1492,6 +1518,7 @@ export function GoalsView({
             dept={deptFilter}
             status={statusFilter}
             due={dueFilter}
+            selfAssigned={selfAssignedFilter}
             assignee={assigneeFilter}
             isMatch={isMatch}
           />
@@ -1504,10 +1531,12 @@ export function GoalsView({
           <GoalsTable
             goals={goals}
             assigneesByGoal={assigneesByGoal}
+            assignerByGoal={assignerByGoal}
             query={query}
             dept={deptFilter}
             status={statusFilter}
             due={dueFilter}
+            selfAssigned={selfAssignedFilter}
             assignee={assigneeFilter}
             grouping={grouping}
             setGrouping={setGrouping}
