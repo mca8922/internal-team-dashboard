@@ -54,6 +54,38 @@ import { parseGoalTemplate, type GoalTemplate } from '@/lib/goal-templates';
 // cast as UTC midnight, shifting the boundary by IST's +5:30 offset.
 const GO_LIVE_INSTANT = new Date(istDayStartMs(GO_LIVE_DATE)).toISOString();
 
+// PostgREST caps every response at a fixed number of rows (1000 by default)
+// and does NOT report the truncation — it just hands back a short array. Any
+// org-wide query over a multi-week window eventually crosses that line, and
+// because the history queries sort oldest-first the rows that silently vanish
+// are the NEWEST ones. That is how the Team page came to show "Not yet" for
+// everybody on a day 20 people had punched in: the punch table passed 1000
+// rows since go-live, so today's punches fell off the end of the response.
+//
+// fetchAllRows pages through the whole result instead. `build` must return a
+// FRESH query builder each call (a Supabase builder can only be awaited once)
+// and that query MUST carry a total order — see the id tiebreaker on the punch
+// queries below — or rows can repeat or be skipped across page boundaries.
+const PAGE_SIZE = 1000;
+
+type RangeQuery<T> = {
+  range: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>;
+};
+
+async function fetchAllRows<T>(build: () => RangeQuery<T>): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await build().range(from, from + PAGE_SIZE - 1);
+    if (error || !data) break;
+    rows.push(...data);
+    // A short page is the last page. A result that is an exact multiple of
+    // PAGE_SIZE costs one extra empty round-trip, which is the correct
+    // trade for never truncating.
+    if (data.length < PAGE_SIZE) break;
+  }
+  return rows;
+}
+
 // Wrapped in React.cache so the layout and the page (and anything else in
 // the same request) share ONE auth+profile round-trip instead of repeating
 // it. This alone removes a duplicate getUser() call per dashboard render.
@@ -89,26 +121,33 @@ export const getProfile = cache(async (id: string): Promise<Profile | null> => {
 export const getPunches = cache(
   async (userId: string, fromDate?: string): Promise<Punch[]> => {
     const supabase = await createClient();
-    const q = supabase
-      .from('punches')
-      .select('*')
-      .eq('user_id', userId)
-      .order('punch_in')
-      .gte('work_date', clampToGoLive(fromDate));
-    const { data } = await q;
-    return data ?? [];
+    const from = clampToGoLive(fromDate);
+    return fetchAllRows<Punch>(() =>
+      supabase
+        .from('punches')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('work_date', from)
+        .order('punch_in')
+        .order('id'),
+    );
   },
 );
 
+// Every member's punches from `fromDate` on. Paged — the punch table outgrew
+// PostgREST's 1000-row response cap, and an unpaged read drops the most recent
+// days, which reads as "nobody has punched in today".
 export const getAllPunches = cache(async (fromDate?: string): Promise<Punch[]> => {
   const supabase = await createClient();
-  const q = supabase
-    .from('punches')
-    .select('*')
-    .order('punch_in')
-    .gte('work_date', clampToGoLive(fromDate));
-  const { data } = await q;
-  return data ?? [];
+  const from = clampToGoLive(fromDate);
+  return fetchAllRows<Punch>(() =>
+    supabase
+      .from('punches')
+      .select('*')
+      .gte('work_date', from)
+      .order('punch_in')
+      .order('id'),
+  );
 });
 
 export const getLogs = cache(async (userId: string): Promise<WorkLog[]> => {
