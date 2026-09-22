@@ -271,6 +271,25 @@ export async function sweepMissedPunchOuts(): Promise<void> {
   }
 }
 
+// Corrects `goals.status` on any task whose checklist is fully ticked
+// (progress = 100) but whose stored status is still 'active' — a label left
+// behind from before deriveGoalStatus() (goal-ui.ts) took over deciding
+// status from the checklist instead of a stored column. The live screens
+// never show this stale value (they always recompute from progress), but a
+// few places still read the raw column (exports, the manual-status dropdown
+// default), so this keeps it from drifting indefinitely. Deliberately does
+// NOT touch 'inactive' (a Board pause) or push anything the other direction —
+// this only catches the one specific drift, same as deriveGoalStatus would.
+export async function sweepStaleGoalStatuses(): Promise<void> {
+  const admin = createAdminClient();
+  await admin
+    .from('goals')
+    .update({ status: 'achieved' })
+    .eq('status', 'active')
+    .eq('progress', 100)
+    .gt('checklist_units', 0);
+}
+
 // How long a notification lives before the daily sweep removes it. Bell rows
 // are transient reminders, not records — anything older than this is stale, so
 // dropping it keeps the `notifications` table bounded instead of growing with
