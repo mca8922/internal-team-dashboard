@@ -234,32 +234,37 @@ export const getGoals = cache(async (): Promise<Goal[]> => {
   const supabase = await createClient();
   // Archived goals (see migration 0044) are excluded from every live view —
   // cascade, dashboard, team and analytics all read through getGoals().
-  const { data } = await supabase
-    .from('goals')
-    .select('*')
-    .is('archived_at', null)
-    .order('sort_order');
-  return data ?? [];
+  return fetchAllRows<Goal>(() =>
+    supabase
+      .from('goals')
+      .select('*')
+      .is('archived_at', null)
+      .order('sort_order')
+      .order('id'),
+  );
 });
 
 // Archived goals only, newest-archived first. Board-only in the UI (used by the
 // Goals cleanup "Archived" tab to restore or permanently delete).
 export const getArchivedGoals = cache(async (): Promise<Goal[]> => {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from('goals')
-    .select('*')
-    .not('archived_at', 'is', null)
-    .order('archived_at', { ascending: false });
-  return data ?? [];
+  return fetchAllRows<Goal>(() =>
+    supabase
+      .from('goals')
+      .select('*')
+      .not('archived_at', 'is', null)
+      .order('archived_at', { ascending: false })
+      .order('id'),
+  );
 });
 
 // All goal→member assignments. The app joins these against the current user
 // to decide which goals to show.
 export const getGoalAssignees = cache(async (): Promise<GoalAssignee[]> => {
   const supabase = await createClient();
-  const { data } = await supabase.from('goal_assignees').select('*');
-  return data ?? [];
+  return fetchAllRows<GoalAssignee>(() =>
+    supabase.from('goal_assignees').select('*').order('goal_id').order('user_id'),
+  );
 });
 
 // Who can see which task lives in goal-visibility.ts — pure, and therefore
@@ -271,12 +276,14 @@ export { visibleGoals, goalDepartments } from '@/lib/goal-visibility';
 // goal_id; goals without items simply have none.
 export const getGoalChecklists = cache(async (): Promise<GoalChecklistItem[]> => {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from('goal_checklist_items')
-    .select('*')
-    .order('goal_id')
-    .order('sort_order');
-  return data ?? [];
+  return fetchAllRows<GoalChecklistItem>(() =>
+    supabase
+      .from('goal_checklist_items')
+      .select('*')
+      .order('goal_id')
+      .order('sort_order')
+      .order('id'),
+  );
 });
 
 // Minimal public identity (id · name · avatar) for a set of members, used to
@@ -316,13 +323,19 @@ export const getOnLeaveUserIdsToday = cache(async (): Promise<string[]> => {
 
 // Per-member checklist completions. Completion is independent per assignee, so
 // a goal card joins these by item_id × user_id to show each person's progress.
+// Paged: this table crossed the 1000-row cap, and an unordered read dropped the
+// most recently written rows — so fresh ticks saved fine but read back as
+// undone, and the task reappeared in "Your day" after every refresh.
 export const getGoalCompletions = cache(
   async (): Promise<GoalChecklistCompletion[]> => {
     const supabase = await createClient();
-    const { data } = await supabase
-      .from('goal_checklist_completions')
-      .select('*');
-    return data ?? [];
+    return fetchAllRows<GoalChecklistCompletion>(() =>
+      supabase
+        .from('goal_checklist_completions')
+        .select('*')
+        .order('item_id')
+        .order('user_id'),
+    );
   },
 );
 
@@ -332,11 +345,13 @@ export const getGoalCompletions = cache(
 // small (filtered per item/member in the view), consistent with completions.
 export const getWorkReports = cache(async (): Promise<WorkReport[]> => {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from('goal_work_reports')
-    .select('*')
-    .order('report_date', { ascending: false });
-  return (data ?? []) as WorkReport[];
+  return fetchAllRows<WorkReport>(() =>
+    supabase
+      .from('goal_work_reports')
+      .select('*')
+      .order('report_date', { ascending: false })
+      .order('id'),
+  );
 });
 
 // Work-report reviews — a Manager/Board rating (1-5) + comment on a member's
@@ -344,11 +359,13 @@ export const getWorkReports = cache(async (): Promise<WorkReport[]> => {
 // consistent with reports/completions; the member sees feedback on their own.
 export const getWorkReportReviews = cache(async (): Promise<WorkReportReview[]> => {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from('goal_work_report_reviews')
-    .select('*')
-    .order('created_at', { ascending: true });
-  return (data ?? []) as WorkReportReview[];
+  return fetchAllRows<WorkReportReview>(() =>
+    supabase
+      .from('goal_work_report_reviews')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .order('id'),
+  );
 });
 
 // Minimal identity (id · name · avatar · role · is_manager) for a set of
