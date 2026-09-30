@@ -1786,11 +1786,17 @@ export async function sendBirthdayWish(celebrantId: string, message: string) {
   if (!trimmed) throw new Error('Write a message first.');
   if (trimmed.length > 240) throw new Error('Keep it under 240 characters.');
 
-  const { data: bday } = await supabase
+  // Service role: anyone may wish anyone, but the profiles RLS only lets a
+  // member read their own row, so the user client can't see a celebrant
+  // outside their scope and every such wish failed as "Not a birthday today".
+  // Only date_of_birth is read, and it never leaves the server.
+  const { data: bday } = await createAdminClient()
     .from('profiles')
     .select('date_of_birth')
     .eq('id', celebrantId)
-    .single();
+    .eq('is_active', true)
+    .is('left_at', null)
+    .maybeSingle();
   if (!bday?.date_of_birth) throw new Error('Not a birthday today.');
   const today = parseDate(fmtDate(new Date()));
   const b = parseDate(bday.date_of_birth);

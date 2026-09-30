@@ -498,6 +498,32 @@ p { margin: 0; }
   display: flex; align-items: center; gap: 8px;
 }
 .topbar .crumb strong { color: var(--color-black); font-weight: 600; }
+/* A record page names itself in the breadcrumb (see CrumbLabel). */
+.topbar .crumb-link {
+  color: var(--color-grey-text);
+  font-weight: 400;
+  text-decoration: none;
+}
+.topbar .crumb-link:hover { color: var(--color-black); text-decoration: underline; }
+.topbar .crumb-detail {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--color-border);
+  color: var(--color-grey-text);
+  font-weight: 400;
+  white-space: nowrap;
+}
+.topbar .crumb-pending {
+  display: inline-block;
+  width: 110px;
+  height: 0.9em;
+  border-radius: 4px;
+  background: var(--color-border);
+  vertical-align: middle;
+}
+@media (max-width: 640px) {
+  .topbar .crumb-detail { display: none; }
+}
 .topbar-spacer { flex: 1; }
 .topbar-right {
   display: flex;
@@ -3482,6 +3508,89 @@ p { margin: 0; }
 .data-table th.weekend-col,
 .data-table td.weekend-col,
 .data-table tr:hover td.weekend-col { background: var(--color-weekend-band); }
+
+/* Click-to-sort column headers (SortableTable). The whole header is the
+   button so the hit area matches the column; the caret shows the active
+   direction, a faint ↕ marks every other sortable column. */
+.data-table th.sort-th { padding: 0; }
+.sort-th-btn {
+  display: inline-flex; align-items: center; gap: 4px; width: 100%;
+  padding: 10px 12px; font: inherit; color: inherit; letter-spacing: inherit;
+  text-transform: inherit; background: none; border: 0; cursor: pointer;
+  justify-content: inherit;
+}
+.sort-th-btn:hover, .sort-th-btn.active { color: var(--color-black); }
+.sort-th-btn:focus-visible { outline: 2px solid var(--color-green-primary); outline-offset: -2px; border-radius: 4px; }
+.sort-th-caret { font-size: 9px; opacity: 0.45; }
+.sort-th-btn.active .sort-th-caret { opacity: 1; color: var(--color-green-primary); }
+/* Member name that opens /team/[id] — reads as text until hovered. */
+.member-link { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
+.member-link:hover .member-link-name { color: var(--color-green-primary); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Punch-request monthly quota. One tone variable (--q) drives every accent,
+   so the green/amber/red ramp stays consistent between the Punch page meter
+   and the Team Analytics chips. Dark theme gets brighter tones of its own:
+   the brand ledger green (#1F5C3E) barely reads on a dark card. */
+.quota-tone-green { --q: var(--color-green-primary); }
+.quota-tone-amber { --q: var(--color-amber-text); }
+.quota-tone-red   { --q: var(--color-red); }
+[data-theme="dark"] .quota-tone-green { --q: #5BC48C; }
+[data-theme="dark"] .quota-tone-amber { --q: #FBBF24; }
+[data-theme="dark"] .quota-tone-red   { --q: #F87171; }
+
+.quota-chip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 6px 12px; border-radius: 10px; white-space: nowrap;
+  font-size: 13px; font-weight: 600; color: var(--q);
+  background: color-mix(in srgb, var(--q) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--q) 32%, transparent);
+}
+.quota-chip-num { font-size: 22px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+
+/* Punch page — segmented meter: big count, 5 pill segments, reset caption. */
+.quota-meter {
+  display: grid; gap: 10px; min-width: 240px;
+  padding: 14px 16px; border-radius: 12px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--q) 14%, transparent), transparent 60%),
+    var(--color-card);
+  border: 1px solid color-mix(in srgb, var(--q) 30%, var(--color-border));
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--q) 10%, transparent) inset, var(--shadow-card);
+}
+.quota-meter-top { display: flex; align-items: center; gap: 12px; }
+.quota-meter-num {
+  font-size: 34px; font-weight: 800; line-height: 1; color: var(--q);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.quota-meter-title { display: block; font-size: 13.5px; font-weight: 600; color: var(--color-black); }
+.quota-meter-sub { display: block; font-size: 12px; color: var(--color-grey-text); margin-top: 1px; }
+.quota-meter-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.quota-seg {
+  height: 7px; border-radius: 999px;
+  background: color-mix(in srgb, var(--q) 16%, var(--color-border));
+  transition: background 240ms ease, box-shadow 240ms ease;
+}
+.quota-seg.on {
+  background: var(--q);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--q) 45%, transparent);
+}
+.quota-meter-foot {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 11.5px; color: var(--color-grey-text); font-variant-numeric: tabular-nums;
+}
+.quota-meter-foot strong { color: var(--color-black); font-weight: 600; }
+@media (max-width: 768px) {
+  .punch-req-header { flex-direction: column; align-items: stretch; gap: 12px; }
+  .quota-meter { min-width: 0; }
+}
+.quota-banner {
+  display: flex; align-items: flex-start; gap: 10px; margin-top: 12px;
+  padding: 12px 14px; border-radius: 8px; font-size: 13.5px;
+  background: var(--color-red-bg); color: var(--color-red);
+  border: 1px solid color-mix(in srgb, var(--color-red) 35%, transparent);
+}
+.quota-banner strong { display: block; margin-bottom: 2px; }
+.quota-banner-body { color: var(--color-black); opacity: 0.85; }
 
 /* ===== Charts ===== */
 .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding: 8px 0; }

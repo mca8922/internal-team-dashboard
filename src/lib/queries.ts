@@ -705,6 +705,30 @@ export const getPunchChangeRequests = cache(
   },
 );
 
+// Every member's punch change requests raised in the current IST calendar
+// month — the window the monthly cap counts — for the Board's per-member
+// roll-up on Team Analytics. The request table's RLS lets only the Founders
+// read other people's rows, so this goes through the service role on purpose:
+// the CALLER must already have gated on role (Team Analytics is Board-only).
+// Only the four columns the roll-up needs are exposed — no reasons, times or
+// review notes.
+export const getMonthPunchChangeRequestSummaryRows = cache(
+  async (
+    today: string,
+  ): Promise<Pick<PunchChangeRequest, 'user_id' | 'request_type' | 'status' | 'created_at'>[]> => {
+    const admin = createAdminClient();
+    const monthStartIso = new Date(istDayStartMs(`${today.slice(0, 7)}-01`)).toISOString();
+    return fetchAllRows<Pick<PunchChangeRequest, 'user_id' | 'request_type' | 'status' | 'created_at'>>(() =>
+      admin
+        .from('punch_change_requests')
+        .select('user_id, request_type, status, created_at')
+        .gte('created_at', monthStartIso)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true }),
+    );
+  },
+);
+
 // Count of pending punch change requests visible to the caller — Founder
 // only, via RLS. Drives the /team/requests sidebar badge.
 export const getPendingPunchChangeRequestCount = cache(async (): Promise<number> => {
@@ -882,10 +906,17 @@ export const getTransactionalEmailLogs = cache(
 
 // Active, non-departed members whose date of birth is today (month/day match,
 // IST calendar day) — feeds the dashboard birthday wishing card.
+//
+// Goes through the service role on purpose: the birthday card is for the
+// WHOLE company, but the profiles RLS (can_view_user, migration 0058) only
+// lets a Founder read everyone — a member sees only their own row, a Director
+// or Manager only their scope — so the card used to show Founders alone.
+// date_of_birth is only matched here, server-side; just id / name / avatar /
+// department leave this function, the same identity everyone sees on Team.
 export const getTodaysBirthdays = cache(
   async (): Promise<{ id: string; name: string; avatarUrl: string | null; department: string }[]> => {
-    const supabase = await createClient();
-    const { data } = await supabase
+    const admin = createAdminClient();
+    const { data } = await admin
       .from('profiles')
       .select('id, name, avatar_url, department, date_of_birth')
       .eq('is_active', true)
@@ -902,12 +933,14 @@ export const getTodaysBirthdays = cache(
 );
 
 // Minimal identity for a set of member ids — resolves wish senders' names /
-// avatars for the birthday card. Everyone can already see this via Team.
+// avatars for the birthday card. Service role for the same reason as
+// getTodaysBirthdays: a member's RLS can't read a sender outside their scope,
+// which left wishes signed "Someone". Only id / name / avatar are exposed.
 export const getBasicProfiles = cache(
   async (ids: string[]): Promise<{ id: string; name: string; avatarUrl: string | null }[]> => {
     if (ids.length === 0) return [];
-    const supabase = await createClient();
-    const { data } = await supabase.from('profiles').select('id, name, avatar_url').in('id', ids);
+    const admin = createAdminClient();
+    const { data } = await admin.from('profiles').select('id, name, avatar_url').in('id', ids);
     return (data ?? []).map((u) => ({ id: u.id, name: u.name, avatarUrl: u.avatar_url }));
   },
 );

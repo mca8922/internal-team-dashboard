@@ -47,6 +47,7 @@ import { FounderPunchEditor } from './FounderPunchEditor';
 import { MemberLogs } from './MemberLogs';
 import { PresenceLine } from './PresenceLine';
 import { AvatarLightbox } from '@/components/AvatarLightbox';
+import { CrumbLabel } from '@/components/CrumbLabel';
 
 export const metadata = { title: 'Employee · Mahesh Chandra & Associates' };
 
@@ -285,6 +286,11 @@ export default async function EmployeePage({
 
   return (
     <div>
+      <CrumbLabel
+        segment={u.id}
+        label={u.name}
+        detail={u.job_title || (isFounder(u) ? 'Founder' : roleLabel(u.role))}
+      />
       <div className="page-header">
         <div>
           <Link href="/team" className="btn btn-ghost btn-sm">

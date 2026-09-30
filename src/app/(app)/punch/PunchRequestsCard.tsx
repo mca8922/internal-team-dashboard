@@ -10,11 +10,11 @@ import { useConfirm } from '@/components/ConfirmDialog';
 import { submitPunchChangeRequest, withdrawPunchChangeRequest } from '@/lib/actions';
 import { DateTimePicker } from '@/components/DateTimePicker';
 import { fmtDateDMY, parseDate } from '@/lib/dates';
+import { Icon } from '@/components/Icon';
 import {
   MONTHLY_REQUEST_LIMIT,
-  monthKey,
-  countsTowardMonthlyLimit,
-  isForcedCorrection,
+  summarizeMonthRequests,
+  quotaTone,
 } from '@/lib/punch-requests';
 import type { LeaveType, PunchChangeRequest, PunchChangeRequestType } from '@/lib/types';
 
@@ -157,8 +157,9 @@ function RequestModal({
       </Field>
 
       <div className="text-xs text-grey">
-        You&apos;ve used {usedThisMonth} of {MONTHLY_REQUEST_LIMIT} requests this month.
-        {atLimit ? ' The cap resets next calendar month.' : ''}
+        {atLimit
+          ? `You have no requests left this month — contact the Founder directly. The cap resets next calendar month.`
+          : `${MONTHLY_REQUEST_LIMIT - usedThisMonth} of ${MONTHLY_REQUEST_LIMIT} requests left this month — this one will use 1.`}
       </div>
 
       <div className="modal-actions">
@@ -198,13 +199,11 @@ export function PunchRequestsCard({
   const confirm = useConfirm();
   const [modalDate, setModalDate] = React.useState<string | null>(null);
 
-  const thisMonth = monthKey(today);
-  const usedThisMonth = myRequests.filter(
-    (r) =>
-      !isForcedCorrection(r.request_type) &&
-      countsTowardMonthlyLimit(r.status) &&
-      monthKey(r.created_at) === thisMonth,
-  ).length;
+  const { used: usedThisMonth, left } = summarizeMonthRequests(myRequests, today);
+  const tone = quotaTone(left);
+  // The cap resets on the 1st of next calendar month.
+  const [ty, tm] = today.split('-').map(Number);
+  const resetLabel = new Date(ty, tm, 1).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
   const withdraw = async (id: string) => {
     const ok = await confirm({
@@ -227,17 +226,56 @@ export function PunchRequestsCard({
   return (
     <>
       <div className="card mt-6">
-        <div className="card-header">
+        <div className="card-header punch-req-header">
           <div>
             <div className="card-subtitle">Punch requests</div>
             <div className="text-xs text-grey mt-1">
               Ask the Founder to fix a missed punch or reclassify a day as leave.
             </div>
           </div>
-          <div className="text-xs text-grey">
-            {usedThisMonth} / {MONTHLY_REQUEST_LIMIT} this month
+          <div
+            className={`quota-meter quota-tone-${tone}`}
+            role="meter"
+            aria-label="Punch requests left this month"
+            aria-valuemin={0}
+            aria-valuemax={MONTHLY_REQUEST_LIMIT}
+            aria-valuenow={left}
+            aria-valuetext={`${left} of ${MONTHLY_REQUEST_LIMIT} left`}
+          >
+            <div className="quota-meter-top">
+              <span className="quota-meter-num">{left}</span>
+              <div>
+                <span className="quota-meter-title">
+                  {left === 1 ? 'request' : 'requests'} left
+                </span>
+                <span className="quota-meter-sub">of {MONTHLY_REQUEST_LIMIT} this month</span>
+              </div>
+            </div>
+            <div className="quota-meter-bar" aria-hidden="true">
+              {Array.from({ length: MONTHLY_REQUEST_LIMIT }, (_, i) => (
+                <span key={i} className={`quota-seg${i < left ? ' on' : ''}`} />
+              ))}
+            </div>
+            <div className="quota-meter-foot">
+              <span>
+                <strong>{usedThisMonth}</strong> used
+              </span>
+              <span>Resets {resetLabel}</span>
+            </div>
           </div>
         </div>
+        {left === 0 ? (
+          <div className="quota-banner" role="status">
+            <Icon name="lock" size={16} />
+            <div>
+              <strong>You&apos;ve used all {MONTHLY_REQUEST_LIMIT} punch requests this month.</strong>
+              <span className="quota-banner-body">
+                Please contact the Founder directly to request a change to your time. Your
+                requests reset on the 1st of next month.
+              </span>
+            </div>
+          </div>
+        ) : null}
         <div style={{ maxHeight: 320, overflowY: 'auto' }}>
           <table className="data-table mt-3">
             <thead>
@@ -255,6 +293,13 @@ export function PunchRequestsCard({
                   <td className="text-right">
                     {d.hasPendingRequest ? (
                       <span className="badge badge-amber">Pending</span>
+                    ) : left === 0 ? (
+                      <span
+                        className="badge badge-red"
+                        title="No requests left this month — contact the Founder directly"
+                      >
+                        Contact Founder
+                      </span>
                     ) : (
                       <Button size="sm" variant="ghost" icon="edit" onClick={() => setModalDate(d.date)}>
                         Request change

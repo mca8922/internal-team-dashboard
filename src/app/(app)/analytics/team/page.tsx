@@ -9,6 +9,7 @@ import {
   getLeaves,
   getGoals,
   getDepartmentColors,
+  getMonthPunchChangeRequestSummaryRows,
   punchTotalMsForDate,
   logStreak,
   logHasContent,
@@ -17,7 +18,10 @@ import Link from 'next/link';
 import { targetHours, isManager } from '@/lib/roles';
 import { fmtDate, addDays, isWeekend, fmtShort, parseDate, daysBetween, GO_LIVE_DATE } from '@/lib/dates';
 import { tierFor } from '@/lib/streak';
-import { Avatar, Progress } from '@/components/ui';
+import { Progress } from '@/components/ui';
+import { SortableTable, type SortColumn, type SortRow } from '@/components/SortableTable';
+import { MemberLink } from '@/components/MemberLink';
+import { MONTHLY_REQUEST_LIMIT, summarizeMonthRequests, quotaTone } from '@/lib/punch-requests';
 import { Icon } from '@/components/Icon';
 import { LineChart } from '@/components/charts';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
@@ -118,7 +122,7 @@ export default async function TeamAnalyticsPage({
   const initialFrom = fmtDate(rangeStart);
   const initialTo = fmtDate(rangeEnd);
 
-  const [profiles, punches, logs, allLogsEver, leaves, goals, deptColorMap] = await Promise.all([
+  const [profiles, punches, logs, allLogsEver, leaves, goals, deptColorMap, monthRequests] = await Promise.all([
     getAllProfiles(),
     getAllPunches(initialFrom),
     getAllLogs(initialFrom),
@@ -129,6 +133,9 @@ export default async function TeamAnalyticsPage({
     getLeaves(),
     getGoals(),
     getDepartmentColors(),
+    // Always the CURRENT month — the window the 5-per-month cap counts — so
+    // it deliberately ignores the range control above.
+    getMonthPunchChangeRequestSummaryRows(todayStr),
   ]);
   // Every member's own logs, grouped once instead of re-filtering the full
   // list per row.
@@ -328,6 +335,92 @@ export default async function TeamAnalyticsPage({
     return { u, cells, total: cells.reduce((a, b) => a + b, 0) };
   });
 
+  // ── Punch requests · this month ─────────────────────────────────────────
+  const requestsByUser = new Map<string, typeof monthRequests>();
+  for (const r of monthRequests) {
+    const arr = requestsByUser.get(r.user_id);
+    if (arr) arr.push(r);
+    else requestsByUser.set(r.user_id, [r]);
+  }
+  const punchReqRows = profiles.map((u) => ({
+    u,
+    s: summarizeMonthRequests(requestsByUser.get(u.id) ?? [], todayStr),
+  }));
+  const exhaustedCount = punchReqRows.filter((r) => r.s.left === 0).length;
+  const monthName = today.toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata',
+  });
+  const countCell = (key: string, n: number, color?: string) =>
+    n ? (
+      <span key={key} className="fw-bold" style={{ color }}>
+        {n}
+      </span>
+    ) : (
+      <span key={key} className="text-grey">
+        —
+      </span>
+    );
+  const punchReqColumns: SortColumn[] = [
+    { key: 'person', label: 'Person' },
+    { key: 'dept', label: 'Department', tdClassName: 'text-grey' },
+    { key: 'left', label: 'Left', align: 'center' },
+    { key: 'used', label: `Used / ${MONTHLY_REQUEST_LIMIT}`, align: 'center' },
+    { key: 'pending', label: 'Pending', align: 'center' },
+    { key: 'approved', label: 'Approved', align: 'center' },
+    { key: 'rejected', label: 'Rejected', align: 'center' },
+    { key: 'withdrawn', label: 'Withdrawn', align: 'center' },
+    { key: 'forced', label: 'Forgot punch-out', align: 'center' },
+    { key: 'action', label: 'Action' },
+  ];
+  const punchReqTableRows: SortRow[] = punchReqRows.map(({ u, s }) => ({
+    id: u.id,
+    sort: [
+      u.name,
+      u.department || '',
+      s.left,
+      s.used,
+      s.pending,
+      s.approved,
+      s.rejected,
+      s.withdrawn,
+      s.forced,
+      s.left === 0 ? 0 : 1,
+    ],
+    cells: [
+      <MemberLink key="p" id={u.id} name={u.name} avatarUrl={u.avatar_url} />,
+      u.department || '—',
+      <span
+        key="l"
+        className={`quota-chip quota-tone-${quotaTone(s.left)}`}
+        style={{ padding: '2px 10px' }}
+        title={`${s.left} of ${MONTHLY_REQUEST_LIMIT} left`}
+      >
+        <span className="quota-chip-num" style={{ fontSize: 16 }}>
+          {s.left}
+        </span>
+      </span>,
+      <span key="u" className="font-mono">
+        {s.used} / {MONTHLY_REQUEST_LIMIT}
+      </span>,
+      countCell('pe', s.pending, 'var(--color-amber-text)'),
+      countCell('ap', s.approved, 'var(--color-green-primary)'),
+      countCell('re', s.rejected, 'var(--color-red)'),
+      countCell('wi', s.withdrawn),
+      countCell('fo', s.forced),
+      s.left === 0 ? (
+        <span key="a" className="badge badge-red" title="No requests left this month">
+          Contact Founder for time changes
+        </span>
+      ) : (
+        <span key="a" className="text-grey text-xs">
+          Can self-request
+        </span>
+      ),
+    ],
+  }));
+
   return (
     <div>
       <div className="page-header">
@@ -449,44 +542,36 @@ export default async function TeamAnalyticsPage({
         </div>
         <div className="card">
           <div className="card-subtitle mb-3">By department</div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Department</th>
-                <th style={{ textAlign: 'center' }}>Tasks</th>
-                <th style={{ textAlign: 'center' }}>Done</th>
-                <th style={{ textAlign: 'center' }}>Overdue</th>
-                <th style={{ minWidth: 130 }}>Avg progress</th>
-              </tr>
-            </thead>
-            <tbody>
-              {gDeptRows.map((r) => (
-                <tr key={r.dept}>
-                  <td className="fw-medium">{r.dept}</td>
-                  <td style={{ textAlign: 'center' }}>{r.total}</td>
-                  <td style={{ textAlign: 'center' }}>{r.achieved}</td>
-                  <td
-                    style={{ textAlign: 'center', color: r.overdue ? 'var(--color-red)' : undefined }}
-                  >
-                    {r.overdue || '-'}
-                  </td>
-                  <td>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <Progress value={r.avg} />
-                      </div>
-                      <span
-                        className="text-xs text-grey"
-                        style={{ minWidth: 30, textAlign: 'right' }}
-                      >
-                        {r.avg}%
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <SortableTable
+            initialSort={{ key: 'total', dir: 'desc' }}
+            columns={[
+              { key: 'dept', label: 'Department', tdClassName: 'fw-medium' },
+              { key: 'total', label: 'Tasks', align: 'center' },
+              { key: 'done', label: 'Done', align: 'center' },
+              { key: 'overdue', label: 'Overdue', align: 'center' },
+              { key: 'avg', label: 'Avg progress', thStyle: { minWidth: 130 } },
+            ]}
+            rows={gDeptRows.map((r) => ({
+              id: r.dept,
+              sort: [r.dept, r.total, r.achieved, r.overdue, r.avg],
+              cells: [
+                r.dept,
+                r.total,
+                r.achieved,
+                <span key="o" style={{ color: r.overdue ? 'var(--color-red)' : undefined }}>
+                  {r.overdue || '-'}
+                </span>,
+                <div key="a" className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Progress value={r.avg} />
+                  </div>
+                  <span className="text-xs text-grey" style={{ minWidth: 30, textAlign: 'right' }}>
+                    {r.avg}%
+                  </span>
+                </div>,
+              ],
+            }))}
+          />
         </div>
       </div>
 
@@ -514,111 +599,137 @@ export default async function TeamAnalyticsPage({
           ) : null}
         </div>
         <div style={{ overflowX: 'auto' }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Person</th>
-              {heatCols.map((col, i) => (
-                <th
-                  key={i}
-                  className={col.weekend ? 'weekend-col' : undefined}
-                  style={{ textAlign: 'center' }}
-                >
-                  {col.label}{' '}
-                  <div style={{ fontSize: 9, color: 'var(--color-grey-text)' }}>
-                    {col.sub}
-                  </div>
-                </th>
-              ))}
-              <th style={{ textAlign: 'right' }}>Total / target</th>
-              <th style={{ textAlign: 'center' }}>Streak</th>
-            </tr>
-          </thead>
-          <tbody>
-            {heatRows.map(({ u, cells, total }) => {
-              const streak = streakByUser.get(u.id) ?? 0;
-              const tier = tierFor(streak);
-              return (
-                <tr key={u.id}>
-                  <td className="fw-medium flex items-center gap-2">
-                    <Avatar name={u.name} size="sm" src={u.avatar_url} /> {u.name}
-                  </td>
-                  {cells.map((h, i) => (
-                    <td
-                      key={i}
-                      className={heatCols[i].weekend ? 'weekend-col' : undefined}
-                      style={{ textAlign: 'center', padding: 4 }}
-                    >
-                      <div
-                        className={useWeeklyHeatmap ? heatClsWeek(h) : heatCls(h)}
-                        title={`${h.toFixed(1)}h`}
-                        style={{
-                          display: 'inline-block',
-                          width: useWeeklyHeatmap ? 36 : 28,
-                          height: 28,
-                          borderRadius: 4,
-                        }}
-                      />
-                    </td>
-                  ))}
-                  <td className="text-right fw-bold">
-                    <AnimatedNumber value={total} decimals={1} suffix="h" />
-                    <span className="text-grey" style={{ fontWeight: 600 }}>
-                      {' '}
-                      / {periodTargetByUser.get(u.id) ?? 0}h
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    {streak > 0 ? (
-                      <span
-                        className="fw-bold"
-                        style={{ color: tier.color, whiteSpace: 'nowrap' }}
-                        title={tier.label ? `${tier.label} · ${streak} working days` : `${streak} working days`}
-                      >
-                        🔥 {streak}
-                      </span>
-                    ) : (
-                      <span className="text-grey">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <SortableTable
+          columns={[
+            { key: 'person', label: 'Person' },
+            ...heatCols.map<SortColumn>((col, i) => ({
+              key: `c${i}`,
+              label: col.label,
+              sub: col.sub,
+              align: 'center',
+              className: col.weekend ? 'weekend-col' : undefined,
+              tdStyle: { padding: 4 },
+            })),
+            { key: 'total', label: 'Total / target', align: 'right', tdClassName: 'fw-bold' },
+            { key: 'streak', label: 'Streak', align: 'center' },
+          ]}
+          rows={heatRows.map(({ u, cells, total }) => {
+            const streak = streakByUser.get(u.id) ?? 0;
+            const tier = tierFor(streak);
+            return {
+              id: u.id,
+              sort: [u.name, ...cells, total, streak],
+              cells: [
+                <MemberLink key="p" id={u.id} name={u.name} avatarUrl={u.avatar_url} />,
+                ...cells.map((h, i) => (
+                  <div
+                    key={i}
+                    className={useWeeklyHeatmap ? heatClsWeek(h) : heatCls(h)}
+                    title={`${h.toFixed(1)}h`}
+                    style={{
+                      display: 'inline-block',
+                      width: useWeeklyHeatmap ? 36 : 28,
+                      height: 28,
+                      borderRadius: 4,
+                    }}
+                  />
+                )),
+                <span key="t">
+                  <AnimatedNumber value={total} decimals={1} suffix="h" />
+                  <span className="text-grey" style={{ fontWeight: 600 }}>
+                    {' '}
+                    / {periodTargetByUser.get(u.id) ?? 0}h
+                  </span>
+                </span>,
+                streak > 0 ? (
+                  <span
+                    key="s"
+                    className="fw-bold"
+                    style={{ color: tier.color, whiteSpace: 'nowrap' }}
+                    title={tier.label ? `${tier.label} · ${streak} working days` : `${streak} working days`}
+                  >
+                    🔥 {streak}
+                  </span>
+                ) : (
+                  <span key="s" className="text-grey">
+                    —
+                  </span>
+                ),
+              ],
+            };
+          })}
+        />
+        </div>
+      </div>
+
+      <div className="card mt-4">
+        <div className="card-header">
+          <div>
+            <div className="card-subtitle">Punch requests · {monthName}</div>
+            <div className="text-xs text-grey mt-1">
+              Each member gets {MONTHLY_REQUEST_LIMIT} self-service punch change requests a month;
+              forgot-punch-out corrections are free. Always the current month.
+            </div>
+          </div>
+          {exhaustedCount > 0 ? (
+            <span className="quota-chip quota-tone-red">
+              <span className="quota-chip-num">{exhaustedCount}</span>
+              <span>out of requests</span>
+            </span>
+          ) : (
+            <span className="quota-chip quota-tone-green">Everyone has requests left</span>
+          )}
+        </div>
+        {exhaustedCount > 0 ? (
+          <div className="quota-banner" role="status">
+            <Icon name="lock" size={16} />
+            <div>
+              <strong>
+                {exhaustedCount} {exhaustedCount === 1 ? 'member has' : 'members have'} used all{' '}
+                {MONTHLY_REQUEST_LIMIT} requests this month.
+              </strong>
+              <span className="quota-banner-body">
+                They can&apos;t self-request any more time changes until next month. Ask them to
+                contact the Founder directly for any change to their time.
+              </span>
+            </div>
+          </div>
+        ) : null}
+        <div className="mt-3" style={{ overflowX: 'auto' }}>
+          <SortableTable
+            initialSort={{ key: 'left', dir: 'asc' }}
+            columns={punchReqColumns}
+            rows={punchReqTableRows}
+          />
         </div>
       </div>
 
       <div className="card mt-4">
         <div className="card-subtitle mb-3">Top performers · {rangeLabel}</div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Person</th>
-              <th>Department</th>
-              <th>Hours</th>
-              <th>Logs</th>
-            </tr>
-          </thead>
-          <tbody>
-            {perf.slice(0, 5).map((p, i) => (
-              <tr key={p.u.id}>
-                <td className="text-grey fw-medium">{i + 1}</td>
-                <td className="fw-medium flex items-center gap-2">
-                  <Avatar name={p.u.name} size="sm" src={p.u.avatar_url} />
-                  {p.u.name}
-                </td>
-                <td className="text-grey">{p.u.department}</td>
-                <td>
-                  <AnimatedNumber value={p.hours} decimals={1} suffix="h" />
-                  <span className="text-grey"> / {p.periodTarget}h</span>
-                </td>
-                <td>{p.logs}/{weekdaysInRange}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <SortableTable
+          initialSort={{ key: 'rank', dir: 'asc' }}
+          columns={[
+            { key: 'rank', label: '#', tdClassName: 'text-grey fw-medium' },
+            { key: 'person', label: 'Person' },
+            { key: 'dept', label: 'Department', tdClassName: 'text-grey' },
+            { key: 'hours', label: 'Hours' },
+            { key: 'logs', label: 'Logs' },
+          ]}
+          rows={perf.slice(0, 5).map((p, i) => ({
+            id: p.u.id,
+            sort: [i + 1, p.u.name, p.u.department, p.hours, p.logs],
+            cells: [
+              i + 1,
+              <MemberLink key="p" id={p.u.id} name={p.u.name} avatarUrl={p.u.avatar_url} />,
+              p.u.department,
+              <span key="h">
+                <AnimatedNumber value={p.hours} decimals={1} suffix="h" />
+                <span className="text-grey"> / {p.periodTarget}h</span>
+              </span>,
+              `${p.logs}/${weekdaysInRange}`,
+            ],
+          }))}
+        />
       </div>
       </TeamAnalyticsShell>
     </div>

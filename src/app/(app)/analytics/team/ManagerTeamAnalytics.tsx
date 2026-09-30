@@ -11,7 +11,9 @@ import {
 } from '@/lib/queries';
 import { weeklyTargetHours } from '@/lib/roles';
 import { fmtDate, addDays, startOfWeek, fmtShort, isWeekend } from '@/lib/dates';
-import { Avatar, Donut, Progress } from '@/components/ui';
+import { Donut } from '@/components/ui';
+import { SortableTable, type SortColumn } from '@/components/SortableTable';
+import { MemberLink } from '@/components/MemberLink';
 import { Icon } from '@/components/Icon';
 import { LineChart } from '@/components/charts';
 import { deriveGoalStatus } from '@/app/(app)/goals/goal-ui';
@@ -222,91 +224,74 @@ export async function ManagerTeamAnalytics({
         {profiles.length === 0 ? (
           <div className="text-grey text-sm">No team members yet.</div>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Person</th>
-                {[0, 1, 2, 3, 4, 5, 6].map((i) => {
-                  const d = addDays(weekStart, i);
-                  return (
-                    <th
+          <SortableTable
+            columns={[
+              { key: 'person', label: 'Person' },
+              ...[0, 1, 2, 3, 4, 5, 6].map<SortColumn>((i) => {
+                const d = addDays(weekStart, i);
+                return {
+                  key: `d${i}`,
+                  label: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'][i],
+                  sub: fmtShort(d),
+                  align: 'center',
+                  className: isWeekend(d) ? 'weekend-col' : undefined,
+                  tdStyle: { padding: 4 },
+                };
+              }),
+              { key: 'total', label: 'Total / target', align: 'right', tdClassName: 'fw-bold' },
+            ]}
+            rows={profiles.map((u) => {
+              const cells = [0, 1, 2, 3, 4, 5, 6].map(
+                (i) => msFor(u.id, fmtDate(addDays(weekStart, i))) / 3.6e6,
+              );
+              const total = cells.reduce((a, b) => a + b, 0);
+              return {
+                id: u.id,
+                sort: [u.name, ...cells, total],
+                cells: [
+                  <MemberLink key="p" id={u.id} name={u.name} avatarUrl={u.avatar_url} />,
+                  ...cells.map((h, i) => (
+                    <div
                       key={i}
-                      className={isWeekend(d) ? 'weekend-col' : undefined}
-                      style={{ textAlign: 'center' }}
-                    >
-                      {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'][i]}
-                      <div style={{ fontSize: 9, color: 'var(--color-grey-text)' }}>{fmtShort(d)}</div>
-                    </th>
-                  );
-                })}
-                <th style={{ textAlign: 'right' }}>Total / target</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profiles.map((u) => {
-                let total = 0;
-                const cells = [0, 1, 2, 3, 4, 5, 6].map((i) => {
-                  const h = msFor(u.id, fmtDate(addDays(weekStart, i))) / 3.6e6;
-                  total += h;
-                  return h;
-                });
-                return (
-                  <tr key={u.id}>
-                    <td className="fw-medium flex items-center gap-2">
-                      <Avatar name={u.name} size="sm" src={u.avatar_url} /> {u.name}
-                    </td>
-                    {cells.map((h, i) => (
-                      <td
-                        key={i}
-                        className={isWeekend(addDays(weekStart, i)) ? 'weekend-col' : undefined}
-                        style={{ textAlign: 'center', padding: 4 }}
-                      >
-                        <div
-                          className={heatCls(h)}
-                          title={`${h.toFixed(1)}h`}
-                          style={{ display: 'inline-block', width: 28, height: 28, borderRadius: 4 }}
-                        />
-                      </td>
-                    ))}
-                    <td className="text-right fw-bold">
-                      {total.toFixed(1)}h
-                      <span className="text-grey" style={{ fontWeight: 600 }}> / {weeklyTargetHours(u)}h</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      className={heatCls(h)}
+                      title={`${h.toFixed(1)}h`}
+                      style={{ display: 'inline-block', width: 28, height: 28, borderRadius: 4 }}
+                    />
+                  )),
+                  <span key="t">
+                    {total.toFixed(1)}h
+                    <span className="text-grey" style={{ fontWeight: 600 }}> / {weeklyTargetHours(u)}h</span>
+                  </span>,
+                ],
+              };
+            })}
+          />
         )}
       </div>
 
       {profiles.length > 0 ? (
         <div className="card mt-4" style={{ borderTop: `2px solid ${accent}` }}>
           <div className="card-subtitle mb-3">Top performers · this week</div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Person</th>
-                <th>Hours</th>
-              </tr>
-            </thead>
-            <tbody>
-              {perf.slice(0, 5).map((p, i) => (
-                <tr key={p.u.id}>
-                  <td className="text-grey fw-medium">{i + 1}</td>
-                  <td className="fw-medium flex items-center gap-2">
-                    <Avatar name={p.u.name} size="sm" src={p.u.avatar_url} />
-                    {p.u.name}
-                  </td>
-                  <td>
-                    {p.hours.toFixed(1)}h
-                    <span className="text-grey"> / {p.weeklyTarget}h</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <SortableTable
+            initialSort={{ key: 'rank', dir: 'asc' }}
+            columns={[
+              { key: 'rank', label: '#', tdClassName: 'text-grey fw-medium' },
+              { key: 'person', label: 'Person' },
+              { key: 'hours', label: 'Hours' },
+            ]}
+            rows={perf.slice(0, 5).map((p, i) => ({
+              id: p.u.id,
+              sort: [i + 1, p.u.name, p.hours],
+              cells: [
+                i + 1,
+                <MemberLink key="p" id={p.u.id} name={p.u.name} avatarUrl={p.u.avatar_url} />,
+                <span key="h">
+                  {p.hours.toFixed(1)}h
+                  <span className="text-grey"> / {p.weeklyTarget}h</span>
+                </span>,
+              ],
+            }))}
+          />
         </div>
       ) : null}
     </div>

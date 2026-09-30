@@ -67,6 +67,51 @@ Still open (not done): DB-side `auth_rls_initplan` warnings + unindexed FKs
 on the goal tables (see Supabase performance advisor), column-narrowing the
 work-report/completion queries, and `next/image` for avatars.
 
+## Punch request visibility (done, rides on `punchRequests`)
+
+- Punch page card: the quota now reads **"X of 5 left this month"** in a
+  large chip (green → amber at 1-2 left → red at 0). At 0 left, a banner tells
+  the member to contact the Founder directly and each row's "Request change"
+  becomes a "Contact Founder" badge. Counting moved to
+  `summarizeMonthRequests()` in `src/lib/punch-requests.ts`, which uses the
+  same IST-month boundary as the server-side cap in `submitPunchChangeRequest`.
+- Team Analytics (Board): new "Punch requests · <month>" table: per member
+  Left, Used/5, Pending, Approved, Rejected, Withdrawn, Forgot punch-out, and
+  a "Contact Founder" flag when no requests are left. It always covers the current
+  month (ignores the range control). RLS only lets the Founders read other
+  people's requests, so the data comes from
+  `getMonthPunchChangeRequestSummaryRows()` through the service role, and
+  only user/type/status/created_at leave the server. The Board-only page
+  gate is what protects it.
+- Team Analytics (Board + Manager): every table's headers click-sort
+  asc/desc (`src/components/SortableTable.tsx`), and every member name links
+  to `/team/[id]` (`src/components/MemberLink.tsx`), the same page as
+  clicking a Team card.
+- Punch page quota is a segmented meter: big count, 5 pill segments and
+  "N used · Resets 1 <next month>". Tones come from one `--q` variable per
+  `.quota-tone-*` class, with brighter dark-theme values, because the brand
+  green is unreadable on a dark card.
+- Top-bar breadcrumb no longer prints a record id. Ported as-is from the
+  reStrucAI Internal Team Dashboard: `/team/[id]` names its crumb
+  "Name | job title" (falls back to Founder / role) via `<CrumbLabel>`
+  (`src/components/CrumbLabel.tsx`, provider in `Shell.tsx`). There is no avatar.
+  Every non-last section crumb links back to its section (e.g. "Team"). An
+  unnamed id shows a grey placeholder bar, then "Member". The detail text is
+  hidden under 640px.
+
+## Birthday card — company-wide (done)
+
+The dashboard birthday card was effectively Founder-only. `getTodaysBirthdays`,
+`getBasicProfiles` (wish sender names) and `sendBirthdayWish`'s date-of-birth
+check all read `profiles` with the user client, and the profiles RLS
+(`can_view_user`, migrations 0058/0061) lets only a Founder read every row.
+Members saw only themselves, Directors and Managers only their scope. All
+three now use the service role, exposing only id / name / avatar / department
+(date of birth is matched server-side and never returned). The profiles RLS
+itself is unchanged. Wish-message privacy (`birthday_wishes` RLS +
+`birthday_wishers()`, migration 0056) is untouched: others' messages stay
+private.
+
 ## Phase 1 — Scope down to 6 core features (done)
 
 Removed the `graphify` knowledge-graph tooling entirely (it was config-only,

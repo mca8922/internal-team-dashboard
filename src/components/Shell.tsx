@@ -22,6 +22,7 @@ import { signOut } from '@/lib/auth-actions';
 import { roleLabel, isManager, isFounder } from '@/lib/roles';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { AvatarLightbox } from '@/components/AvatarLightbox';
+import { CrumbLabelProvider, looksLikeId, useCrumbLabels } from '@/components/CrumbLabel';
 import { fmtTimeFull, fmtFriendly, fmtDateDMY, parseDate } from '@/lib/dates';
 import { getThemePref, setThemePref, applyTheme, type ThemePref } from '@/lib/theme';
 import { useThemePref } from '@/lib/useThemePref';
@@ -415,6 +416,11 @@ function OnlineNowStrip({ online, max }: { online: OnlineUser[]; max: number }) 
   );
 }
 
+// The generic word for a record whose page hasn't named its crumb.
+const RECORD_NOUN: Record<string, string> = {
+  team: 'Member',
+};
+
 function TopBar({
   user,
   themePref,
@@ -462,7 +468,32 @@ function TopBar({
     email: 'Emails',
     notifications: 'Notifications',
   };
-  const crumbs = pathname.split('/').filter(Boolean).map((p) => labels[p] || p);
+  // A page may name its own segment (a member's page names itself after the
+  // member, see CrumbLabel). Every crumb before the last links back to its
+  // section, so "Team" on a member's page returns to the team.
+  const pageLabels = useCrumbLabels();
+  // After mount, an id no page has named falls back to a generic word for
+  // the record ("Member") instead of holding the placeholder forever.
+  // Before mount it stays a placeholder, since the page's name arrives then.
+  const [crumbMounted, setCrumbMounted] = React.useState(false);
+  React.useEffect(() => setCrumbMounted(true), []);
+  const segments = pathname.split('/').filter(Boolean);
+  const crumbs = segments.map((seg, i) => {
+    const named = pageLabels[seg];
+    return {
+      key: `${i}:${seg}`,
+      label:
+        named?.label ??
+        labels[seg] ??
+        (looksLikeId(seg)
+          ? crumbMounted
+            ? (RECORD_NOUN[segments[i - 1]] ?? 'Details')
+            : null
+          : seg),
+      detail: named?.detail ?? null,
+      href: i < segments.length - 1 && labels[seg] ? `/${segments.slice(0, i + 1).join('/')}` : null,
+    };
+  });
   const onDashboard = pathname === '/dashboard';
 
   return (
@@ -490,19 +521,32 @@ function TopBar({
       ) : (
         <div className="crumb">
           {crumbs.map((c, i) => (
-            <span key={i}>
+            <span key={c.key}>
               {i > 0 ? (
                 <span style={{ margin: '0 6px', color: 'var(--color-grey-text)' }}>/</span>
               ) : null}
-              <strong
-                style={
-                  i === crumbs.length - 1
-                    ? undefined
-                    : { fontWeight: 400, color: 'var(--color-grey-text)' }
-                }
-              >
-                {c}
-              </strong>
+              {c.label == null ? (
+                // An id nobody has named yet: hold the space instead of
+                // flashing the raw id before the page mounts.
+                <span className="crumb-pending" aria-hidden />
+              ) : c.href ? (
+                <Link href={c.href} className="crumb-link">
+                  {c.label}
+                </Link>
+              ) : (
+                <strong
+                  style={
+                    i === crumbs.length - 1
+                      ? undefined
+                      : { fontWeight: 400, color: 'var(--color-grey-text)' }
+                  }
+                >
+                  {c.label}
+                </strong>
+              )}
+              {c.detail && i === crumbs.length - 1 ? (
+                <span className="crumb-detail">{c.detail}</span>
+              ) : null}
             </span>
           ))}
         </div>
@@ -727,6 +771,7 @@ export function Shell({
   React.useEffect(() => { setMoreOpen(false); }, [pathname]);
 
   return (
+    <CrumbLabelProvider>
     <div className="app-shell" data-sidebar={collapsed ? 'collapsed' : 'expanded'}>
       <Sidebar
         user={user}
@@ -785,5 +830,6 @@ export function Shell({
       ) : null}
       <BirthdayCelebration userId={user.id} name={user.name} dateOfBirth={user.date_of_birth} />
     </div>
+    </CrumbLabelProvider>
   );
 }
