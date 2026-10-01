@@ -67,8 +67,10 @@ export const FEATURE_FLAGS = {
   // migration 0064's RLS: the database still permits what the UI stops
   // offering, which is the same shape every other flag here has.
   executiveTasks: true,
-  // Internship progress, flagged members, milestone replay.
-  // Team pulse, department check-in, and the streak card are always on —
+  // Internship progress, milestone replay. (Flagged members used to live here
+  // too; Phase 3 folded it into Team pulse's "Not yet" chip.)
+  // Team pulse and department check-in are always on for the Board; the
+  // streak card shows only while a streak is live (and only with dailyLog) —
   // see dashboard/page.tsx.
   dashboardExtras: true,
 } as const;

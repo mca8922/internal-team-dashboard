@@ -1,7 +1,15 @@
 // Daily Log page — the Notion-style editor. The ?date= query param lets the
 // missing-log banner deep-link to a specific backlog day.
 import { redirect } from 'next/navigation';
-import { getCurrentProfile, getLog, getLeaves, getHolidays, getUserTagStats } from '@/lib/queries';
+import {
+  getCurrentProfile,
+  getLog,
+  getLogs,
+  getLeaves,
+  getHolidays,
+  getUserTagStats,
+  streakHealth,
+} from '@/lib/queries';
 import { fmtDate, isWeekend } from '@/lib/dates';
 import { LogEditor } from './LogEditor';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
@@ -18,11 +26,14 @@ export default async function LogPage({
   const { date: dateParam } = await searchParams;
   const date = dateParam || fmtDate(new Date());
 
-  const [log, leaves, holidays, tagStats] = await Promise.all([
+  const [log, leaves, holidays, tagStats, allLogs] = await Promise.all([
     getLog(profile.id, date),
     getLeaves(profile.id),
     getHolidays(),
     getUserTagStats(profile.id),
+    // Full history for the streak in the right rail — a streak can outrun any
+    // windowed query. Always measured as of today, whichever day is open.
+    getLogs(profile.id),
   ]);
 
   const onLeave = leaves.some(
@@ -52,6 +63,7 @@ export default async function LogPage({
       isWeekendDay={isWeekend(date)}
       pastTags={tagStats.map((t) => t.tag)}
       tagStats={tagStats}
+      streak={streakHealth(allLogs)}
     />
   );
 }

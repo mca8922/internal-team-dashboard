@@ -16,6 +16,7 @@
   --color-gold-darker: #A6820E;
   --shadow-gold: 0 4px 14px rgba(201, 162, 39, 0.35);
   --color-slate: #676F7E;
+  --color-slate-bg: rgba(103, 111, 126, 0.12);
   --color-black: #0B0B0B;
   --color-bg: #FAFAF9;
   --color-grey-text: #848687;
@@ -26,6 +27,9 @@
   --color-border: #ECECEA;
   --color-amber-bg: #FEF3C7;
   --color-amber-text: #92400E;
+  /* Team pulse bar's "on leave" segment — amber-text is too dark to read as
+     a fill in light mode, and too pale as one in dark mode. */
+  --color-amber-vivid: #D97706;
   /* "Due today" spotlight — a vivid orange one notch hotter than the amber
      "urgent" (1-3 day) band and one notch cooler than red "Overdue", so the
      deadline-proximity ramp (gold → amber → orange → red) reads as a single
@@ -108,6 +112,7 @@
   --color-white: #15171A;
   --color-black: #F5F5F4;
   --color-slate: #B8BFCC;
+  --color-slate-bg: rgba(184, 191, 204, 0.14);
   --color-grey-text: #8A8C90;
   --color-grey-link: #7B8294;
   --color-dark-grey: #C8CACE;
@@ -116,6 +121,7 @@
   --color-gold-light: #2E260E;
   --color-amber-bg: #3A2D0E;
   --color-amber-text: #FCD34D;
+  --color-amber-vivid: #FCD34D;
   --color-orange: #FB923C;
   --color-orange-bg: #341C0E;
   --color-red-bg: #2A1310;
@@ -13303,3 +13309,423 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
    native-dark rather than light chrome in a dark panel. */
 :root { --assistant-color-scheme: light; }
 [data-theme="dark"] { --assistant-color-scheme: dark; }
+
+/* ===== Team pulse (dashboard, Board view) =====
+   A proportional bar (how the whole team splits right now) sits above a row
+   of pill chips (the same counts, plus pending requests). Each chip is a
+   hover/tap target that opens the roster of the people it counts — the
+   detail lives entirely in the panel, which appears only while a chip is
+   pointed at. */
+/* On very narrow phones "Team pulse · N people" plus the "Board view" badge
+   don't both fit one line — wrap the badge onto its own line rather than
+   letting the title's words break apart mid-phrase. */
+.pulse-card .card-header { flex-wrap: wrap; row-gap: 6px; }
+.pulse-title { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+/* A soft heartbeat rather than a status dot with a fixed meaning — this
+   card is always "live", so the pulse itself is the only thing it needs to
+   say before any number is read. */
+.pulse-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-green-primary);
+  animation: pulseRowDot 1.8s ease-out infinite;
+}
+
+/* Folded into the "Team pulse" title line instead of a line of its own —
+   a muted trailing clause rather than a whole second sentence for one number. */
+.pulse-headcount { font-weight: 400; color: var(--color-grey-text); }
+
+/* While a panel is out the whole card floats above its neighbours — without
+   this the panel paints under the card that follows it in the column. */
+.pulse-card { position: relative; }
+.pulse-card.is-open { z-index: 60; }
+
+/* The bar is a true partition of the team (working + away + idle always
+   sums to ~headcount), so its three segments read as "what today looks
+   like" before a single number is read. Pending requests is a different
+   kind of fact — asks waiting on the Board, not a place someone is — so it
+   lives only in the chip row below, not in the bar. */
+.pulse-bar {
+  display: flex;
+  height: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--color-bg);
+  margin-top: 14px;
+}
+.pulse-bar-seg { height: 100%; transition: width 260ms ease; }
+.pulse-bar-seg:first-child { border-radius: 999px 0 0 999px; }
+.pulse-bar-seg:last-child { border-radius: 0 999px 999px 0; }
+
+.pulse-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.pulse-chip { position: relative; }
+.pulse-chip-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.pulse-chip-btn:hover,
+.pulse-chip.is-open .pulse-chip-btn {
+  border-color: color-mix(in srgb, var(--pulse-accent) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--pulse-accent) 8%, var(--color-bg));
+}
+.pulse-chip-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--pulse-accent) 55%, transparent);
+  outline-offset: 2px;
+}
+.pulse-chip-label { font-size: 12px; font-weight: 600; color: var(--color-grey-text); white-space: nowrap; }
+
+/* The count itself, as a proper badge rather than plain coloured text — a
+   tinted circle that becomes a rounded pill once a number hits two digits,
+   the same notification-count shape used everywhere from OS tray icons to
+   Slack. Background/text is the same light-tint-plus-saturated-text pairing
+   as the app's own .badge, so it's already proven readable in dark mode. */
+.pulse-chip-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Face-pile on the "Not yet" chip — who is flagged, visible without a
+   hover or a click. Overlapping circles read as one group at a glance
+   instead of a list, which is the point: this replaces a whole card. */
+.pulse-facepile { display: flex; align-items: center; margin-left: 1px; }
+.pulse-facepile-avatar {
+  display: block;
+  margin-left: -7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-card);
+}
+.pulse-facepile-avatar:first-child { margin-left: 0; }
+.pulse-facepile-avatar .avatar { width: 17px; height: 17px; font-size: 7.5px; }
+.pulse-facepile-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -7px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-card);
+  background: var(--color-card);
+  font-size: 7.5px;
+  font-weight: 700;
+  color: var(--color-grey-text);
+}
+
+/* The roster panel. Anchored to its tile and aligned outward so the two
+   right-hand tiles open leftwards instead of off the card. Wide enough that
+   a full name, a department and a job title all fit on their own lines. */
+.pulse-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 40;
+  width: 400px;
+  max-width: min(400px, 84vw);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  animation: pulsePanelIn 140ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.pulse-panel--left { left: 0; }
+.pulse-panel--right { right: 0; }
+@keyframes pulsePanelIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+.pulse-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-grey-text);
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--pulse-accent) 8%, transparent);
+}
+.pulse-panel-count { color: var(--pulse-accent); font-size: 12px; }
+.pulse-panel-body { max-height: 330px; overflow-y: auto; padding: 5px; }
+
+.pulse-group {
+  padding: 8px 9px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-grey-text);
+}
+.pulse-empty { padding: 14px 14px; font-size: 12px; color: var(--color-grey-text); }
+
+/* A row is a 3-column table: face | person | value. The middle column is the
+   only one allowed to take the slack, and NOTHING is truncated — long names
+   and departments wrap to a second line instead of being cut off. */
+.pulse-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  transition: background 130ms ease;
+}
+.pulse-row + .pulse-row { box-shadow: inset 0 1px 0 var(--color-border); }
+.pulse-row:hover { background: var(--color-bg); }
+.pulse-row:hover + .pulse-row,
+.pulse-row:hover { box-shadow: none; }
+.pulse-row-avatar { position: relative; flex-shrink: 0; display: block; }
+.pulse-row-avatar .avatar { width: 30px; height: 30px; font-size: 11px; }
+/* Realtime presence — in the app this second, which is not the same thing
+   as being punched in. */
+.pulse-row-online {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid var(--color-card);
+}
+
+.pulse-row-person { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.pulse-row-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-black);
+  overflow-wrap: break-word;
+}
+.pulse-row-dept {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+}
+.pulse-row-note {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--color-grey-text);
+  overflow-wrap: break-word;
+}
+
+/* The value column never wraps. Its contents are short, indivisible facts —
+   "3h 42m", "since 11:24 AM · WFH", "Sep 14 – Sep 16" — and letting them
+   break turned a duration into a two-line stack and a timestamp into four.
+   Staying nowrap also keeps this an honest `auto` grid track: it asks for
+   exactly the width of its longest line and the person column takes the
+   rest, instead of both collapsing towards min-content. */
+.pulse-row-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 1px;
+}
+.pulse-row-value-main {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pulse-row-value-sub {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--color-grey-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pulse-row-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.pulse-row-dot--live { animation: pulseRowDot 1.8s ease-out infinite; }
+@keyframes pulseRowDot {
+  0%   { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  70%  { box-shadow: 0 0 0 5px transparent; opacity: 0.75; }
+  100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+}
+
+/* A chip is narrower than the panel, so the panel grows sideways from the
+   chip's own edge rather than trying to sit centred over it. */
+@media (max-width: 1000px) {
+  .pulse-panel { max-width: min(400px, 88vw); }
+}
+
+/* On a narrow phone the panel just spans the card instead of the chip. */
+@media (max-width: 640px) {
+  .pulse-panel,
+  .pulse-panel--left,
+  .pulse-panel--right {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-panel { animation: none; }
+  .pulse-row-dot--live,
+  .pulse-live-dot { animation: none; }
+}
+
+
+/* ===== Dashboard — Department check-in (Phase 3, right column) =====
+   One row per department, sorted lowest check-in first so the department that
+   needs a look is already on top. A row is a 3-column grid — dot | name | count
+   — over a full-width bar, so it holds up from a 1/3-width desktop column down
+   to a phone: long names wrap instead of being cut, and the count column never
+   wraps. The summary line above repeats the whole-firm total. */
+.dept-card .card-header { flex-wrap: wrap; row-gap: 6px; align-items: flex-start; }
+.dept-total { font-size: 12px; color: var(--color-grey-text); margin-top: 4px; }
+.dept-total strong { color: var(--color-black); font-weight: 600; font-variant-numeric: tabular-nums; }
+.dept-total-pct {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--color-green-light);
+  color: var(--color-green-primary);
+  white-space: nowrap;
+}
+.dept-list { display: grid; gap: 14px; margin-top: 4px; }
+.dept-row { display: grid; gap: 7px; }
+.dept-row-head {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 9px;
+}
+.dept-row-dot { width: 10px; height: 10px; border-radius: 3px; }
+.dept-row-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-black);
+  overflow-wrap: anywhere;
+}
+.dept-row-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-grey-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dept-row-count b { font-weight: 700; color: var(--color-black); }
+.dept-row-pct {
+  min-width: 38px;
+  text-align: right;
+  font-weight: 700;
+  color: var(--color-dark-grey);
+}
+.dept-row[data-tone='full'] .dept-row-pct { color: var(--color-green-primary); }
+.dept-row[data-tone='low'] .dept-row-pct { color: var(--color-amber-text); }
+.dept-row[data-tone='none'] .dept-row-pct { color: var(--color-red); }
+.dept-row-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+.dept-row-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 260ms ease;
+}
+.dept-empty { font-size: 13px; color: var(--color-grey-text); }
+
+/* ===== Log streak card (Dashboard + Daily Log rail) =====
+   --tier-color comes from tierFor() so the chip matches the Team Analytics
+   heatmap's flame for the same length. At risk turns the card amber with an
+   actionable line; ended dims it. */
+.streak-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.streak-chip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--tier-color);
+  background: color-mix(in srgb, var(--tier-color) 14%, transparent);
+}
+.streak-chip.is-risk { color: var(--color-amber-text); background: var(--color-amber-bg); }
+.streak-chip.is-lost { color: var(--color-grey-text); background: var(--color-bg); border: 1px solid var(--color-border); }
+.streak-card-body { display: flex; align-items: center; gap: 12px; }
+.streak-flame { font-size: 32px; line-height: 1; }
+.streak-count { min-width: 0; }
+.streak-count-num {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-black);
+}
+.streak-count-label { font-size: 12px; color: var(--color-grey-text); }
+.streak-alert {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-amber-text);
+  background: var(--color-amber-bg);
+}
+a.streak-alert:hover { filter: brightness(0.97); }
+.streak-card.is-at-risk { border-color: color-mix(in srgb, var(--color-amber-text) 40%, var(--color-border)); }
+.streak-card.is-at-risk .streak-flame { animation: streakFlicker 1.6s ease-in-out infinite; }
+.streak-card.is-ended .streak-flame { filter: grayscale(1); opacity: 0.45; }
+.streak-card.is-ended .streak-count-num { color: var(--color-grey-text); }
+@keyframes streakFlicker {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.94); }
+}
+/* Daily Log rail variant: no card chrome, sits like the Mood/Energy fields,
+   with a divider underneath separating it from them. */
+.streak-card--rail {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+.streak-card--rail .streak-flame { font-size: 26px; }
+.streak-card--rail .streak-count-num { font-size: 24px; }
+@media (prefers-reduced-motion: reduce) {
+  .streak-card.is-at-risk .streak-flame { animation: none; }
+}

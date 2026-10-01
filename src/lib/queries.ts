@@ -8,8 +8,6 @@ import {
   fmtDate,
   addDays,
   parseDate,
-  startOfDay,
-  isWorkingDay,
   istDayStartMs,
   daysBetween,
   GO_LIVE_DATE,
@@ -20,7 +18,6 @@ import type {
   UserRole,
   Punch,
   WorkLog,
-  Block,
   Goal,
   GoalAssignee,
   GoalChecklistItem,
@@ -773,49 +770,10 @@ export function activeOpenSession<T extends { punch_in: string; punch_out: strin
   return best;
 }
 
-// True once a log carries actual typed text, not just the day's seeded
-// section headings. LogEditor autosaves every 30s (and on unmount) with no
-// emptiness check, so `blocks` is never actually empty — a day the member
-// opened but never wrote in still gets the three h3 prompts + blank text
-// blocks persisted. Mirrors LogEditor's own `isEmpty` check (h3 headings
-// are structural, not content) so "logged" means the same thing everywhere
-// this gets checked — streaks, calendars, dashboards, team views.
-export function logHasContent(blocks: Block[] | null | undefined): boolean {
-  if (!blocks || !blocks.length) return false;
-  return blocks.some((b) => {
-    if (b.type === 'h3') return false;
-    return (b.content || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() !== '';
-  });
-}
-
-// Consecutive working days (Mon–Fri, on/after go-live) with a non-empty log,
-// counted back from the most recent working day. Today only breaks the
-// streak if it is itself a past working day with no log — an as-yet-unlogged
-// "today" doesn't reset a streak built on prior days.
-export function logStreak(logs: WorkLog[]): number {
-  const logged = new Set(
-    logs.filter((l) => logHasContent(l.blocks)).map((l) => l.log_date),
-  );
-  let streak = 0;
-  let d = startOfDay(new Date());
-  const todayStr = fmtDate(new Date());
-  for (let i = 0; i < 400; i++) {
-    if (!isWorkingDay(d)) {
-      d = addDays(d, -1);
-      if (fmtDate(d) < GO_LIVE_DATE) break;
-      continue;
-    }
-    const ds = fmtDate(d);
-    if (logged.has(ds)) {
-      streak += 1;
-    } else if (ds !== todayStr) {
-      break; // a past working day with no log ends the streak
-    }
-    d = addDays(d, -1);
-    if (fmtDate(d) < GO_LIVE_DATE) break;
-  }
-  return streak;
-}
+// logHasContent / logStreak / streakHealth live in the pure @/lib/streak
+// (testable, and importable from client components — this file pulls in the
+// server Supabase client). Re-exported so every existing import keeps working.
+export { logHasContent, logStreak, streakHealth } from '@/lib/streak';
 
 export function isOnLeave(leaves: Leave[], userId: string, date: string): boolean {
   return leaves.some(

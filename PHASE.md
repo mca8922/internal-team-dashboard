@@ -67,6 +67,58 @@ Still open (not done): DB-side `auth_rls_initplan` warnings + unindexed FKs
 on the goal tables (see Supabase performance advisor), column-narrowing the
 work-report/completion queries, and `next/image` for avatars.
 
+## Phase 3 — Dashboard improvements (done, branch `phase-3/dashboard-improvements`)
+
+The dashboard was trimmed and its leadership cards reworked, partly ported
+from the reStrucAI Internal Team Dashboard. There are no data-model changes
+and no new queries on the dashboard; the Daily Log page adds one `getLogs()`.
+
+1. **Removed**: the "Open today's log" / "Go to punch" header buttons,
+   the Quick actions card, the Recent logs card, and the Board's Flagged
+   members card. Flagged members was never a flag flip; its list now lives in
+   Team pulse's "Not yet" chip (item 4). Both pages are still one click away
+   in the sidebar. When the right column has nothing to show (a member with
+   no live streak), the main column takes the full width.
+2. **Log streak**: shown on the Dashboard **only while the streak is live
+   (1+ days)**. It is safe, or "Ends tonight" (amber, with a link to the log)
+   when today is a working day and today's log isn't written yet. At 0 (never
+   started, or just broken), the card is not rendered. The Daily Log page's
+   right rail (above Mood) always shows it, in every state, including
+   "Streak lost · N days" for 7 days after a run of 3+ breaks. It upgrades to
+   the day earned as soon as today's log has text, since saving doesn't
+   refresh the page.
+   - `logHasContent` / `logStreak` moved from `queries.ts` (server-only) to
+     the pure `src/lib/streak.ts`, plus new `streakHealth()`. `queries.ts`
+     re-exports all three, so existing imports are unchanged.
+     `src/lib/streak.test.ts` covers them.
+   - **The streak rule itself is unchanged**: weekends pause it, and any other
+     unlogged past working day breaks it, holidays and leave included.
+     reStrucAI also pauses on holidays and leave, and counts logs written on
+     days off. That rule was deliberately **not** ported. If you ever want it,
+     change it in `logStreak()`, and the at-risk check in `streakHealth()`
+     must follow.
+   - The card is shared: `src/components/StreakCard.tsx`
+     (`variant="card" | "rail"`). The old `dashboard/StreakCard.tsx` was
+     deleted.
+3. **Department check-in** (Board only) moved to the **right column**. It now
+   shows one bar per department instead of a donut each. It has a firm-wide
+   "X of Y punched in today" summary and a % pill, and rows are sorted lowest
+   check-in first. Each row is dot | name | `in/total` + %, with the % colored
+   by tone (100% green, under 50% amber, 0% red). Long names wrap, and the
+   count column never does. `DepartmentCheckIn` is in `dashboard/page.tsx`.
+4. **Team pulse**: a port of reStrucAI's `src/components/TeamPulse.tsx`.
+   It has a proportional bar (punched in / on leave / not yet) and four pill
+   chips. Each chip opens on hover, or is pinned on tap, and shows a roster
+   of the people behind its number: live-ticking hours and "since 11:24 AM"
+   for whoever is on the clock, leave type and dates, who is in the app but
+   not punched in (realtime presence), and pending requests with who
+   pre-accepted them. "Not yet" carries a face-pile. On phones (≤640px), the
+   panels span the card. The only difference from reStrucAI: there is no
+   In Office / WFH chip, because MCA has no work mode. CSS adds the
+   `--color-slate-bg` and `--color-amber-vivid` tokens (light + dark).
+
+Verified with `tsc --noEmit` + `vitest run` (155 tests) + `next build`.
+
 ## Punch request visibility (done, rides on `punchRequests`)
 
 - Punch page card: the quota now reads **"X of 5 left this month"** in a

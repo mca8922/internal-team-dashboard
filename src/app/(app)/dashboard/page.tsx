@@ -8,15 +8,13 @@ import {
   getAllPunches,
   getGoals,
   getGoalAssignees,
-  getRecentLogs,
   getLogs,
   getLeaves,
   getDepartmentColors,
   punchTotalMsForDate,
   punchStatus,
   activeOpenSession,
-  logStreak,
-  logHasContent,
+  streakHealth,
   isOnLeave,
   visibleGoals,
   getBirthdayCelebrants,
@@ -31,17 +29,18 @@ import {
   addMonths,
   daysBetween,
   startOfWeek,
+  punchTotalMs,
 } from '@/lib/dates';
 import { targetHours, roleLabel, isFounder, isManager } from '@/lib/roles';
 import { LEVEL_META, deriveGoalStatus } from '@/app/(app)/goals/goal-ui';
-import { Donut } from '@/components/ui';
 import { ManagerBadge } from '@/components/ManagerBadge';
 import { PunchWidget } from './PunchWidget';
-import { StreakCard } from './StreakCard';
-import { BlockRender } from '@/components/BlockEditor';
+import { StreakCard } from '@/components/StreakCard';
+import { TeamPulse } from '@/components/TeamPulse';
+import type { TeamPulseData, PulseWorking, PulseAway, PulseRequest } from '@/components/TeamPulse';
 import { LeaveReviewRow } from './LeaveReviewRow';
 import { BirthdayBanner } from './BirthdayBanner';
-import type { Profile, UserRole } from '@/lib/types';
+import type { Profile, Punch, UserRole } from '@/lib/types';
 import { MilestoneReplayButton } from '@/components/MilestoneReplayButton';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
@@ -115,13 +114,62 @@ function Greeting({
   );
 }
 
-function Stat({ label, value, color }: { label: string; value: number; color: string }) {
+// Department check-in — Board only, right column (Phase 3). Replaces the
+// donut-per-department row: a bar per department reads at any width, from a
+// 1/3 desktop column down to a phone, where a row of 56px donuts wrapped
+// unpredictably. Rows arrive sorted lowest check-in first.
+function DepartmentCheckIn({
+  depts,
+}: {
+  depts: { name: string; total: number; punched: number; color: string }[];
+}) {
+  const total = depts.reduce((n, d) => n + d.total, 0);
+  const punched = depts.reduce((n, d) => n + d.punched, 0);
+  const overall = total === 0 ? 0 : Math.round((punched / total) * 100);
   return (
-    <div>
-      <div className="text-xs text-grey">{label}</div>
-      <div className="text-3xl fw-bold mt-1" style={{ color }}>
-        {value}
+    <div className="card dept-card">
+      <div className="card-header">
+        <div>
+          <div className="card-subtitle">Department check-in</div>
+          <div className="dept-total">
+            <strong>{punched}</strong> of <strong>{total}</strong> punched in today
+          </div>
+        </div>
+        <span className="dept-total-pct">{overall}%</span>
       </div>
+      {depts.length === 0 ? (
+        <div className="dept-empty">No departments yet.</div>
+      ) : (
+        <div className="dept-list">
+          {depts.map((d) => {
+            const pct = d.total === 0 ? 0 : Math.round((d.punched / d.total) * 100);
+            const tone = pct === 100 ? 'full' : pct === 0 ? 'none' : pct < 50 ? 'low' : 'ok';
+            return (
+              <div
+                key={d.name}
+                className="dept-row"
+                data-tone={tone}
+                role="group"
+                aria-label={`${d.name}: ${d.punched} of ${d.total} punched in, ${pct}%`}
+              >
+                <div className="dept-row-head">
+                  <span className="dept-row-dot" style={{ background: d.color }} aria-hidden />
+                  <span className="dept-row-name">{d.name}</span>
+                  <span className="dept-row-count">
+                    <span>
+                      <b>{d.punched}</b>/{d.total}
+                    </span>
+                    <span className="dept-row-pct">{pct}%</span>
+                  </span>
+                </div>
+                <div className="dept-row-track" aria-hidden>
+                  <div className="dept-row-fill" style={{ width: `${pct}%`, background: d.color }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -144,13 +192,12 @@ export default async function DashboardPage() {
   // 0056_birthday_privacy.sql), not just hidden in the UI. It depends on none of
   // the other queries, so it rides the same parallel batch instead of running
   // as a separate serial round-trip afterwards.
-  const [myPunches, myLogs, myAllLogs, allGoals, assignees, boardData, celebrants] =
+  const [myPunches, myAllLogs, allGoals, assignees, boardData, celebrants] =
     await Promise.all([
       getPunches(profile.id, punchFrom),
-      getRecentLogs(profile.id),
-      // The streak can run longer than getRecentLogs' window (it used to get
-      // silently cut short there once a streak passed 40 days) — logStreak
-      // needs the complete history to walk all the way back to where it broke.
+      // The streak can run longer than getRecentLogs' 40-day window (it used to
+      // get silently cut short there) — logStreak needs the complete history to
+      // walk all the way back to where it broke.
       getLogs(profile.id),
       getGoals(),
       getGoalAssignees(),
@@ -187,7 +234,12 @@ export default async function DashboardPage() {
   // Total for today, splitting any session that crossed midnight so only the
   // minutes worked after 00:00 IST count toward today.
   const total = punchTotalMsForDate(myPunches, today);
-  const streak = logStreak(myAllLogs);
+  // Phase 3: the Dashboard shows the streak card only while a streak is live
+  // (1+ days) — 'safe', or 'at_risk' when today's log is still owed and it
+  // ends at midnight. At 0 (never started, or just broken) the card is not
+  // rendered at all; the Daily Log page is where a lost streak is reported.
+  const health = streakHealth(myAllLogs);
+  const showStreak = FEATURE_FLAGS.dailyLog && health.streak >= 1;
   // Tasks landing in the current week (Mon–Sun), already scoped by visibleGoals
   // above. There is no Weekly TIER any more — the cascade runs Yearly →
   // Half-Yearly → Quarterly → Monthly → Daily — so "this week" is now a due-date
@@ -204,12 +256,6 @@ export default async function DashboardPage() {
       deriveGoalStatus(g) !== 'achieved' &&
       deriveGoalStatus(g) !== 'not_met',
   );
-  // Most recent logs that actually have content, newest first.
-  const recentLogs = [...myLogs]
-    .filter((l) => logHasContent(l.blocks))
-    .sort((a, b) => b.log_date.localeCompare(a.log_date))
-    .slice(0, 4);
-
   // Internship tenure progress - interns only, when the board has set it.
   let internship: {
     month: number;
@@ -244,8 +290,6 @@ export default async function DashboardPage() {
     onLeave: number;
     notYet: number;
     pending: number;
-    flaggedPunch: Profile[];
-    flaggedLog: Profile[];
     pendingLeaves: {
       id: string;
       userName: string;
@@ -255,6 +299,9 @@ export default async function DashboardPage() {
       preApproverName: string | null;
     }[];
     depts: { name: string; total: number; punched: number; color: string }[];
+    // Everything the Team pulse card needs to name the people behind each
+    // number, not just count them. See components/TeamPulse.tsx.
+    pulse: TeamPulseData;
   } | null = null;
 
   if (isBoard && boardData) {
@@ -286,17 +333,103 @@ export default async function DashboardPage() {
       if (punchedSet.has(u.id)) depts[u.department].punched += 1;
     });
 
+    // --- Team pulse roster -------------------------------------------------
+    // Same four buckets as the counts above, but carrying the people. Built
+    // from data already in hand (today's punches, leaves, dept colours), so
+    // the richer card costs no extra query. Ported from reStrucAI.
+    const pulsePerson = (u: Profile) => ({
+      id: u.id,
+      name: u.name,
+      avatarUrl: u.avatar_url,
+      department: u.department,
+      deptColor: deptColors[u.department] ?? 'var(--color-green-primary)',
+      jobTitle: u.job_title || roleLabel(u.role),
+    });
+
+    const sessionsOf = new Map<string, Punch[]>();
+    todayAll.forEach((p) => {
+      const list = sessionsOf.get(p.user_id);
+      if (list) list.push(p);
+      else sessionsOf.set(p.user_id, [p]);
+    });
+
+    const working: PulseWorking[] = profiles
+      .filter((u) => punchedSet.has(u.id))
+      .map((u) => {
+        // getAllPunches orders by punch_in, so the last row is the most recent.
+        const sessions = sessionsOf.get(u.id) ?? [];
+        const open = sessions.find((s) => !s.punch_out) ?? null;
+        const closed = sessions.filter((s) => s.punch_out);
+        return {
+          ...pulsePerson(u),
+          // Only the finished stretches are fixed; the open one is sent as a
+          // start time and ticks on the client.
+          openSince: open ? open.punch_in : null,
+          closedMs: punchTotalMs(closed),
+          lastOut: closed.length > 0 ? closed[closed.length - 1].punch_out : null,
+          sessions: sessions.length,
+        };
+      })
+      .sort((a, b) => Number(Boolean(b.openSince)) - Number(Boolean(a.openSince)));
+
+    const away: PulseAway[] = profiles.flatMap((u) => {
+      const l = allLeaves.find(
+        (x) =>
+          x.user_id === u.id &&
+          x.status === 'approved' &&
+          today >= x.start_date &&
+          today <= x.end_date,
+      );
+      if (!l) return [];
+      return [
+        {
+          ...pulsePerson(u),
+          leaveType: l.type,
+          halfDay: l.is_half_day,
+          startDate: l.start_date,
+          endDate: l.end_date,
+        },
+      ];
+    });
+
+    // Includes the viewer like anyone else, so this always matches `notYet`.
+    // This list replaces the old "Flagged members" card.
+    const idle = profiles
+      .filter((u) => !punchedSet.has(u.id) && !isOnLeave(allLeaves, u.id, today))
+      .map(pulsePerson);
+
+    const requests: PulseRequest[] = pendingList
+      .slice()
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .flatMap((l) => {
+        const u = profiles.find((p) => p.id === l.user_id);
+        if (!u) return [];
+        const acc = l.pre_approved_by
+          ? profiles.find((p) => p.id === l.pre_approved_by)
+          : null;
+        return [
+          {
+            ...pulsePerson(u),
+            reqId: l.id,
+            leaveType: l.type,
+            halfDay: l.is_half_day,
+            startDate: l.start_date,
+            endDate: l.end_date,
+            // Same count the Leaves page uses: half-day = 0.5, otherwise
+            // inclusive calendar days.
+            days: l.is_half_day ? 0.5 : daysBetween(l.start_date, l.end_date) + 1,
+            askedAt: l.created_at,
+            preApprovedBy: l.pre_approved_by ? (acc?.name ?? 'A Board Member') : null,
+          },
+        ];
+      });
+
     board = {
       profiles,
       punchedIn,
       onLeave,
       notYet,
       pending: pendingList.length,
-      flaggedPunch: profiles.filter(
-        (u) =>
-          u.id !== profile.id && !punchedSet.has(u.id) && !isOnLeave(allLeaves, u.id, today),
-      ),
-      flaggedLog: [],
       pendingLeaves: reviewableList.slice(0, 3).map((l) => {
         const u = profiles.find((p) => p.id === l.user_id);
         const acc = l.pre_approved_by
@@ -314,12 +447,38 @@ export default async function DashboardPage() {
           preApproverName: l.pre_approved_by ? (acc?.name ?? 'A Board Member') : null,
         };
       }),
-      depts: Object.values(depts),
+      // Lowest check-in first — the department that needs a look surfaces at
+      // the top instead of wherever it happened to sit in the roster.
+      depts: Object.values(depts).sort((a, b) => {
+        const pctA = a.total === 0 ? 0 : a.punched / a.total;
+        const pctB = b.total === 0 ? 0 : b.punched / b.total;
+        return pctA - pctB || a.name.localeCompare(b.name);
+      }),
+      pulse: {
+        // Summed from the buckets rather than profiles.length, so the bar
+        // always fills exactly even if a bucket's rule changes.
+        headcount: working.length + away.length + idle.length,
+        // Stamped here so the card's first client render matches SSR before
+        // its own clock takes over.
+        nowMs: Date.now(),
+        working,
+        away,
+        idle,
+        requests,
+      },
     };
   }
 
+  // The right column only exists when it has something to show. For a member
+  // with no live streak it would be empty, so the main column takes the full
+  // width instead of leaving a blank third of the page.
+  const hasSide = showStreak || !!board;
+
   return (
     <div>
+      {/* Phase 3: the "Open today's log" / "Go to punch" buttons that sat to
+          the right of the greeting are gone — both pages are one click away in
+          the sidebar, and the punch card below has its own button. */}
       <div className="page-header" style={{ marginBottom: 28 }}>
         <Greeting
           name={profile.name}
@@ -332,16 +491,6 @@ export default async function DashboardPage() {
             ) : null
           }
         />
-        <div className="page-header-actions">
-          {FEATURE_FLAGS.dailyLog ? (
-            <Link href="/log" className="btn btn-secondary">
-              Open today&apos;s log
-            </Link>
-          ) : null}
-          <Link href="/punch" className="btn">
-            Go to punch
-          </Link>
-        </div>
       </div>
 
       {/* align-items:start keeps each column at its natural height. Without it
@@ -349,10 +498,10 @@ export default async function DashboardPage() {
           right one, and CSS Grid then inflates each card to fill — leaving a
           dead blank area inside the short Punch card. */}
       <div
-        className="grid grid-2fr1fr"
-        style={{ gridTemplateColumns: '2fr 1fr', gap: 16, alignItems: 'start' }}
+        className={hasSide ? 'grid grid-2fr1fr' : 'grid'}
+        style={{ gridTemplateColumns: hasSide ? '2fr 1fr' : '1fr', gap: 16, alignItems: 'start' }}
       >
-        <div className="grid gap-4">
+        <div className="grid gap-4" style={{ minWidth: 0 }}>
           <PunchWidget
             initialStatus={status}
             initialTotalMs={total}
@@ -398,25 +547,7 @@ export default async function DashboardPage() {
             </div>
           ) : null}
 
-          {isBoard && board ? (
-            <div className="card active-card">
-              <div className="card-header">
-                <div>
-                  <div className="card-subtitle">Team pulse</div>
-                  <div className="text-xs text-grey mt-1">
-                    Live · {board.profiles.length} people
-                  </div>
-                </div>
-                <span className="badge badge-slate">Board view</span>
-              </div>
-              <div className="grid grid-4 gap-3 mt-3">
-                <Stat label="Punched in" value={board.punchedIn} color="var(--color-green-primary)" />
-                <Stat label="On leave" value={board.onLeave} color="var(--color-amber-text)" />
-                <Stat label="Not yet" value={board.notYet} color="var(--color-red)" />
-                <Stat label="Pending reqs" value={board.pending} color="var(--color-slate)" />
-              </div>
-            </div>
-          ) : null}
+          {board ? <TeamPulse data={board.pulse} /> : null}
 
           <div className="card" data-tour="goals-card">
             <div className="card-header">
@@ -463,154 +594,41 @@ export default async function DashboardPage() {
               </div>
             )}
           </div>
-
-          {isBoard && board ? (
-            <div className="card">
-              <div className="card-subtitle mb-4">Department check-in</div>
-              <div className="flex items-center gap-6" style={{ flexWrap: 'wrap' }}>
-                {board.depts.map((d) => {
-                  const pct = d.total === 0 ? 0 : (d.punched / d.total) * 100;
-                  return (
-                    <div key={d.name} className="flex items-center gap-3">
-                      <div className="relative">
-                        <Donut
-                          data={[{ value: pct, color: d.color }]}
-                          total={100}
-                          size={56}
-                          thickness={8}
-                        />
-                        <div
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            display: 'grid',
-                            placeItems: 'center',
-                            fontSize: 12,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {Math.round(pct)}%
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm fw-medium">{d.name}</div>
-                        <div className="text-xs text-grey">
-                          {d.punched}/{d.total} in
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
         </div>
 
-        <div className="grid gap-4">
-          <StreakCard streak={streak} />
+        {/* Right column (Phase 3): Quick actions, Recent logs and Flagged
+            members are gone — the last now lives in Team pulse's "Not yet"
+            chip. What's left: the streak (only while live), then the Board's
+            Department check-in and leave inbox. */}
+        {hasSide ? (
+          <div className="grid gap-4" style={{ minWidth: 0 }}>
+            {showStreak ? (
+              <StreakCard streak={health.streak} state={health.state} />
+            ) : null}
 
-          <div className="card">
-            <div className="card-subtitle mb-3">Quick actions</div>
-            <div className="grid gap-2">
-              <Link href="/punch" className="btn btn-secondary">Punch In/Out</Link>
-              {FEATURE_FLAGS.dailyLog ? (
-                <Link href="/log" className="btn btn-secondary">Log today&apos;s work</Link>
-              ) : null}
-              <Link href="/goals" className="btn btn-secondary">View tasks</Link>
-              <Link href="/leaves" className="btn btn-secondary">Request leave</Link>
-            </div>
+            {board ? <DepartmentCheckIn depts={board.depts} /> : null}
+
+            {board ? (
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-subtitle">Pending leave requests</div>
+                  <Link href="/leaves" className="text-green text-xs fw-medium">
+                    View all →
+                  </Link>
+                </div>
+                {board.pendingLeaves.length === 0 ? (
+                  <div className="text-grey text-sm mt-2">No leave requests need review.</div>
+                ) : (
+                  <div className="grid gap-2">
+                    {board.pendingLeaves.map((l) => (
+                      <LeaveReviewRow key={l.id} {...l} isFounder={founder} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
-
-          {FEATURE_FLAGS.dailyLog ? (
-            <div className="card">
-              <div className="card-header">
-                <div className="card-subtitle">Recent logs</div>
-                <Link href="/log/history" className="text-green text-xs fw-medium">
-                  View all →
-                </Link>
-              </div>
-              {recentLogs.length === 0 ? (
-                <div className="text-grey text-sm mt-2">
-                  No logs yet. <Link href="/log" className="text-green">Write today&apos;s →</Link>
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {recentLogs.map((l) => (
-                    <Link
-                      key={l.id}
-                      href={'/log?date=' + l.log_date}
-                      style={{
-                        display: 'block',
-                        padding: 10,
-                        borderRadius: 8,
-                        background: 'var(--color-bg)',
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm fw-medium">
-                          {fmtRelative(parseDate(l.log_date))}
-                        </div>
-                        {l.mood ? <span style={{ fontSize: 16 }}>{l.mood}</span> : null}
-                      </div>
-                      <div
-                        className="text-xs text-grey"
-                        style={{ maxHeight: 36, overflow: 'hidden', marginTop: 2 }}
-                      >
-                        <BlockRender blocks={(l.blocks || []).slice(0, 1)} />
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          {isBoard && board ? (
-            <div className="card">
-              <div className="card-header">
-                <div className="card-subtitle">Pending leave requests</div>
-                <Link href="/leaves" className="text-green text-xs fw-medium">
-                  View all →
-                </Link>
-              </div>
-              {board.pendingLeaves.length === 0 ? (
-                <div className="text-grey text-sm mt-2">No leave requests need review.</div>
-              ) : (
-                <div className="grid gap-2">
-                  {board.pendingLeaves.map((l) => (
-                    <LeaveReviewRow key={l.id} {...l} isFounder={founder} />
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          {FEATURE_FLAGS.dashboardExtras && isBoard && board ? (
-            <div className="card">
-              <div className="card-subtitle mb-3">Flagged members</div>
-              {board.flaggedPunch.length === 0 ? (
-                <div className="text-grey text-sm">Everyone is punched in.</div>
-              ) : (
-                <div>
-                  <div className="text-xs fw-medium text-grey mb-2">Not punched in today</div>
-                  {board.flaggedPunch.map((u) => (
-                    <Link
-                      key={u.id}
-                      href={`/team/${u.id}`}
-                      className="flex items-center gap-3 mb-2"
-                    >
-                      <span className="badge badge-red">No punch</span>
-                      <div className="flex-1">
-                        <div className="text-sm fw-medium">{u.name}</div>
-                        <div className="text-xs text-grey">{roleLabel(u.role)}</div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
+        ) : null}
       </div>
     </div>
   );

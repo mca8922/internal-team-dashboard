@@ -12,9 +12,11 @@ import { BlockEditor, BlockRender } from '@/components/BlockEditor';
 import { useToast } from '@/components/Toast';
 import { useConfirm } from '@/components/ConfirmDialog';
 import { TagManagerModal } from './TagManagerModal';
+import { StreakCard } from '@/components/StreakCard';
 import { saveLog, deleteLog } from '@/lib/actions';
-import { fmtDate, fmtFriendly, parseDate, addDays, fmtRelative, fmtTime } from '@/lib/dates';
+import { fmtDate, fmtFriendly, parseDate, addDays, fmtRelative, fmtTime, isWorkingDay } from '@/lib/dates';
 import type { Block } from '@/lib/types';
+import type { StreakHealth } from '@/lib/streak';
 
 // Each mood gets a friendly label that surfaces as a hover tooltip. The
 // emoji itself is what gets persisted to log.mood (DB shape unchanged).
@@ -353,6 +355,7 @@ export function LogEditor({
   isWeekendDay,
   pastTags = [],
   tagStats = [],
+  streak,
 }: {
   date: string;
   initialLog: LogState;
@@ -366,6 +369,9 @@ export function LogEditor({
   // pie chart. Superset of pastTags; kept separate since most callers only
   // need the plain names.
   tagStats?: { tag: string; count: number }[];
+  // The member's streak as of today (streakHealth), for the right rail.
+  // Always about TODAY, whichever day the editor has open.
+  streak: StreakHealth;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -516,6 +522,15 @@ export function LogEditor({
   const isEmpty = (['notes', 'journal', 'learning'] as SectionKey[]).every((k) =>
     sections[k].every((b) => !blockText(b)),
   );
+
+  // Saving doesn't refresh this page, so the server-computed streak would keep
+  // saying "Ends tonight" while the member is mid-sentence. Once today's log
+  // has real text, show the day as earned — the 30s autosave (and the one on
+  // unmount) persists it, and the next server render agrees.
+  const shownStreak: StreakHealth =
+    isToday && !isEmpty && streak.state !== 'safe' && isWorkingDay(today)
+      ? { streak: streak.streak + 1, state: 'safe', lost: 0, lostOn: null }
+      : streak;
 
   // Ctrl/Cmd+S force-saves immediately — the instinct anyone with a visible
   // "Save" button reaches for, rather than waiting on the 30s autosave tick.
@@ -692,6 +707,15 @@ export function LogEditor({
         {/* Right rail — Mood, Energy and Tags stacked one after another. Stays
             pinned while the writer scrolls through the cards on the left. */}
         <aside className="editor-meta" data-tour="log-meta">
+          {/* Every state shows here, including 0 and a recently lost run —
+              unlike the Dashboard, which only shows a live streak. */}
+          <StreakCard
+            variant="rail"
+            streak={shownStreak.streak}
+            state={shownStreak.state}
+            lost={shownStreak.lost}
+            lostOn={shownStreak.lostOn}
+          />
           <div className="editor-meta__field">
             <div className="text-xs text-grey fw-medium mb-1">Mood</div>
             <div className="mood-picker">
