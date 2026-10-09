@@ -215,6 +215,22 @@ function Chip({
   const [pinned, setPinned] = React.useState(false);
   const wrapRef = React.useRef<HTMLDivElement>(null);
 
+  // Hover-out closes after a beat rather than instantly, so a pointer
+  // travelling from the chip down into its panel (or cutting a corner on the
+  // way) doesn't drop the panel mid-trip. Re-entering cancels the close.
+  const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelClose = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpen(false), 150);
+  };
+  React.useEffect(() => cancelClose, []);
+
   const notify = React.useRef(onOpenChange);
   notify.current = onOpenChange;
   React.useEffect(() => {
@@ -246,9 +262,12 @@ function Chip({
       ref={wrapRef}
       className={`pulse-chip${open ? ' is-open' : ''}`}
       style={{ ['--pulse-accent' as string]: color }}
-      onMouseEnter={() => setOpen(true)}
+      onMouseEnter={() => {
+        cancelClose();
+        setOpen(true);
+      }}
       onMouseLeave={() => {
-        if (!pinned) setOpen(false);
+        if (!pinned) scheduleClose();
       }}
     >
       <button

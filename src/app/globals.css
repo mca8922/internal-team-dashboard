@@ -13360,6 +13360,17 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
 
 .pulse-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .pulse-chip { position: relative; }
+/* Invisible bridge over the 8px gap between an open chip and its panel.
+   Without it the pointer briefly leaves the chip on its way down to the
+   list, mouseleave fires and the panel closes before it can be reached. */
+.pulse-chip.is-open::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 10px;
+}
 .pulse-chip-btn {
   display: flex;
   align-items: center;
