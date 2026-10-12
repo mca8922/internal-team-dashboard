@@ -69,12 +69,17 @@ export interface CardCtx {
   // The viewer is an Executive (migration 0064): they manage no one else's
   // tasks, but they fully manage the ones they created — see canManageCard.
   selfManage: boolean;
+  // "Delete option for everyone" is on (migration 0070): a non-Board viewer may
+  // archive or delete the tasks they created — see canRemoveOwnCard.
+  memberDelete: boolean;
   members: AssignableMember[];
   // User IDs on approved leave today — excluded from "due" progress and badged.
   onLeave: Set<string>;
   onEdit: (g: Goal) => void;
   onDuplicate: (g: Goal) => void;
   onDelete: (g: Goal) => void;
+  // Opens the archive-or-delete choice for the viewer's own task.
+  onRemoveOwn: (g: Goal) => void;
   onSetStatus: (g: Goal, status: GoalStatus) => void;
   onReassign: (g: Goal, userIds: string[]) => void;
   onSaveTemplate: (g: Goal) => void;
@@ -92,10 +97,19 @@ export interface CardCtx {
 
 // May the viewer open the edit form on THIS card? The Board and Managers
 // manage every task in their scope; an Executive manages the ones they created
-// and nothing else. Deleting is never part of it — that stays ctx.canDelete
-// (Founders and Directors), matching the "goals: board delete" policy and the
-// goals_archive_is_board trigger from migration 0064.
+// and nothing else. Deleting is not part of it — that is ctx.canDelete
+// (Founders and Directors), or canRemoveOwnCard below while the Board has the
+// "Delete option for everyone" switch on.
 export function canManageCard(goal: Goal, ctx: CardCtx): boolean {
   if (ctx.isBoard) return true;
   return ctx.selfManage && goal.created_by === ctx.currentUserId;
+}
+
+// May a non-Board viewer remove (archive or delete) THIS card? Only while the
+// Board's switch is on, and only a task they created themselves — never one
+// assigned to them. Mirrors "goals: board delete" + the archive trigger in
+// migration 0070. The Board keeps its own ctx.canDelete button instead.
+export function canRemoveOwnCard(goal: Goal, ctx: CardCtx): boolean {
+  if (ctx.canDelete || !ctx.memberDelete) return false;
+  return !!goal.created_by && goal.created_by === ctx.currentUserId;
 }

@@ -36,7 +36,7 @@ import {
   goalDepts,
 } from './goal-ui';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
-import { canManageCard, type AssigneeChip, type PP, type CardCtx } from './card-context';
+import { canManageCard, canRemoveOwnCard, type AssigneeChip, type PP, type CardCtx } from './card-context';
 import type {
   Goal,
   GoalStatus,
@@ -590,6 +590,17 @@ export function GoalCard({
                 </button>
               ) : null}
             </>
+          ) : null}
+          {canRemoveOwnCard(goal, ctx) ? (
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => ctx.onRemoveOwn(goal)}
+              aria-label="Remove task"
+              title="Archive or delete this task"
+            >
+              <Icon name="trash" size={14} />
+            </button>
           ) : null}
         </span>
       </div>

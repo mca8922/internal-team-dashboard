@@ -428,6 +428,31 @@ export interface Company {
   vision: string;
   updated_by: string | null;
   updated_at: string;
+  // "Delete option for everyone" (migration 0070): while on, Executives and
+  // Managers may archive / delete the tasks they created themselves.
+  member_task_delete: boolean;
+}
+
+// One archive / restore / delete of a task (migration 0070). Written only by
+// triggers on `goals`; a deleted task is gone, so this row carries a snapshot.
+export type GoalActivityAction = 'archived' | 'restored' | 'deleted';
+export type GoalActivityActorRole = 'founder' | 'director' | 'manager' | 'executive' | 'system';
+export interface GoalActivity {
+  id: string;
+  goal_id: string;
+  action: GoalActivityAction;
+  actor_id: string | null;
+  actor_name: string | null;
+  actor_role: GoalActivityActorRole;
+  title: string;
+  level: string | null;
+  department: string | null;
+  departments: string[] | null;
+  created_by: string | null;
+  creator_name: string | null;
+  assignee_names: string[];
+  due_date: string | null;
+  occurred_at: string;
 }
 
 // A department's chosen accent colour. Departments themselves are still the
@@ -696,6 +721,7 @@ export interface Database {
         Update: {
           mission?: string;
           vision?: string;
+          member_task_delete?: boolean;
           updated_by?: string | null;
           updated_at?: string;
         };

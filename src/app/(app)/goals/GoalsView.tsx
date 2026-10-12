@@ -31,6 +31,9 @@ import {
   createGoal,
   updateGoal,
   deleteGoal,
+  archiveOwnGoal,
+  restoreOwnGoal,
+  deleteOwnGoal,
   saveCompany,
   setGoalAssignees,
   createGoalTemplate,
@@ -130,6 +133,7 @@ export function GoalsView({
   canAdmin,
   canUseTemplates,
   selfManage,
+  memberTaskDelete,
   viewerRole,
   tenureMonths,
   currentUserId,
@@ -159,6 +163,8 @@ export function GoalsView({
   canAdmin: boolean;
   canUseTemplates: boolean;
   selfManage: boolean;
+  // The Board's "Delete option for everyone" switch (company.member_task_delete).
+  memberTaskDelete: boolean;
   viewerRole: UserRole;
   tenureMonths: number | null;
   currentUserId: string;
@@ -193,6 +199,11 @@ export function GoalsView({
   const [rtOpen, setRtOpen] = React.useState(false);
   // Goals cleanup (Board only): bulk export + archive/delete of past goals.
   const [cleanupOpen, setCleanupOpen] = React.useState(false);
+  // An Executive / Manager removing a task they created: the task whose
+  // archive-or-delete choice is open, and which action is in flight.
+  const [removing, setRemoving] = React.useState<Goal | null>(null);
+  const [removeBusy, setRemoveBusy] = React.useState<'archive' | 'delete' | null>(null);
+  const memberDelete = FEATURE_FLAGS.memberTaskDelete && memberTaskDelete;
   const [mvDraft, setMvDraft] = React.useState({ mission, vision });
   React.useEffect(() => setMvDraft({ mission, vision }), [mission, vision]);
 
@@ -716,6 +727,47 @@ export function GoalsView({
     }
   };
 
+  // Archive is the soft option, so it gets an Undo on the toast; after that a
+  // Director restores it from the Clean up modal's Archived tab.
+  const archiveOwn = async (g: Goal) => {
+    setRemoveBusy('archive');
+    try {
+      const res = await archiveOwnGoal(g.id);
+      if (!res.ok) {
+        toast(res.error, 'error');
+        return;
+      }
+      setRemoving(null);
+      toast(`Archived “${g.title}”`, 'success', {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            const undo = await restoreOwnGoal(g.id);
+            if (undo.ok) toast(`Restored “${g.title}”`);
+            else toast(undo.error, 'error');
+          },
+        },
+      });
+    } finally {
+      setRemoveBusy(null);
+    }
+  };
+
+  const deleteOwn = async (g: Goal) => {
+    setRemoveBusy('delete');
+    try {
+      const res = await deleteOwnGoal(g.id);
+      if (!res.ok) {
+        toast(res.error, 'error');
+        return;
+      }
+      setRemoving(null);
+      toast(`Deleted “${g.title}”`);
+    } finally {
+      setRemoveBusy(null);
+    }
+  };
+
   const saveMv = async () => {
     setSubmitting(true);
     try {
@@ -745,6 +797,7 @@ export function GoalsView({
     canAdmin,
     canUseTemplates,
     selfManage,
+    memberDelete,
     members,
     onLeave,
     // Highlight search matches anywhere a query is active (board results or a
@@ -830,6 +883,7 @@ export function GoalsView({
         })),
       }),
     onDelete: archive,
+    onRemoveOwn: (g) => setRemoving(g),
   };
 
   const header = (
@@ -1193,8 +1247,51 @@ export function GoalsView({
           archivedGoals={archivedGoals}
           assigneesByGoal={assigneesByGoal}
           checklistsByGoal={checklistsByGoal}
+          memberTaskDelete={memberTaskDelete}
         />
       ) : null}
+
+      {/* An Executive / Manager removing a task they created. Two exits:
+          archive (reversible — Undo on the toast, then a Director) or delete
+          for good. Both are recorded in the Board's Activity log. */}
+      <Modal
+        open={!!removing}
+        onClose={() => (removeBusy ? undefined : setRemoving(null))}
+        title="Remove this task?"
+        subtitle={removing?.title}
+        width={460}
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div className="text-grey" style={{ fontSize: 13 }}>
+            <b>Archive</b> hides it from every view but keeps it — you can undo right away,
+            and a Director can restore it later. <b>Delete</b> removes it, its checklist and
+            its reports for good. Either way, your Directors can see that you removed it.
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <Button variant="ghost" disabled={!!removeBusy} onClick={() => setRemoving(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="secondary"
+              icon="archive"
+              loading={removeBusy === 'archive'}
+              disabled={!!removeBusy}
+              onClick={() => removing && archiveOwn(removing)}
+            >
+              Archive
+            </Button>
+            <Button
+              variant="danger"
+              icon="trash"
+              loading={removeBusy === 'delete'}
+              disabled={!!removeBusy}
+              onClick={() => removing && deleteOwn(removing)}
+            >
+              Delete permanently
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={!!peek}

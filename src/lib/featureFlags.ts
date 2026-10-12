@@ -67,6 +67,14 @@ export const FEATURE_FLAGS = {
   // migration 0064's RLS: the database still permits what the UI stops
   // offering, which is the same shape every other flag here has.
   executiveTasks: true,
+  // "Delete option for everyone" switch in the Clean up modal, and the trash
+  // button it unlocks on an Executive's / Manager's OWN task cards (migration
+  // 0070). Off, the switch and the button are hidden and the own-task actions
+  // refuse — but the stored company.member_task_delete value is left alone,
+  // and 0070's RLS still honours it, same shape as executiveTasks above. The
+  // Activity tab (the deletion log) is not behind this flag: it records the
+  // Board's own cleanup too and lives with goalsCleanup.
+  memberTaskDelete: true,
   // Internship progress, milestone replay. (Flagged members used to live here
   // too; Phase 3 folded it into Team pulse's "Not yet" chip.)
   // Team pulse and department check-in are always on for the Board; the

@@ -22,6 +22,7 @@ import type {
   Block,
   ChangeRequestField,
   ChecklistRecurrence,
+  GoalActivity,
   GoalLevel,
   GoalViewConfig,
   LeaveType,
@@ -1223,6 +1224,109 @@ export async function deleteGoals(ids: string[]) {
   if (error) throw new Error(error.message);
   revalidatePath('/goals');
   revalidatePath('/dashboard');
+}
+
+// ── "Delete option for everyone" (migration 0070) ───────────────────────────
+
+// The Board's switch. Any Director or Founder may flip it.
+export async function setMemberTaskDelete(enabled: boolean) {
+  if (!FEATURE_FLAGS.memberTaskDelete) throw new Error('This option is turned off.');
+  const { supabase, userId } = await requireBoard();
+  const { error } = await supabase
+    .from('company')
+    .update({
+      member_task_delete: enabled,
+      updated_by: userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', 1);
+  if (error) throw new Error(error.message);
+  revalidatePath('/goals');
+}
+
+// The own-task actions below re-check what RLS and the archive trigger already
+// enforce, so a refusal reads as a sentence instead of a silent no-op (a
+// DELETE that RLS filters out affects zero rows and reports no error).
+async function requireOwnRemovableGoal(id: string) {
+  if (!FEATURE_FLAGS.memberTaskDelete) throw new Error('This option is turned off.');
+  const { supabase, userId } = await requireUser();
+  const [{ data: company }, { data: goal }] = await Promise.all([
+    supabase.from('company').select('member_task_delete').eq('id', 1).single(),
+    supabase.from('goals').select('id, created_by').eq('id', id).maybeSingle(),
+  ]);
+  if (!company?.member_task_delete) {
+    throw new Error('Deleting your own tasks is currently turned off by a Director.');
+  }
+  if (!goal) throw new Error('Task not found.');
+  if (goal.created_by !== userId) throw new Error('You can only remove tasks you created.');
+  return { supabase, userId };
+}
+
+type OwnGoalResult = { ok: true } | { ok: false; error: string };
+
+// Runs `run` (which returns how many rows it touched) behind the ownership
+// check, and turns any refusal into { ok: false } for the card's toast.
+async function ownGoalAction(
+  id: string,
+  run: (ctx: Awaited<ReturnType<typeof requireOwnRemovableGoal>>) => Promise<number>,
+): Promise<OwnGoalResult> {
+  try {
+    const ctx = await requireOwnRemovableGoal(id);
+    const changed = await run(ctx);
+    if (changed === 0) return { ok: false, error: 'The task could not be changed.' };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+  revalidatePath('/goals');
+  revalidatePath('/dashboard');
+  return { ok: true };
+}
+
+export async function archiveOwnGoal(id: string): Promise<OwnGoalResult> {
+  return ownGoalAction(id, async ({ supabase, userId }) => {
+    const { data, error } = await supabase
+      .from('goals')
+      .update({ archived_at: new Date().toISOString(), archived_by: userId })
+      .eq('id', id)
+      .select('id');
+    if (error) throw new Error(error.message);
+    return data?.length ?? 0;
+  });
+}
+
+// The Undo on the "Task archived" toast. Restoring later is a Director's job
+// from the Clean up modal's Archived tab.
+export async function restoreOwnGoal(id: string): Promise<OwnGoalResult> {
+  return ownGoalAction(id, async ({ supabase }) => {
+    const { data, error } = await supabase
+      .from('goals')
+      .update({ archived_at: null, archived_by: null })
+      .eq('id', id)
+      .select('id');
+    if (error) throw new Error(error.message);
+    return data?.length ?? 0;
+  });
+}
+
+export async function deleteOwnGoal(id: string): Promise<OwnGoalResult> {
+  return ownGoalAction(id, async ({ supabase }) => {
+    const { data, error } = await supabase.from('goals').delete().eq('id', id).select('id');
+    if (error) throw new Error(error.message);
+    return data?.length ?? 0;
+  });
+}
+
+// The Clean up modal's Activity tab. RLS scopes it: Founders see everything,
+// a Director their own departments' entries.
+export async function getGoalActivity(): Promise<GoalActivity[]> {
+  const { supabase } = await requireBoard();
+  const { data, error } = await supabase
+    .from('goal_activity_log')
+    .select('*')
+    .order('occurred_at', { ascending: false })
+    .limit(500);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as GoalActivity[];
 }
 
 export async function saveCompany(mission: string, vision: string) {

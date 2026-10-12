@@ -293,6 +293,7 @@ export default async function GoalsPage() {
       canAdmin={isBoard}
       canUseTemplates
       selfManage={isExec}
+      memberTaskDelete={company.member_task_delete ?? false}
       viewerRole={profile.role}
       tenureMonths={profile.internship_months}
       currentUserId={profile.id}

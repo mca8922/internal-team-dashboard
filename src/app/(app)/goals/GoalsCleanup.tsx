@@ -8,17 +8,35 @@
 //   • Archives them  → hidden from every view but retained and restorable, or
 //   • Deletes them    → permanent removal from the database (typed confirmation).
 // A second tab lists already-archived goals to restore or permanently delete.
+// A third, Activity, is the log of every archive / restore / delete (migration
+// 0070) — the Board's own cleanups included, not only the members'.
+//
+// The header carries the Board's "Delete option for everyone" switch: while on,
+// Executives and Managers may archive or delete the tasks they created.
 import * as React from 'react';
-import { Modal, Button, Avatar } from '@/components/ui';
+import { Modal, Button, Avatar, Toggle } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
 import { useConfirm } from '@/components/ConfirmDialog';
 import { downloadCsv, downloadJson } from '@/lib/csv';
-import { fmtDate, fmtShort } from '@/lib/dates';
-import { archiveGoals, restoreGoals, deleteGoals } from '@/lib/actions';
+import { fmtDate, fmtDateDMY, fmtShort, fmtTime } from '@/lib/dates';
+import {
+  archiveGoals,
+  restoreGoals,
+  deleteGoals,
+  setMemberTaskDelete,
+  getGoalActivity,
+} from '@/lib/actions';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { STATUS, LEVEL_META, plainText, goalDepts, deriveGoalStatus } from './goal-ui';
 import type { AssigneeChip } from './GoalsView';
-import type { Goal, GoalChecklistItem } from '@/lib/types';
+import type {
+  Goal,
+  GoalActivity,
+  GoalActivityAction,
+  GoalActivityActorRole,
+  GoalChecklistItem,
+} from '@/lib/types';
 
 // A goal's "month" — its due date if it has one, else when it was created. Both
 // are ISO-ish strings, so a YYYY-MM prefix is a stable, sortable bucket key.
@@ -96,6 +114,89 @@ function toJsonRecord(
   };
 }
 
+// ── Activity log ────────────────────────────────────────────────────────────
+
+const ACTION_META: Record<
+  GoalActivityAction,
+  { label: string; cls: string; icon: 'trash' | 'archive' | 'refresh' }
+> = {
+  deleted: { label: 'Deleted', cls: 'badge-red', icon: 'trash' },
+  archived: { label: 'Archived', cls: 'badge-amber', icon: 'archive' },
+  restored: { label: 'Restored', cls: 'badge-slate', icon: 'refresh' },
+};
+
+const ROLE_LABEL: Record<GoalActivityActorRole, string> = {
+  founder: 'Founder',
+  director: 'Director',
+  manager: 'Manager',
+  executive: 'Executive',
+  system: 'System',
+};
+
+// Who filter: the members the switch empowers vs. the Board itself.
+type WhoFilter = 'all' | 'members' | 'board';
+function matchesWho(a: GoalActivity, who: WhoFilter): boolean {
+  if (who === 'all') return true;
+  const member = a.actor_role === 'executive' || a.actor_role === 'manager';
+  return who === 'members' ? member : !member;
+}
+
+function activityDepts(a: GoalActivity): string {
+  const list = a.departments?.length ? a.departments : a.department ? [a.department] : [];
+  return list.join(' · ');
+}
+
+function tierLabel(a: GoalActivity): string {
+  if (!a.level) return '';
+  return LEVEL_META[a.level as Goal['level']]?.label ?? a.level;
+}
+
+const ACTIVITY_CSV = [
+  { header: 'Date', value: (a: GoalActivity) => fmtDateDMY(a.occurred_at) },
+  { header: 'Time (IST)', value: (a: GoalActivity) => fmtTime(a.occurred_at) },
+  { header: 'Action', value: (a: GoalActivity) => ACTION_META[a.action].label },
+  { header: 'By', value: (a: GoalActivity) => a.actor_name ?? 'System' },
+  { header: 'Role', value: (a: GoalActivity) => ROLE_LABEL[a.actor_role] },
+  { header: 'Task', value: (a: GoalActivity) => a.title },
+  { header: 'Tier', value: tierLabel },
+  { header: 'Departments', value: activityDepts },
+  { header: 'Created by', value: (a: GoalActivity) => a.creator_name ?? '' },
+  { header: 'Assignees', value: (a: GoalActivity) => a.assignee_names.join('; ') },
+  { header: 'Due date', value: (a: GoalActivity) => a.due_date ?? '' },
+];
+
+function ActivityRow({ a }: { a: GoalActivity }) {
+  const meta = ACTION_META[a.action];
+  const tier = tierLabel(a);
+  return (
+    <div className="card" style={{ padding: '8px 10px', display: 'grid', gap: 3 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span
+          className={`badge ${meta.cls}`}
+          style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}
+        >
+          <Icon name={meta.icon} size={11} /> {meta.label}
+        </span>
+        <span className="fw-medium" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {a.title}
+        </span>
+      </div>
+      <div style={{ fontSize: 12 }}>
+        by <b>{a.actor_name ?? 'System'}</b>{' '}
+        <span className="text-grey">
+          ({ROLE_LABEL[a.actor_role]}) · {fmtDateDMY(a.occurred_at)} · {fmtTime(a.occurred_at)}
+        </span>
+      </div>
+      <div className="text-grey" style={{ fontSize: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {tier ? <span>{tier}</span> : null}
+        <span>{activityDepts(a) || '—'}</span>
+        {a.creator_name ? <span>Created by {a.creator_name}</span> : null}
+        {a.assignee_names.length ? <span>Assigned to {a.assignee_names.join(', ')}</span> : null}
+      </div>
+    </div>
+  );
+}
+
 function GoalRow({
   goal,
   checked,
@@ -139,6 +240,24 @@ function GoalRow({
   );
 }
 
+// A checkbox that can also show "some selected" — `indeterminate` is a DOM
+// property only, with no HTML attribute, so it has to be set through a ref.
+function TriCheckbox({
+  checked,
+  partial,
+  onChange,
+}: {
+  checked: boolean;
+  partial: boolean;
+  onChange: () => void;
+}) {
+  const ref = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    if (ref.current) ref.current.indeterminate = partial;
+  }, [partial]);
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} />;
+}
+
 function rowStyle(checked: boolean): React.CSSProperties {
   return {
     display: 'flex',
@@ -158,6 +277,7 @@ export function GoalsCleanup({
   archivedGoals,
   assigneesByGoal,
   checklistsByGoal,
+  memberTaskDelete,
 }: {
   open: boolean;
   onClose: () => void;
@@ -165,13 +285,27 @@ export function GoalsCleanup({
   archivedGoals: Goal[];
   assigneesByGoal: Record<string, AssigneeChip[]>;
   checklistsByGoal: Record<string, GoalChecklistItem[]>;
+  memberTaskDelete: boolean;
 }) {
   const toast = useToast();
   const confirm = useConfirm();
-  const [tab, setTab] = React.useState<'cleanup' | 'archived'>('cleanup');
+  const [tab, setTab] = React.useState<'cleanup' | 'archived' | 'activity'>('cleanup');
+  // The switch, held locally so it flips at once; the server value follows via
+  // revalidation, and a failed save puts it back.
+  const [memberDelete, setMemberDelete] = React.useState(memberTaskDelete);
+  const [switchBusy, setSwitchBusy] = React.useState(false);
+  React.useEffect(() => setMemberDelete(memberTaskDelete), [memberTaskDelete]);
+  // Activity tab: fetched on demand (it's a log, not page data), and again on
+  // every visit so this session's own archives / deletes show up.
+  const [activity, setActivity] = React.useState<GoalActivity[] | null>(null);
+  const [activityError, setActivityError] = React.useState<string | null>(null);
+  const [actionFilter, setActionFilter] = React.useState<GoalActivityAction | 'all'>('all');
+  const [whoFilter, setWhoFilter] = React.useState<WhoFilter>('all');
   const [busy, setBusy] = React.useState(false);
-  // Cleanup tab: which month buckets are selected.
-  const [selMonths, setSelMonths] = React.useState<Set<string>>(new Set());
+  // Cleanup tab: the individual tasks selected (a month checkbox just adds or
+  // removes all of that month's ids), and which months are opened to list them.
+  const [selIds, setSelIds] = React.useState<Set<string>>(new Set());
+  const [openMonths, setOpenMonths] = React.useState<Set<string>>(new Set());
   // Archived tab: which archived goals are selected.
   const [selArchived, setSelArchived] = React.useState<Set<string>>(new Set());
   // Permanent-delete guard: the typed confirmation text ("DELETE").
@@ -181,12 +315,61 @@ export function GoalsCleanup({
   // Reset transient state whenever the modal (re)opens.
   React.useEffect(() => {
     if (!open) return;
-    setSelMonths(new Set());
+    setSelIds(new Set());
+    setOpenMonths(new Set());
     setSelArchived(new Set());
     setConfirmText('');
     setDeleteArmed(false);
     setTab('cleanup');
   }, [open]);
+
+  React.useEffect(() => {
+    if (!open || tab !== 'activity') return;
+    let live = true;
+    setActivityError(null);
+    getGoalActivity()
+      .then((rows) => {
+        if (live) setActivity(rows);
+      })
+      .catch((e) => {
+        if (live) setActivityError((e as Error).message || 'Could not load the activity.');
+      });
+    return () => {
+      live = false;
+    };
+  }, [open, tab]);
+
+  const filteredActivity = React.useMemo(
+    () =>
+      (activity ?? []).filter(
+        (a) => (actionFilter === 'all' || a.action === actionFilter) && matchesWho(a, whoFilter),
+      ),
+    [activity, actionFilter, whoFilter],
+  );
+
+  const flipMemberDelete = async (next: boolean) => {
+    if (next) {
+      const ok = await confirm({
+        title: 'Let everyone delete their own tasks?',
+        message:
+          'Executives and Managers will be able to archive or permanently delete tasks they created themselves — never tasks assigned to them. Every removal is recorded in the Activity tab.',
+        confirmLabel: 'Turn on',
+        icon: 'trash',
+      });
+      if (!ok) return;
+    }
+    setMemberDelete(next);
+    setSwitchBusy(true);
+    try {
+      await setMemberTaskDelete(next);
+      toast(next ? 'Everyone can now delete their own tasks' : 'Only Directors can delete tasks now');
+    } catch (e) {
+      setMemberDelete(!next);
+      toast((e as Error).message || 'Could not change the setting.', 'error');
+    } finally {
+      setSwitchBusy(false);
+    }
+  };
 
   // Past goals bucketed by month (newest month first).
   const monthBuckets = React.useMemo(() => {
@@ -200,25 +383,48 @@ export function GoalsCleanup({
     return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [goals]);
 
+  // Derived from the live buckets, so an id that has since been archived or
+  // deleted simply stops counting — no stale selections reach an action.
   const selectedGoals = React.useMemo(
-    () => monthBuckets.filter(([k]) => selMonths.has(k)).flatMap(([, gs]) => gs),
-    [monthBuckets, selMonths],
+    () => monthBuckets.flatMap(([, gs]) => gs.filter((g) => selIds.has(g.id))),
+    [monthBuckets, selIds],
   );
   const selectedArchivedGoals = React.useMemo(
     () => archivedGoals.filter((g) => selArchived.has(g.id)),
     [archivedGoals, selArchived],
   );
 
-  const toggleMonth = (key: string) =>
-    setSelMonths((prev) => {
+  const toggleTask = (id: string) =>
+    setSelIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  // A fully selected month clears; anything less (none or some) selects it all.
+  const toggleMonth = (gs: Goal[]) =>
+    setSelIds((prev) => {
+      const n = new Set(prev);
+      const all = gs.every((g) => n.has(g.id));
+      for (const g of gs) {
+        if (all) n.delete(g.id);
+        else n.add(g.id);
+      }
+      return n;
+    });
+  const toggleMonthOpen = (key: string) =>
+    setOpenMonths((prev) => {
       const n = new Set(prev);
       if (n.has(key)) n.delete(key);
       else n.add(key);
       return n;
     });
-  const allMonthsSelected = monthBuckets.length > 0 && selMonths.size === monthBuckets.length;
+  const pastTotal = monthBuckets.reduce((sum, [, gs]) => sum + gs.length, 0);
+  const allMonthsSelected = pastTotal > 0 && selectedGoals.length === pastTotal;
   const toggleAllMonths = () =>
-    setSelMonths(allMonthsSelected ? new Set() : new Set(monthBuckets.map(([k]) => k)));
+    setSelIds(
+      allMonthsSelected ? new Set() : new Set(monthBuckets.flatMap(([, gs]) => gs.map((g) => g.id))),
+    );
 
   const toggleArchived = (id: string) =>
     setSelArchived((prev) => {
@@ -261,7 +467,7 @@ export function GoalsCleanup({
     try {
       await archiveGoals(ids);
       toast(`Archived ${ids.length} task${ids.length !== 1 ? 's' : ''}`);
-      setSelMonths(new Set());
+      setSelIds(new Set());
     } catch (e) {
       toast((e as Error).message || 'Could not archive the tasks.', 'error');
     } finally {
@@ -309,6 +515,26 @@ export function GoalsCleanup({
       title="Clean up tasks"
       subtitle="Export past tasks as a backup, then archive or delete them in one shot."
       width={720}
+      headerAction={
+        FEATURE_FLAGS.memberTaskDelete ? (
+          <div className="gc-member-delete">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="gc-member-delete-title">Delete option for everyone</div>
+              <div className="gc-member-delete-sub">
+                {memberDelete
+                  ? 'On: Executives & Managers can delete tasks they created.'
+                  : 'Off: only Directors can delete tasks.'}
+              </div>
+            </div>
+            <Toggle
+              on={memberDelete}
+              onChange={flipMemberDelete}
+              disabled={switchBusy}
+              label="Delete option for everyone"
+            />
+          </div>
+        ) : null
+      }
     >
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
         <button
@@ -325,9 +551,79 @@ export function GoalsCleanup({
         >
           <Icon name="archive" size={14} /> Archived ({archivedGoals.length})
         </button>
+        <button
+          type="button"
+          className={`gb-viewswitch-btn${tab === 'activity' ? ' active' : ''}`}
+          onClick={() => setTab('activity')}
+        >
+          <Icon name="clock" size={14} /> Activity
+        </button>
       </div>
 
-      {tab === 'cleanup' ? (
+      {tab === 'activity' ? (
+        <div style={{ display: 'grid', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select
+              className="input"
+              style={{ width: 'auto' }}
+              value={actionFilter}
+              onChange={(e) => setActionFilter(e.target.value as GoalActivityAction | 'all')}
+              aria-label="Filter by action"
+            >
+              <option value="all">All actions</option>
+              <option value="deleted">Deleted</option>
+              <option value="archived">Archived</option>
+              <option value="restored">Restored</option>
+            </select>
+            <select
+              className="input"
+              style={{ width: 'auto' }}
+              value={whoFilter}
+              onChange={(e) => setWhoFilter(e.target.value as WhoFilter)}
+              aria-label="Filter by who"
+            >
+              <option value="all">Everyone</option>
+              <option value="members">Executives &amp; Managers</option>
+              <option value="board">Directors &amp; Founders</option>
+            </select>
+            <span style={{ flex: 1 }} />
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="copy"
+              disabled={filteredActivity.length === 0}
+              onClick={() => {
+                const n = filteredActivity.length;
+                downloadCsv(`task-activity-${fmtDate(new Date())}`, filteredActivity, ACTIVITY_CSV);
+                toast(`Exported ${n} entr${n !== 1 ? 'ies' : 'y'} as CSV`);
+              }}
+            >
+              Export CSV
+            </Button>
+          </div>
+          {activityError ? (
+            <div className="text-grey" style={{ padding: '24px 8px', textAlign: 'center' }}>
+              {activityError}
+            </div>
+          ) : activity === null ? (
+            <div className="text-grey" style={{ padding: '24px 8px', textAlign: 'center' }}>
+              Loading activity…
+            </div>
+          ) : filteredActivity.length === 0 ? (
+            <div className="text-grey" style={{ padding: '24px 8px', textAlign: 'center' }}>
+              {activity.length === 0
+                ? 'Nothing archived, restored or deleted yet. Every removal shows up here.'
+                : 'No activity matches these filters.'}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 6, maxHeight: '46vh', overflowY: 'auto' }}>
+              {filteredActivity.map((a) => (
+                <ActivityRow key={a.id} a={a} />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : tab === 'cleanup' ? (
         monthBuckets.length === 0 ? (
           <div className="text-grey" style={{ padding: '24px 8px', textAlign: 'center' }}>
             No tasks older than this month. Nothing to clean up yet.
@@ -335,29 +631,62 @@ export function GoalsCleanup({
         ) : (
           <div style={{ display: 'grid', gap: 8, maxHeight: '46vh', overflowY: 'auto' }}>
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
-              <input type="checkbox" checked={allMonthsSelected} onChange={toggleAllMonths} />
+              <TriCheckbox
+                checked={allMonthsSelected}
+                partial={selectedGoals.length > 0 && !allMonthsSelected}
+                onChange={toggleAllMonths}
+              />
               <span className="fw-medium">Select all past months</span>
             </label>
             {monthBuckets.map(([key, gs]) => {
-              const on = selMonths.has(key);
+              const picked = gs.reduce((n, g) => n + (selIds.has(g.id) ? 1 : 0), 0);
+              const isOpen = openMonths.has(key);
               return (
                 <div key={key} className="card" style={{ padding: 10 }}>
-                  <label
-                    style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}
-                  >
-                    <input type="checkbox" checked={on} onChange={() => toggleMonth(key)} />
-                    <Icon name="calendar" size={14} />
-                    <span className="fw-medium">{monthLabel(key)}</span>
-                    <span className="badge badge-slate" style={{ marginLeft: 'auto' }}>
-                      {gs.length} task{gs.length !== 1 ? 's' : ''}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <label
+                      style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', flex: 1, minWidth: 0 }}
+                    >
+                      <TriCheckbox
+                        checked={picked === gs.length}
+                        partial={picked > 0 && picked < gs.length}
+                        onChange={() => {
+                          // Selecting a month opens it, so what was picked is in view.
+                          if (picked < gs.length) setOpenMonths((prev) => new Set(prev).add(key));
+                          toggleMonth(gs);
+                        }}
+                      />
+                      <Icon name="calendar" size={14} />
+                      <span className="fw-medium">{monthLabel(key)}</span>
+                    </label>
+                    <span className="badge badge-slate">
+                      {picked > 0 ? `${picked} of ${gs.length}` : `${gs.length} task${gs.length !== 1 ? 's' : ''}`}
                     </span>
-                  </label>
-                  {on ? (
-                    <div style={{ marginTop: 8, display: 'grid', gap: 4 }}>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={() => toggleMonthOpen(key)}
+                      aria-expanded={isOpen}
+                      aria-label={isOpen ? `Hide ${monthLabel(key)} tasks` : `Show ${monthLabel(key)} tasks`}
+                      title={isOpen ? 'Hide tasks' : 'Show tasks to pick individually'}
+                    >
+                      <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} size={14} />
+                    </button>
+                  </div>
+                  {isOpen ? (
+                    <div style={{ marginTop: 8, display: 'grid', gap: 2, paddingLeft: 4 }}>
                       {gs.map((g) => (
-                        <div key={g.id} style={{ fontSize: 12 }} className="text-grey">
-                          · {g.title}
-                        </div>
+                        <label key={g.id} className="gc-task-pick">
+                          <input
+                            type="checkbox"
+                            checked={selIds.has(g.id)}
+                            onChange={() => toggleTask(g.id)}
+                          />
+                          <span className="gc-task-pick-title">{g.title}</span>
+                          <span className="gc-task-pick-meta">
+                            {g.due_date ? `Due ${fmtShort(g.due_date)}` : LEVEL_META[g.level].label}
+                          </span>
+                        </label>
                       ))}
                     </div>
                   ) : null}
@@ -389,7 +718,9 @@ export function GoalsCleanup({
       )}
 
       {/* Shared action bar: export the current selection, then archive / restore
-          / delete. Permanent delete is gated behind a typed confirmation. */}
+          / delete. Permanent delete is gated behind a typed confirmation. The
+          Activity tab is read-only and has its own export above. */}
+      {tab !== 'activity' ? (
       <div
         style={{
           borderTop: '1px solid var(--color-border, rgba(0,0,0,0.1))',
@@ -502,7 +833,7 @@ export function GoalsCleanup({
                 disabled={confirmText.trim().toUpperCase() !== 'DELETE' || busy}
                 onClick={() =>
                   tab === 'cleanup'
-                    ? runDelete(selectedGoals, () => setSelMonths(new Set()))
+                    ? runDelete(selectedGoals, () => setSelIds(new Set()))
                     : runDelete(selectedArchivedGoals, () => setSelArchived(new Set()))
                 }
               >
@@ -512,6 +843,7 @@ export function GoalsCleanup({
           </div>
         )}
       </div>
+      ) : null}
     </Modal>
   );
 }

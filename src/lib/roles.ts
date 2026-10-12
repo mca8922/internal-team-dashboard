@@ -96,6 +96,9 @@ export function canManageTask(
 // Founders and Directors. A Manager creates and edits but never removes, and
 // neither does the Executive who created the task. Mirrors the
 // "goals: board delete" policy and the goals_archive_is_board trigger.
+// The one exception is the Board's "Delete option for everyone" switch
+// (migration 0070), which lets a task's creator remove it — that is
+// canRemoveOwnCard in goals/card-context.ts, not this.
 export function canDeleteTask(
   profile: { role: UserRole } | null | undefined,
 ): boolean {

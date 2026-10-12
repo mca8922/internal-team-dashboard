@@ -260,6 +260,7 @@ export function Modal({
   children,
   width,
   disableBackdropClose,
+  headerAction,
 }: {
   open: boolean;
   onClose: () => void;
@@ -268,6 +269,8 @@ export function Modal({
   children: React.ReactNode;
   width?: number;
   disableBackdropClose?: boolean;
+  // Rendered top-right, beside the title and subtitle (e.g. a settings switch).
+  headerAction?: React.ReactNode;
 }) {
   const dialogRef = React.useRef<HTMLDivElement>(null);
   // Keep the latest onClose in a ref so the focus/keydown effect below only
@@ -339,8 +342,20 @@ export function Modal({
         style={width ? { width, maxWidth: 'calc(100vw - 32px)' } : undefined}
         onClick={(e) => e.stopPropagation()}
       >
-        {title ? <h2 className="modal-title">{title}</h2> : null}
-        {subtitle ? <p className="modal-subtitle">{subtitle}</p> : null}
+        {headerAction ? (
+          <div className="modal-head-row">
+            <div style={{ minWidth: 0, flex: 1 }}>
+              {title ? <h2 className="modal-title">{title}</h2> : null}
+              {subtitle ? <p className="modal-subtitle">{subtitle}</p> : null}
+            </div>
+            <div className="modal-head-action">{headerAction}</div>
+          </div>
+        ) : (
+          <>
+            {title ? <h2 className="modal-title">{title}</h2> : null}
+            {subtitle ? <p className="modal-subtitle">{subtitle}</p> : null}
+          </>
+        )}
         {children}
       </div>
     </div>
@@ -348,12 +363,29 @@ export function Modal({
 }
 
 // ---- Toggle ----
-export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+export function Toggle({
+  on,
+  onChange,
+  label,
+  disabled,
+}: {
+  on: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={disabled}
       onClick={() => onChange(!on)}
       style={{
+        flexShrink: 0,
+        cursor: disabled ? 'wait' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
         width: 40,
         height: 22,
         borderRadius: 999,

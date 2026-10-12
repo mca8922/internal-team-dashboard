@@ -195,7 +195,8 @@ Everything else stays in the codebase, gated off via `FEATURE_FLAGS`
 | `emails` | "Emails" nav item + `/email` page | `Shell.tsx`, `email/page.tsx` |
 | `apps` | "Apps" nav item + `/apps` page | `Shell.tsx`, `apps/page.tsx` |
 | `analyticsFilters` | Month/Week stepper + CSV export on Personal Analytics; range control (7/14/30/all/month/custom) on Team Analytics | `analytics/page.tsx`, `analytics/team/page.tsx`, `analytics/team/TeamAnalyticsShell.tsx` |
-| `goalsCleanup` | "Clean up" button + archive/export/restore modal on Goals | `goals/GoalsView.tsx` |
+| `goalsCleanup` | "Clean up" button + archive/export/restore modal on Goals (incl. the Activity log tab) | `goals/GoalsView.tsx` |
+| `memberTaskDelete` | "Delete option for everyone" switch in the Clean up modal + the trash button on an Executive's/Manager's own task cards (0070) | `goals/GoalsCleanup.tsx`, `goals/GoalCard.tsx`, `lib/actions.ts` |
 | `settingsNotifications` | "Notifications" card (push/sound toggles) + per-event notification prefs card on Settings | `settings/SettingsView.tsx` |
 | `notificationsFull` | Bell + `/notifications` history for goal/leave/punch/work-report events, incl. their toasts/chimes and teammate punch-in/out toasts, PLUS the dashboard birthday banner (wishes + private replies). Only the three undismissable device reminders (upload avatar, change password, add date of birth) stay on; everything else shows a locked "Unlocks in Phase 2" row/state instead | `NotificationsBell.tsx`, `notifications/NotificationsHistory.tsx`, `dashboard/page.tsx`, `dashboard/BirthdayBanner.tsx` |
 | ~~`dashboardExtras`~~ | ~~Internship progress card, flagged members card, milestone replay button~~ — re-enabled, see below | `dashboard/page.tsx` |
@@ -929,6 +930,47 @@ are one-time, so this is a corner). And a task with no assignees still counts a
 step done if **any** teammate ticked it — so a member who ticked 3 of 4 can see
 "100%" when a colleague did the fourth; that is the rule the client asked for,
 not a bug.
+
+## "Delete option for everyone" + task activity log (branch `feature/exec-task-delete-toggle` — migration 0070, `memberTaskDelete`)
+
+A Board switch in the **Clean up** modal's header that relaxes the
+"Delete or archive: Board only" line from 0064 — for a task's **creator**
+only, and only while it is on. It is **off** by default, so applying 0070 by
+itself doesn't change anyone's permissions.
+
+| Power, while the switch is ON | Executive | Manager | Director / Founder |
+|---|---|---|---|
+| Archive a task **they created** | yes | yes | yes (any task) |
+| Permanently delete a task **they created** | yes | yes | yes (any task) |
+| Remove a task **assigned** to them by someone else | no | no | — |
+| Restore an archived task | only via the **Undo** on the toast | same | yes, Archived tab |
+| Flip the switch | no | no | yes (any Director) |
+
+- **Storage.** `company.member_task_delete` (the singleton row). Read by
+  `member_task_delete_enabled()`, which is used by the `goals: board delete`
+  policy and by the rewritten `assert_goal_archive_is_board()` trigger.
+- **UI.** A trash button on a card is shown when `canRemoveOwnCard`
+  (`card-context.ts`) passes. It opens an Archive / Delete permanently choice.
+  Archive's toast carries **Undo** (`restoreOwnGoal`). After that, restoring is
+  a Director's job. The Board's own card button and bulk cleanup work the same
+  as before.
+- **Actions.** `archiveOwnGoal` / `restoreOwnGoal` / `deleteOwnGoal` re-check the
+  switch and `created_by` server-side. They `.select('id')` so a row filtered
+  out by RLS returns an error instead of failing silently.
+  `setMemberTaskDelete` is `requireBoard`.
+- **Activity log.** `goal_activity_log`, written **only by triggers** on
+  `goals`: BEFORE DELETE, so the assignees are snapshotted before they cascade
+  away, and AFTER UPDATE OF archived_at. Every path is recorded, including the
+  Board's own bulk cleanup. Each row holds the actor and their tier at that time,
+  plus a snapshot of the task (title, tier, departments, creator, assignees,
+  due date). There are no write policies, so nobody can edit or erase it.
+  **Read:** Founders see everything. Directors see their own departments, the
+  same scope 0065 applies to live tasks. Anyone can see their own actions.
+  Shown in the Clean up modal's **Activity** tab, filterable by action and by
+  who, with a CSV export.
+- `memberTaskDelete` off hides the switch and the card button, and makes the
+  own-task actions refuse. Like `executiveTasks`, it does not roll back 0070's
+  RLS. The Activity tab stays, under `goalsCleanup`.
 
 ## Phase 2 — Backlog (historical: what each flag hid in Phase 1)
 
