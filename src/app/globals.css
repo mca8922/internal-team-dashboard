@@ -3676,6 +3676,17 @@ p { margin: 0; }
   display: grid; place-items: center; padding: 40px;
 }
 .auth-form-inner { width: 100%; max-width: 380px; }
+/* Text-style links on the auth forms ("Forgot password?", "Back to sign in"). */
+.auth-link {
+  justify-self: start;
+  padding: 0; border: 0; background: none;
+  font: inherit; font-size: 14px; font-weight: 500;
+  color: var(--color-green-primary);
+  cursor: pointer;
+}
+.auth-link:hover { text-decoration: underline; }
+.auth-link:focus-visible { outline: 2px solid var(--color-green-primary); outline-offset: 2px; border-radius: 4px; }
+.auth-link-end { justify-self: end; margin-top: -6px; }
 .auth-art {
   background: var(--color-black);
   color: #fff;

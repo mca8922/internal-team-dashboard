@@ -49,6 +49,21 @@ tools from the page itself now that it's reachable.
 See "Phase 2 — Backlog" below for the per-flag detail table this replaces,
 kept for the historical "what each flag hides" reference.
 
+## Phase 3 — Password reset (done)
+
+Self-service "Forgot password?" on the login page. Core auth, so it has no
+feature flag. The flow:
+- `LoginForm` switches to a reset-request view, and `requestPasswordReset`
+  (`auth-actions.ts`) calls Supabase `resetPasswordForEmail`. **Supabase Auth
+  sends the email**, not our SMTP mailer, so it doesn't depend on the
+  deferred `emails` flag.
+- The link goes to `/auth/callback`, which exchanges the code for a recovery
+  session and forwards to `/auth/reset-password`. That page sets the new
+  password (`resetPassword`) and opens the dashboard. Without a session it
+  shows "Link expired" and links to `/login?forgot=1`.
+- Requires `<site>/auth/callback` in Supabase → Auth → URL Configuration →
+  Redirect URLs, for every environment.
+
 ## Phase 3 — Tasks performance
 
 The Tasks (Goals) cascade was mounting every descendant `GoalCard` on the

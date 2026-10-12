@@ -1,11 +1,12 @@
 'use client';
 
 // Login form — backed by Supabase Auth. There is no public sign-up; only
-// Board Members create accounts (from the Team page).
+// Board Members create accounts (from the Team page). "Forgot password?"
+// swaps the form for a reset-link request (see requestPasswordReset).
 import * as React from 'react';
 import { Button, Field } from '@/components/ui';
 import { Icon } from '@/components/Icon';
-import { signIn } from '@/lib/auth-actions';
+import { requestPasswordReset, signIn } from '@/lib/auth-actions';
 import { BrandPanel } from './BrandPanel';
 
 function ArrowGlyph({ className }: { className?: string }) {
@@ -26,7 +27,10 @@ function ArrowGlyph({ className }: { className?: string }) {
   );
 }
 
-export function LoginForm() {
+type Mode = 'signin' | 'forgot' | 'sent';
+
+export function LoginForm({ initialMode = 'signin' }: { initialMode?: 'signin' | 'forgot' }) {
+  const [mode, setMode] = React.useState<Mode>(initialMode);
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [pwVisible, setPwVisible] = React.useState(false);
@@ -51,6 +55,28 @@ export function LoginForm() {
     }
   };
 
+  const submitForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setErr({ email: 'Email is required' });
+      return;
+    }
+    setErr({});
+    setPending(true);
+    const res = await requestPasswordReset(email);
+    setPending(false);
+    if (res.error) {
+      setErr({ email: res.error });
+      return;
+    }
+    setMode('sent');
+  };
+
+  const switchMode = (m: Mode) => {
+    setErr({});
+    setMode(m);
+  };
+
   return (
     <div className="auth-shell">
       <div className="auth-form-wrap">
@@ -61,6 +87,45 @@ export function LoginForm() {
           >
             Team Dashboard
           </div>
+          {mode === 'forgot' ? (
+            <>
+              <h1 className="text-3xl mb-2">Reset password</h1>
+              <p className="text-grey mb-6">
+                Enter your work email and we&apos;ll send you a link to set a new password.
+              </p>
+              <form onSubmit={submitForgot} className="grid gap-4">
+                <Field label="Email" error={err.email}>
+                  <input
+                    className="input"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="youremail@example.com"
+                    autoComplete="username"
+                    autoFocus
+                  />
+                </Field>
+                <Button type="submit" size="lg" loading={pending}>
+                  {pending ? 'Sending…' : 'Send reset link'}
+                </Button>
+                <button type="button" className="auth-link" onClick={() => switchMode('signin')}>
+                  Back to sign in
+                </button>
+              </form>
+            </>
+          ) : mode === 'sent' ? (
+            <>
+              <h1 className="text-3xl mb-2">Check your inbox</h1>
+              <p className="text-grey mb-6">
+                If an account exists for <strong>{email}</strong>, a reset link is on its way.
+                Open it on this device to choose a new password.
+              </p>
+              <button type="button" className="auth-link" onClick={() => switchMode('signin')}>
+                Back to sign in
+              </button>
+            </>
+          ) : (
+            <>
           <h1 className="text-3xl mb-2">Sign in</h1>
           <p className="text-grey mb-6">Welcome back. Pick up where you left off.</p>
           <form onSubmit={submit} className="grid gap-4">
@@ -96,6 +161,13 @@ export function LoginForm() {
                 </button>
               </div>
             </Field>
+            <button
+              type="button"
+              className="auth-link auth-link-end"
+              onClick={() => switchMode('forgot')}
+            >
+              Forgot password?
+            </button>
             <Button type="submit" size="lg" loading={pending} className="signin-submit">
               {pending ? (
                 'Signing in…'
@@ -113,6 +185,8 @@ export function LoginForm() {
               )}
             </Button>
           </form>
+            </>
+          )}
         </div>
       </div>
       {/* Right panel — premium brand experience (hidden on mobile). */}
