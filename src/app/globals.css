@@ -1549,6 +1549,37 @@ p { margin: 0; }
 }
 .modal-title { font-size: 20px; margin-bottom: 6px; }
 .modal-subtitle { color: var(--color-grey-text); margin-bottom: 20px; font-size: 13px; }
+.modal-head-row { display: flex; align-items: flex-start; gap: 16px; }
+.modal-head-action { flex-shrink: 0; margin-bottom: 16px; }
+@media (max-width: 600px) {
+  .modal-head-row { flex-direction: column; gap: 0; }
+  .modal-head-action { width: 100%; }
+}
+/* "Delete option for everyone" switch in the Clean up modal's header. */
+.gc-member-delete {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  max-width: 260px;
+}
+.gc-member-delete-title { font-size: 13px; font-weight: 600; }
+.gc-member-delete-sub { font-size: 12px; color: var(--color-grey-text); margin-top: 2px; }
+@media (max-width: 600px) { .gc-member-delete { max-width: none; } }
+/* One pickable task inside an opened month in the Clean up modal. */
+.gc-task-pick {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.gc-task-pick:hover { background: var(--color-hover, rgba(127,127,127,0.08)); }
+.gc-task-pick-title {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gc-task-pick-meta { color: var(--color-grey-text); flex-shrink: 0; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; flex-wrap: wrap; }
 
 /* ===== Avatar crop / zoom dialog ===== */
@@ -2706,6 +2737,15 @@ p { margin: 0; }
 }
 .toast.error { border-left-color: var(--color-red); }
 .toast.warning { border-left-color: #D97706; }
+.toast-action {
+  margin-left: auto;
+  background: none; border: none; cursor: pointer;
+  padding: 2px 4px;
+  font: inherit; font-weight: 600;
+  color: var(--color-green-primary);
+  text-decoration: underline;
+  flex-shrink: 0;
+}
 @keyframes toastIn {
   0%   { opacity: 0; transform: translateX(28px) translateY(-6px) scale(0.96); }
   60%  { opacity: 1; transform: translateX(-2px) translateY(0) scale(1.01); }
