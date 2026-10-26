@@ -9,3 +9,5 @@ Feature visibility is controlled centrally via `FEATURE_FLAGS` in
 `src/lib/featureFlags.ts` — most non-core features are gated off, not
 deleted. Re-enabling a feature is a one-line flip of its flag; see
 `PHASE.md` for what each flag hides and where.
+
+- Always ask me clarifying questions before proceeding any task until you are 95% sure
