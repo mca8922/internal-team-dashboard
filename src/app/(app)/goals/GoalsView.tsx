@@ -82,6 +82,7 @@ import type {
   GoalViewConfig,
   GoalGrouping,
   GoalSortKey,
+  CascadeOrder,
 } from '@/lib/types';
 
 // Re-exported so existing importers (page.tsx, GoalsTable, GoalsCleanup) keep
@@ -210,8 +211,39 @@ export function GoalsView({
   const topLabel =
     viewerRole === 'intern' && tenureMonths ? `${tenureMonths}-Month Task` : 'Yearly Task';
 
+  // Cascade order within each tier: the stored sort_order ('default', the
+  // order goals arrive in) or by created date. Remembered per-device, like
+  // the view mode below, and captured by saved views.
+  const [cascadeOrder, setCascadeOrder] = React.useState<CascadeOrder>('default');
+  React.useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('goals.cascadeOrder');
+      if (saved === 'newest' || saved === 'oldest' || saved === 'default') setCascadeOrder(saved);
+    } catch {
+      // Storage blocked: fall back to the default order.
+    }
+  }, []);
+  const chooseCascadeOrder = (o: CascadeOrder) => {
+    setCascadeOrder(o);
+    try {
+      window.localStorage.setItem('goals.cascadeOrder', o);
+    } catch {
+      // Storage blocked: the choice still applies for this visit.
+    }
+  };
+  // `goals` re-ordered for the cascade. Every list the cascade derives
+  // (tiers, unlinked, children per parent) reads from this, so one sort here
+  // orders the whole tree. Table, One-Shot and the filtered results sort for
+  // themselves and keep reading `goals`.
+  const cascadeGoals = React.useMemo(() => {
+    if (cascadeOrder === 'default') return goals;
+    const t = (g: Goal) => (g.created_at ? new Date(g.created_at).getTime() : 0);
+    const dir = cascadeOrder === 'newest' ? -1 : 1;
+    return [...goals].sort((a, b) => dir * (t(a) - t(b)));
+  }, [goals, cascadeOrder]);
+
   const { yearly, halfYearly, subYearly, unlinked } = React.useMemo(() => {
-    const byLevel = (lvl: GoalLevel) => goals.filter((g) => g.level === lvl);
+    const byLevel = (lvl: GoalLevel) => cascadeGoals.filter((g) => g.level === lvl);
     const yearly = byLevel('yearly');
     // Everything below the top tier, in cascade order — used for the flat list
     // shown when there's no yearly root to hang the tree off.
@@ -231,7 +263,7 @@ export function GoalsView({
     });
 
     return { yearly, halfYearly: byLevel('half_yearly'), subYearly, unlinked };
-  }, [goals]);
+  }, [cascadeGoals]);
 
   const [selId, setSelId] = React.useState(yearly[0]?.id ?? '');
   // Start with the whole cascade folded. A founder's tree can run to hundreds
@@ -253,17 +285,27 @@ export function GoalsView({
   const LIST_PAGE = 20;
   const LIST_STEP = 40;
   const [listLimit, setListLimit] = React.useState(LIST_PAGE);
-  const showMoreBtn = (total: number) => {
-    if (total <= listLimit) return null;
-    const shown = Math.min(listLimit, total);
+  const showMoreBtn = (total: number) =>
+    loadMorePanel(total, listLimit, LIST_STEP, setListLimit);
+  // The "Showing X of Y" panel with a next page and a show-all escape hatch,
+  // shared by the task lists and the Yearly list.
+  const loadMorePanel = (
+    total: number,
+    limit: number,
+    step: number,
+    setLimit: React.Dispatch<React.SetStateAction<number>>,
+    opts: { noun?: string; className?: string } = {},
+  ) => {
+    if (total <= limit) return null;
+    const shown = Math.min(limit, total);
     const remaining = total - shown;
-    const nextChunk = Math.min(LIST_STEP, remaining);
+    const nextChunk = Math.min(step, remaining);
     const pct = Math.round((shown / total) * 100);
     return (
-      <div className="gb-loadmore">
+      <div className={`gb-loadmore${opts.className ? ` ${opts.className}` : ''}`}>
         <div className="gb-loadmore-info">
           <span className="gb-loadmore-count">
-            Showing <strong>{shown}</strong> of <strong>{total}</strong> tasks
+            Showing <strong>{shown}</strong> of <strong>{total}</strong> {opts.noun ?? 'tasks'}
           </span>
           <span className="gb-loadmore-track">
             <span className="gb-loadmore-fill" style={{ width: `${pct}%` }} />
@@ -273,7 +315,7 @@ export function GoalsView({
           <button
             type="button"
             className="gb-loadmore-btn"
-            onClick={() => setListLimit((n) => n + LIST_STEP)}
+            onClick={() => setLimit((n) => n + step)}
           >
             <Icon name="chevron-down" size={16} />
             Show {nextChunk} more
@@ -282,7 +324,7 @@ export function GoalsView({
             <button
               type="button"
               className="gb-loadmore-all"
-              onClick={() => setListLimit(Number.MAX_SAFE_INTEGER)}
+              onClick={() => setLimit(Number.MAX_SAFE_INTEGER)}
             >
               Show all {total}
             </button>
@@ -314,10 +356,34 @@ export function GoalsView({
   };
   // Table grouping + sort (also captured by saved views).
   const [grouping, setGrouping] = React.useState<GoalGrouping>('due');
-  const [sort, setSort] = React.useState<{ key: GoalSortKey; dir: 'asc' | 'desc' }>({
+  const [sort, setSortState] = React.useState<{ key: GoalSortKey; dir: 'asc' | 'desc' }>({
     key: 'due',
     dir: 'asc',
   });
+  // The table sort is remembered per-device too. Written only from the setter
+  // (not an effect on `sort`) so the initial default never overwrites a
+  // saved choice before it has been read back.
+  React.useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('goals.tableSort');
+      if (!raw) return;
+      const v = JSON.parse(raw) as { key?: string; dir?: string };
+      const keys: GoalSortKey[] = ['title', 'status', 'due', 'progress', 'created'];
+      if (keys.includes(v.key as GoalSortKey) && (v.dir === 'asc' || v.dir === 'desc')) {
+        setSortState({ key: v.key as GoalSortKey, dir: v.dir });
+      }
+    } catch {
+      // Storage blocked or bad JSON: keep the default sort.
+    }
+  }, []);
+  const setSort = (s: { key: GoalSortKey; dir: 'asc' | 'desc' }) => {
+    setSortState(s);
+    try {
+      window.localStorage.setItem('goals.tableSort', JSON.stringify(s));
+    } catch {
+      // Storage blocked: the sort still applies for this visit.
+    }
+  };
   // The goal last jumped to (table row / palette) — drives the breadcrumb.
   const [focused, setFocused] = React.useState<Goal | null>(null);
   // Quick-jump command palette (Cmd/Ctrl+K).
@@ -536,6 +602,21 @@ export function GoalsView({
 
   const sel = yearly.find((g) => g.id === selId) ?? yearly[0] ?? null;
 
+  // The Yearly list (Board pinboard and the members' pill row) is paged like
+  // the task lists: the cards are large, so a long list buried the breakdown.
+  const YEARLY_PAGE = 8;
+  const [yearlyLimit, setYearlyLimit] = React.useState(YEARLY_PAGE);
+  // Never hide the selected Yearly task: a jump-to-task, deep-link or a new
+  // cascade order can select one past the current page, so grow the page
+  // (in whole steps) until it is shown.
+  const selIndex = sel ? yearly.indexOf(sel) : -1;
+  React.useEffect(() => {
+    if (selIndex >= yearlyLimit) {
+      setYearlyLimit(Math.ceil((selIndex + 1) / YEARLY_PAGE) * YEARLY_PAGE);
+    }
+  }, [selIndex, yearlyLimit]);
+  const yearlyShown = yearly.slice(0, yearlyLimit);
+
   const toggle = (id: string) =>
     setCollapsed((c) => {
       const n = new Set(c);
@@ -557,14 +638,14 @@ export function GoalsView({
   // this map each lookup is O(1).
   const childrenByParent = React.useMemo(() => {
     const m = new Map<string, Goal[]>();
-    for (const g of goals) {
+    for (const g of cascadeGoals) {
       if (!g.parent_id) continue;
       const arr = m.get(g.parent_id);
       if (arr) arr.push(g);
       else m.set(g.parent_id, [g]);
     }
     return m;
-  }, [goals]);
+  }, [cascadeGoals]);
   const expandAll = () => setCollapsed(new Set());
   const collapseAll = () => setCollapsed(new Set(parentIds));
 
@@ -643,6 +724,7 @@ export function GoalsView({
     status: statusFilter,
     due: dueFilter,
     assignee: assigneeFilter,
+    cascadeOrder,
   };
   const applyView = (cfg: GoalViewConfig) => {
     chooseView(cfg.view ?? 'cascade');
@@ -653,6 +735,7 @@ export function GoalsView({
     setStatusFilter(cfg.status ?? 'all');
     setDueFilter(cfg.due ?? 'all');
     setAssigneeFilter(cfg.assignee ?? 'all');
+    chooseCascadeOrder(cfg.cascadeOrder ?? 'default');
   };
 
   const submitGoal = async (data: GoalSubmit) => {
@@ -1014,6 +1097,38 @@ export function GoalsView({
           <Icon name="network" size={14} /> One-Shot
         </button>
       </div>
+      {viewMode === 'cascade' ? (
+        <div className="gb-ordersort-wrap">
+          {/* Plain caption OUTSIDE the pill so it never reads as a button. */}
+          <span className="gb-ordersort-label" id="gb-ordersort-label">
+            <Icon name="calendar" size={13} /> Created date:
+          </span>
+          <div
+            className="gb-viewswitch gb-ordersort"
+            role="group"
+            aria-labelledby="gb-ordersort-label"
+          >
+            {(
+              [
+                ['default', 'Default', 'The usual cascade order'],
+                ['newest', 'Newest', 'Newest created first, within each tier'],
+                ['oldest', 'Oldest', 'Oldest created first, within each tier'],
+              ] as const
+            ).map(([key, label, hint]) => (
+              <button
+                key={key}
+                type="button"
+                className={`gb-viewswitch-btn${cascadeOrder === key ? ' active' : ''}`}
+                onClick={() => chooseCascadeOrder(key)}
+                aria-pressed={cascadeOrder === key}
+                title={hint}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <button type="button" className="gb-cmdk-trigger" onClick={() => setCmdkOpen(true)}>
         <Icon name="search" size={14} /> Jump to task
         <kbd className="gb-kbd">Ctrl K</kbd>
@@ -1489,22 +1604,22 @@ export function GoalsView({
         ) : null}
         {isBoard ? (
           <>
-            <div className="gb-section-head">
-              <h2 className="gb-section-title">Yearly Tasks</h2>
-              <p className="gb-section-sub">Pin your big yearly tasks here. Click a card to drill into the breakdown.</p>
-            </div>
-            <div className="gb-pinboard-wrap">
-              <div className="gb-pinboard">
-                <button
-                  type="button"
-                  className="gb-pin-add"
-                  onClick={() => setEditing({ level: 'yearly' })}
-                >
-                  <div className="gb-pin-add-icon">+</div>
-                  New Yearly Task
-                </button>
+              <div className="gb-section-head">
+                <h2 className="gb-section-title">Yearly Tasks</h2>
+                <p className="gb-section-sub">Pin your big yearly tasks here. Click a card to drill into the breakdown.</p>
               </div>
-            </div>
+              <div className="gb-pinboard-wrap">
+                <div className="gb-pinboard">
+                  <button
+                    type="button"
+                    className="gb-pin-add"
+                    onClick={() => setEditing({ level: 'yearly' })}
+                  >
+                    <div className="gb-pin-add-icon">+</div>
+                    New Yearly Task
+                  </button>
+                </div>
+              </div>
           </>
         ) : null}
         {flat.length > 0 ? (
@@ -1710,7 +1825,7 @@ export function GoalsView({
       {isBoard ? (
         <div className="gb-pinboard-wrap">
           <div className="gb-pinboard">
-            {yearly.map((y, i) => {
+            {yearlyShown.map((y, i) => {
               const yBranches = halfYearly.filter((h) => h.parent_id === y.id);
               const isSelected = sel?.id === y.id;
               const rot = i % 3 === 0 ? -1.5 : i % 3 === 1 ? 1.2 : -0.7;
@@ -1785,24 +1900,35 @@ export function GoalsView({
               <div className="gb-pin-add-icon">+</div>
               New Yearly Task
             </button>
+            {/* Footer of the board itself, so it reads as part of the Yearly
+                list rather than a separate block under it. */}
+            {loadMorePanel(yearly.length, yearlyLimit, YEARLY_PAGE, setYearlyLimit, {
+              noun: 'yearly tasks',
+              className: 'gb-loadmore-inboard',
+            })}
           </div>
         </div>
       ) : (
         /* ── Non-board: original pill selector ── */
         yearly.length > 1 ? (
-          <div className="gb-switch">
-            {yearly.map((y) => (
-              <button
-                key={y.id}
-                type="button"
-                className={`gb-pill ${sel?.id === y.id ? 'active' : ''}`}
-                onClick={() => setSelId(y.id)}
-              >
-                <span className="gb-pill-title">{y.title}</span>
-                <span className="gb-pill-pct">{y.progress || 0}%</span>
-              </button>
-            ))}
-          </div>
+          <>
+            <div className="gb-switch">
+              {yearlyShown.map((y) => (
+                <button
+                  key={y.id}
+                  type="button"
+                  className={`gb-pill ${sel?.id === y.id ? 'active' : ''}`}
+                  onClick={() => setSelId(y.id)}
+                >
+                  <span className="gb-pill-title">{y.title}</span>
+                  <span className="gb-pill-pct">{y.progress || 0}%</span>
+                </button>
+              ))}
+            </div>
+            {loadMorePanel(yearly.length, yearlyLimit, YEARLY_PAGE, setYearlyLimit, {
+              noun: 'yearly tasks',
+            })}
+          </>
         ) : null
       )}
 

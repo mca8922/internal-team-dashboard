@@ -31,6 +31,7 @@ import {
   deriveGoalStatus,
 } from './goal-ui';
 import { dueBucket, BUCKET_META } from '@/lib/goal-buckets';
+import { fmtDateDMY } from '@/lib/dates';
 import type { AssigneeChip, AssignerInfo } from './GoalsView';
 import type { Goal, GoalStatus, GoalGrouping, GoalSortKey } from '@/lib/types';
 
@@ -72,6 +73,8 @@ interface Row {
   depts: string;
   search: string;
   pct: number;
+  created: string; // display date, e.g. "04-11-2026"
+  createdMs: number;
 }
 
 function groupKeyOf(r: Row, grouping: GoalGrouping): string {
@@ -122,6 +125,8 @@ function cmp(a: Row, b: Row, key: GoalSortKey): number {
     case 'due':
       // Both undated (Infinity - Infinity = NaN) would poison the comparator.
       return a.days === b.days ? 0 : a.days - b.days; // no due date sorts last
+    case 'created':
+      return a.createdMs - b.createdMs;
   }
 }
 
@@ -186,6 +191,7 @@ const TableRow = React.memo(function TableRow({
         {chips.length === 0 ? <span className="gb-td-team-empty">-</span> : null}
       </span>
       <span className={`gb-td gb-td-due${overdue ? ' over' : ''}`}>{row.due}</span>
+      <span className="gb-td gb-td-created">{row.created}</span>
       <span className="gb-td gb-td-pct">{row.pct}%</span>
     </div>
   );
@@ -270,6 +276,8 @@ export function GoalsTable({
         depts: goalDepts(g).join(', '),
         search: `${g.title} ${hit.text}`.toLowerCase(),
         pct: g.progress ?? 0,
+        created: g.created_at ? fmtDateDMY(g.created_at) : '-',
+        createdMs: g.created_at ? new Date(g.created_at).getTime() : 0,
       };
     });
     // Drop cache entries for goals that no longer exist.
@@ -420,6 +428,14 @@ export function GoalsTable({
       <span className="gb-th gb-th-team">Team</span>
       <button type="button" className="gb-th gb-th-due" onClick={() => toggleSort('due')}>
         Due <span className="gb-sort">{sortCaret('due')}</span>
+      </button>
+      <button
+        type="button"
+        className="gb-th gb-th-created"
+        onClick={() => toggleSort('created')}
+        title="Sort by the date the task was added"
+      >
+        Created <span className="gb-sort">{sortCaret('created')}</span>
       </button>
       <button type="button" className="gb-th gb-th-pct" onClick={() => toggleSort('progress')}>
         % <span className="gb-sort">{sortCaret('progress')}</span>
