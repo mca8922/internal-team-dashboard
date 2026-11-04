@@ -192,7 +192,10 @@ export interface Goal {
 // flip between presets ("My overdue", "Sales this month", …). Stored as JSON in
 // goal_saved_views.config.
 export type GoalGrouping = 'due' | 'department' | 'status' | 'level' | 'none';
-export type GoalSortKey = 'title' | 'status' | 'due' | 'progress';
+export type GoalSortKey = 'title' | 'status' | 'due' | 'progress' | 'created';
+// Cascade ordering within each tier. 'default' is the stored sort_order (the
+// order the server hands goals back in); newest/oldest sort by created_at.
+export type CascadeOrder = 'default' | 'newest' | 'oldest';
 
 export interface GoalViewConfig {
   view: 'cascade' | 'table' | 'canvas';
@@ -205,6 +208,9 @@ export interface GoalViewConfig {
   // 'all' or a member id. Optional so views saved before this filter existed
   // still load (missing == 'all').
   assignee?: string;
+  // Optional so views saved before the cascade order toggle existed still
+  // load (missing == 'default').
+  cascadeOrder?: CascadeOrder;
 }
 
 export interface SavedView {

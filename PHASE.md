@@ -987,6 +987,28 @@ itself doesn't change anyone's permissions.
   own-task actions refuse. Like `executiveTasks`, it does not roll back 0070's
   RLS. The Activity tab stays, under `goalsCleanup`.
 
+## Sort tasks by created date (branch `feature/task-created-sort`, no migration, no flag)
+
+Uses the `created_at` every task already has. Open to everyone who can see
+the Tasks page.
+
+- **Table view:** new **Created** column (DD-MM-YYYY, IST). Click the header
+  to sort oldest first, click again for newest first, same as the other
+  columns. Hidden on phone widths along with Status/Team/Due.
+- **Cascade view:** a **Created: Default / Newest / Oldest** toggle beside
+  the view switcher (shown only in Cascade). Default keeps the usual
+  `sort_order`; Newest/Oldest reorder tasks within each tier and under each
+  parent. The tree shape is unchanged.
+- **One-Shot** and the filtered results list keep their own ordering.
+- Both choices are remembered per device (`goals.tableSort`,
+  `goals.cascadeOrder` in localStorage) and captured by Board saved views
+  (`GoalViewConfig.cascadeOrder`, optional so older saved views still load).
+- **Yearly list paging:** the Yearly list (Board pinboard and the members'
+  pill row) shows 8 at a time with the same "Show more / Show all" panel as
+  the task lists. On the pinboard it is the board's own footer, inside its
+  border under the cards. The selected Yearly task is never hidden: if a jump,
+  deep-link or new order selects one past the page, the page grows to it.
+
 ## Phase 2 — Backlog (historical: what each flag hid in Phase 1)
 
 All of these are now unlocked — see "Phase 2 — status" above. Table kept for
