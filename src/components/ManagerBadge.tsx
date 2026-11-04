@@ -25,16 +25,72 @@ export function ManagerBadge({
   }
 
   return (
+    <RoleBadge
+      icon="crown"
+      kicker="Department Manager"
+      label={`Head of ${department}`}
+      accent={accent}
+    />
+  );
+}
+
+// The shared two-line glossy badge beside the dashboard greeting. Each tier
+// has its own icon and accent: Director (brand gold, star), Department
+// Manager (department colour, crown), Executive (department colour, shield).
+export function RoleBadge({
+  icon,
+  kicker,
+  label,
+  accent,
+}: {
+  icon: 'crown' | 'star-filled' | 'shield';
+  kicker: string;
+  label: string;
+  accent?: string | null;
+}) {
+  const style = accent ? ({ '--dept': accent } as React.CSSProperties) : undefined;
+  return (
     <div className="mgr-badge mgr-badge-full" style={style}>
       <span className="mgr-badge-glow" aria-hidden />
       <span className="mgr-badge-crown">
-        <Icon name="crown" size={18} />
+        <Icon name={icon} size={18} />
       </span>
       <span className="mgr-badge-text">
-        <span className="mgr-badge-kicker">Department Manager</span>
-        <span className="mgr-badge-dept">Head of {department}</span>
+        <span className="mgr-badge-kicker">{kicker}</span>
+        <span className="mgr-badge-dept">{label}</span>
       </span>
       <span className="mgr-badge-shine" aria-hidden />
     </div>
+  );
+}
+
+// Picks the right greeting badge for a profile: Director for the Board, the
+// Manager badge for a department head, Executive for everyone else.
+export function GreetingRoleBadge({
+  isBoard,
+  managedDepartment,
+  department,
+  accent,
+}: {
+  isBoard: boolean;
+  managedDepartment: string | null;
+  department: string;
+  accent?: string | null;
+}) {
+  if (isBoard) {
+    return (
+      <RoleBadge
+        icon="star-filled"
+        kicker="Board Member"
+        label="Director"
+        accent="var(--color-gold-primary)"
+      />
+    );
+  }
+  if (managedDepartment) {
+    return <ManagerBadge department={managedDepartment} accent={accent} />;
+  }
+  return (
+    <RoleBadge icon="shield" kicker="Executive" label={`${department} team`} accent={accent} />
   );
 }
