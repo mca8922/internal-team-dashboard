@@ -1,7 +1,7 @@
 'use client';
 
 // One pending-leave row on the dashboard. Excludes the viewer's own request
-// (see dashboard/page.tsx's reviewableList — you can't review your own
+// (see dashboard/page.tsx's reviewableList: you can't review your own
 // leave). A Board Member who is not the Founder can only *accept* (a
 // pre-approval awaiting Founder sign-off); the Founder finalises and may
 // delete the log.
@@ -68,11 +68,13 @@ export function LeaveReviewRow({
 
   return (
     <div
-      className="flex items-center gap-3"
+      className="flex items-start gap-3"
       style={{ padding: 10, borderRadius: 6, background: 'var(--color-bg)' }}
     >
       <Avatar name={userName} size="sm" src={userAvatarUrl} />
-      <div className="flex-1">
+      <div className="flex-1" style={{ minWidth: 0 }}>
+        {/* Name and details get the full row width; actions sit on their
+            own line below so they never squeeze the name. */}
         <div className="text-sm fw-medium">{userName}</div>
         <div className="text-xs text-grey">
           {type} · {range}
@@ -82,55 +84,64 @@ export function LeaveReviewRow({
             Accepted by {preApproverName} · {isFounder ? 'awaiting you' : 'awaiting Founder approval'}
           </div>
         ) : null}
+        <div
+          className="flex items-center"
+          style={{ gap: 8, marginTop: 10, flexWrap: 'wrap' }}
+        >
+          {isFounder ? (
+            <>
+              <Button size="sm" icon="check" disabled={pending} onClick={() => decide('approved')}>
+                {preApproverName ? 'Finalize' : 'Approve'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => decide('rejected')}
+              >
+                Decline
+              </Button>
+              <span style={{ marginLeft: 'auto' }}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="trash"
+                  disabled={pending}
+                  onClick={remove}
+                  aria-label="Delete leave request"
+                  title="Delete leave request"
+                />
+              </span>
+            </>
+          ) : preApproverName ? (
+            <>
+              <span className="badge badge-amber">Awaiting Founder approval</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => decide('rejected')}
+              >
+                Decline
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button size="sm" icon="check" disabled={pending} onClick={() => decide('approved')}>
+                Accept
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => decide('rejected')}
+              >
+                Decline
+              </Button>
+            </>
+          )}
+        </div>
       </div>
-      {isFounder ? (
-        <>
-          <Button size="sm" icon="check" disabled={pending} onClick={() => decide('approved')}>
-            {preApproverName ? 'Finalize' : 'Approve'}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={pending}
-            onClick={() => decide('rejected')}
-          >
-            Decline
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon="trash"
-            disabled={pending}
-            onClick={remove}
-          />
-        </>
-      ) : preApproverName ? (
-        <>
-          <span className="badge badge-amber">Awaiting Founder approval</span>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={pending}
-            onClick={() => decide('rejected')}
-          >
-            Decline
-          </Button>
-        </>
-      ) : (
-        <>
-          <Button size="sm" icon="check" disabled={pending} onClick={() => decide('approved')}>
-            Accept
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={pending}
-            onClick={() => decide('rejected')}
-          >
-            Decline
-          </Button>
-        </>
-      )}
     </div>
   );
 }

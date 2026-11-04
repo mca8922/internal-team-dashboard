@@ -33,13 +33,14 @@ import {
 } from '@/lib/dates';
 import { targetHours, roleLabel, isFounder, isManager } from '@/lib/roles';
 import { LEVEL_META, deriveGoalStatus } from '@/app/(app)/goals/goal-ui';
-import { ManagerBadge } from '@/components/ManagerBadge';
+import { GreetingRoleBadge } from '@/components/ManagerBadge';
 import { PunchWidget } from './PunchWidget';
 import { StreakCard } from '@/components/StreakCard';
 import { TeamPulse } from '@/components/TeamPulse';
 import type { TeamPulseData, PulseWorking, PulseAway, PulseRequest } from '@/components/TeamPulse';
 import { LeaveReviewRow } from './LeaveReviewRow';
 import { BirthdayBanner } from './BirthdayBanner';
+import { DayArc, dayPhase } from './DayArc';
 import type { Profile, Punch, UserRole } from '@/lib/types';
 import { MilestoneReplayButton } from '@/components/MilestoneReplayButton';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
@@ -88,30 +89,56 @@ function Greeting({
     year: 'numeric',
   }).format(now);
   const firstName = name.split(' ')[0];
+  const minutes =
+    Number(
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        minute: '2-digit',
+      }).format(now),
+    ) + h * 60;
+  const tenure = tenureLabel(joinedDate, now);
   return (
-    <div className="greeting-block">
-      <div
-        className="text-xs text-grey fw-medium greet-eyebrow"
-        style={{ letterSpacing: '0.06em', textTransform: 'uppercase' }}
-      >
-        {dateLine} · Week {weekNumber(now)}
+    <div className="greeting-block greet-hero" data-phase={dayPhase(h)}>
+      <div className="greet-hero__text">
+        <div
+          className="text-xs text-grey fw-medium greet-eyebrow"
+          style={{ letterSpacing: '0.06em', textTransform: 'uppercase' }}
+        >
+          {dateLine} · Week {weekNumber(now)}
+        </div>
+        <div className="flex items-center gap-3" style={{ flexWrap: 'wrap' }}>
+          <h1 className="text-3xl mt-1 greet-line">
+            <span className="greet-hello">{greeting},</span>
+            {/* Same bright shine sweep as "Execution Excellence" on Goals. */}
+            <span className="text-shine">{firstName}</span>
+          </h1>
+          {badge}
+        </div>
+        <div className="greet-since">
+          <span>Member since {fmtFriendly(parseDate(joinedDate))}</span>
+          {tenure ? <span className="greet-tenure">{tenure}</span> : null}
+        </div>
+        {FEATURE_FLAGS.dashboardExtras ? (
+          <MilestoneReplayButton joinedDate={joinedDate} role={role} internshipMonths={internshipMonths} />
+        ) : null}
       </div>
-      <div className="flex items-center gap-3" style={{ flexWrap: 'wrap' }}>
-        <h1 className="text-3xl mt-1 greet-line">
-          <span className="greet-hello">{greeting},</span>
-          {/* Same bright shine sweep as "Execution Excellence" on Goals. */}
-          <span className="text-shine">{firstName}</span>
-        </h1>
-        {badge}
-      </div>
-      <div className="text-xs text-grey mt-1 greet-since">
-        Member since {fmtFriendly(parseDate(joinedDate))}
-      </div>
-      {FEATURE_FLAGS.dashboardExtras ? (
-        <MilestoneReplayButton joinedDate={joinedDate} role={role} internshipMonths={internshipMonths} />
-      ) : null}
+      <DayArc minutes={minutes} />
     </div>
   );
+}
+
+// "34 yrs with the firm", "5 mos with the firm", or "New here" in the first
+// month. Null if the joined date is in the future or unreadable.
+function tenureLabel(joinedDate: string, now: Date): string | null {
+  const j = parseDate(joinedDate);
+  if (Number.isNaN(j.getTime()) || j > now) return null;
+  let months =
+    (now.getFullYear() - j.getFullYear()) * 12 + (now.getMonth() - j.getMonth());
+  if (now.getDate() < j.getDate()) months -= 1;
+  if (months < 1) return 'New here';
+  if (months < 12) return `${months} mo${months === 1 ? '' : 's'} with the firm`;
+  const years = Math.floor(months / 12);
+  return `${years} yr${years === 1 ? '' : 's'} with the firm`;
 }
 
 // Department check-in — Board only, right column (Phase 3). Replaces the
@@ -217,13 +244,13 @@ export default async function DashboardPage() {
   // (the Board sees all).
   const goals = visibleGoals(allGoals, assignees, profile);
 
-  // Department-manager badge accent — getDepartmentColors is React.cache()d and
-  // already fetched by the layout this request, so this is effectively free.
+  // Greeting role badge accent: a Manager's badge takes the colour of the
+  // department they head, an Executive's the colour of their own department
+  // (Directors use brand gold, set in the badge). getDepartmentColors is
+  // React.cache()d and already fetched by the layout, so this is effectively free.
   const isMgr = isManager(profile);
-  const managedColor =
-    isMgr && profile.managed_department
-      ? (await getDepartmentColors())[profile.managed_department] ?? null
-      : null;
+  const badgeDept = isMgr && profile.managed_department ? profile.managed_department : profile.department;
+  const badgeColor = isBoard ? null : (await getDepartmentColors())[badgeDept] ?? null;
 
   const todayPunches = myPunches.filter((p) => p.work_date === today);
   // A session that began late last night and is still running counts as being
@@ -486,9 +513,12 @@ export default async function DashboardPage() {
           role={profile.role}
           internshipMonths={profile.internship_months}
           badge={
-            isMgr && profile.managed_department ? (
-              <ManagerBadge department={profile.managed_department} accent={managedColor} />
-            ) : null
+            <GreetingRoleBadge
+              isBoard={isBoard}
+              managedDepartment={isMgr ? profile.managed_department ?? null : null}
+              department={profile.department}
+              accent={badgeColor}
+            />
           }
         />
       </div>
