@@ -706,48 +706,54 @@ export function LeavesView({
           <div className="card-header">
             <div className="card-subtitle">Pending approvals · {pendingLeaves.length}</div>
           </div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Person</th>
-                <th>Type</th>
-                <th>Dates</th>
-                <th>Reason</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {pendingLeaves.map((l) => (
-                <tr key={l.id} data-leave-id={l.id} className={l.id === flashLeaveId ? 'leave-flash' : ''}>
-                  <td className="fw-medium flex items-center gap-2">
-                    <Avatar name={l.userName} size="sm" src={l.userAvatarUrl} />
-                    {l.userName}
-                  </td>
-                  <td>
-                    <span className="badge badge-slate" style={{ textTransform: 'capitalize' }}>
-                      {l.type}
-                    </span>
-                  </td>
-                  <td>
-                    {fmtShort(parseDate(l.start_date))}
-                    {l.start_date !== l.end_date
-                      ? ` - ${fmtShort(parseDate(l.end_date))}`
-                      : ''}
-                  </td>
-                  <td className="text-grey">
-                    {l.reason}
-                    {l.pre_approved_by ? (
-                      <div className="text-xs" style={{ color: 'var(--color-amber-text)' }}>
-                        Accepted by {l.preApproverName ?? 'a Board Member'} · awaiting Founder
-                        approval
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="text-right">{reviewActions(l)}</td>
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Person</th>
+                  <th>Type</th>
+                  <th>Dates</th>
+                  <th>Reason</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pendingLeaves.map((l) => (
+                  <tr key={l.id} data-leave-id={l.id} className={l.id === flashLeaveId ? 'leave-flash' : ''}>
+                    <td className="fw-medium cell-nowrap">
+                      <div className="leave-person">
+                        <Avatar name={l.userName} size="sm" src={l.userAvatarUrl} />
+                        <span>{l.userName}</span>
+                      </div>
+                    </td>
+                    <td className="cell-nowrap">
+                      <span className="badge badge-slate" style={{ textTransform: 'capitalize' }}>
+                        {l.type}
+                      </span>
+                    </td>
+                    <td className="cell-nowrap">
+                      {fmtShort(parseDate(l.start_date))}
+                      {l.start_date !== l.end_date
+                        ? ` - ${fmtShort(parseDate(l.end_date))}`
+                        : ''}
+                    </td>
+                    <td className="text-grey cell-wrap">
+                      {l.reason}
+                      {l.pre_approved_by ? (
+                        <div className="text-xs" style={{ color: 'var(--color-amber-text)' }}>
+                          Accepted by {l.preApproverName ?? 'a Board Member'} · awaiting Founder
+                          approval
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="text-right cell-nowrap">
+                      <div className="leave-actions">{reviewActions(l)}</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -849,6 +855,7 @@ export function LeavesView({
             title={leaves.length === 0 ? 'No leave history yet' : 'No leaves match these filters'}
           />
         ) : (
+          <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -863,20 +870,20 @@ export function LeavesView({
             <tbody>
               {listForTable.map((l) => (
                 <tr key={l.id} data-leave-id={l.id} className={l.id === flashLeaveId ? 'leave-flash' : ''}>
-                  {isBoard ? <td className="fw-medium">{l.userName}</td> : null}
-                  <td>
+                  {isBoard ? <td className="fw-medium cell-nowrap">{l.userName}</td> : null}
+                  <td className="cell-nowrap">
                     <span className="badge badge-slate" style={{ textTransform: 'capitalize' }}>
                       {l.type}
                       {l.is_half_day ? ' · ½' : ''}
                     </span>
                   </td>
-                  <td>
+                  <td className="cell-nowrap">
                     {fmtShort(parseDate(l.start_date))}
                     {l.start_date !== l.end_date
                       ? ` - ${fmtShort(parseDate(l.end_date))}`
                       : ''}
                   </td>
-                  <td className="text-grey">{l.reason || '-'}</td>
+                  <td className="text-grey cell-wrap">{l.reason || '-'}</td>
                   <td>
                     <span
                       className={`badge ${
@@ -917,6 +924,7 @@ export function LeavesView({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

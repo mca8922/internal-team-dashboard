@@ -267,11 +267,11 @@ export function EmailAdmin({
               <tbody>
                 {logs.map((l) => (
                   <tr key={l.id}>
-                    <td className="fw-medium">
+                    <td className="fw-medium cell-nowrap">
                       {l.recipient_name}
                       <div className="text-xs text-grey">{l.recipient_email}</div>
                     </td>
-                    <td>
+                    <td className="cell-wrap">
                       <span className="badge badge-slate">
                         {EVENT_LABEL[l.event_type] ?? l.event_type}
                       </span>
@@ -289,7 +289,7 @@ export function EmailAdmin({
                         </div>
                       ) : null}
                     </td>
-                    <td className="text-grey">{fmtAt(l.created_at)}</td>
+                    <td className="text-grey cell-nowrap">{fmtAt(l.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

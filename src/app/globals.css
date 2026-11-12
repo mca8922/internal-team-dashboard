@@ -4349,6 +4349,28 @@ body { font-size: 15px; }
   }
 }
 
+/* Table cell wrapping helpers. Short columns (names, types, dates, actions)
+   take .cell-nowrap so they never break mid-name; the one long free-text
+   column takes .cell-wrap and absorbs the spare width (it also overrides the
+   mobile rule that makes every .data-table nowrap, so long text wraps instead
+   of producing a huge one-line scroll). Layout inside a cell (avatar + name)
+   goes on an inner div: a flex <td> drops out of the table row and its
+   border/height stop lining up with the rest of the row. */
+/* Lets a wide table scroll inside its card instead of spilling out of it. */
+.table-scroll { max-width: 100%; overflow-x: auto; }
+.data-table .cell-nowrap { white-space: nowrap; }
+.data-table .cell-wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 220px;
+  width: 100%;
+}
+.leave-person { display: flex; align-items: center; gap: 8px; }
+.leave-actions {
+  display: inline-flex; align-items: center; justify-content: flex-end;
+  gap: 4px; flex-wrap: nowrap;
+}
+
 /* ── Lifecycle card states ──────────────────────────────────────────────
    Active goals keep the per-tier look above. Once a goal passes its due date
    it reads differently so the cascade is scannable at a glance:

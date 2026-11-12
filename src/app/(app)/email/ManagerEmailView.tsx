@@ -42,6 +42,7 @@ export function ManagerEmailView({
           <div className="card-subtitle mb-3">
             Transactional emails · {txnLogs.length}
           </div>
+          <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -55,16 +56,16 @@ export function ManagerEmailView({
             <tbody>
               {txnLogs.map((l) => (
                 <tr key={l.id}>
-                  <td className="fw-medium">
+                  <td className="fw-medium cell-nowrap">
                     {l.recipient_name}
                     <div className="text-xs text-grey">{l.recipient_email}</div>
                   </td>
                   <td>{String(l.event_type).replace(/_/g, ' ')}</td>
-                  <td className="text-grey">{l.subject}</td>
+                  <td className="text-grey cell-wrap">{l.subject}</td>
                   <td>
                     <StatusPill status={l.status} />
                   </td>
-                  <td style={{ textAlign: 'right' }} className="text-xs text-grey">
+                  <td style={{ textAlign: 'right' }} className="text-xs text-grey cell-nowrap">
                     {l.created_at
                       ? `${fmtDateDMY(new Date(l.created_at))} · ${fmtTime(new Date(l.created_at))}`
                       : '-'}
@@ -73,6 +74,7 @@ export function ManagerEmailView({
               ))}
             </tbody>
           </table>
+          </div>
         </section>
       )}
     </div>
