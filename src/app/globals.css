@@ -13843,8 +13843,14 @@ button.gb-health-tile.red:hover { border-color: var(--color-red); }
   .pulse-panel { max-width: min(400px, 88vw); }
 }
 
-/* On a narrow phone the panel just spans the card instead of the chip. */
+/* On a narrow phone the panel just spans the card instead of the chip. The
+   chip stops being the positioning context and the chip row takes over, so
+   left/right 0 stretch the panel across the full row width rather than the
+   width of one small pill (which crushed the name column to a letter wide). */
 @media (max-width: 640px) {
+  .pulse-chips { position: relative; }
+  .pulse-chip { position: static; }
+  .pulse-row { grid-template-columns: 30px minmax(110px, 1fr) auto; }
   .pulse-panel,
   .pulse-panel--left,
   .pulse-panel--right {
